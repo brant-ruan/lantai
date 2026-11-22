@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>兰台 Lantai：你和 Agent 一起写的工作日志</title>
+  <meta name="description" content="Agent 记下过程，你写下意义。兰台从 Agent 会话起草日报、周报和月报，你在旁边写下会话里没有的部分。本地优先、开源。">
+  <link rel="canonical" href="https://lantai.wohin.me/zh/">
+  <link rel="alternate" hreflang="en" href="https://lantai.wohin.me/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lantai.wohin.me/zh/">
+  <link rel="alternate" hreflang="x-default" href="https://lantai.wohin.me/">
+  <link rel="icon" type="image/png" href="../assets/favicon.png">
+  <link rel="apple-touch-icon" href="../assets/icon.png">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://lantai.wohin.me/zh/">
+  <meta property="og:title" content="兰台 Lantai：你和 Agent 一起写的工作日志">
+  <meta property="og:description" content="Agent 记下过程，你写下意义。一份由你和 Agent 共同书写、留在本机的工作日志。">
+  <meta property="og:image" content="https://lantai.wohin.me/assets/icon.png">
+  <meta property="og:locale" content="zh_CN">
+  <meta name="twitter:card" content="summary">
+  <link rel="stylesheet" href="../assets/site.css">
+  <link rel="stylesheet" href="../assets/demo.css">
+  <script src="../assets/site.js"></script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="兰台首页">
+      <img src="../assets/icon.png" alt="" width="30" height="30">
+      <span>兰台 <span class="zh">Lantai</span></span>
+    </a>
+    <nav class="nav" aria-label="页面章节">
+      <a href="#hands">两种笔迹</a>
+      <a href="#how">工作方式</a>
+      <a href="#features">功能</a>
+      <a href="#privacy">隐私</a>
+      <a href="#start">开始使用</a>
+      <a href="#story">初衷</a>
+    </nav>
+    <div class="header-actions">
+      <a class="icon-btn lang-switch" href="../" lang="en" hreflang="en" title="English version">EN</a>
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="切换主题">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg>
+      </button>
+      <a class="icon-btn" href="https://github.com/brant-ruan/lantai" aria-label="兰台的 GitHub 仓库">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.8a10.2 10.2 0 0 0-3.2 19.9c.5.1.7-.2.7-.5v-1.8c-2.9.6-3.5-1.2-3.5-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.3-.3-4.7-1.1-4.7-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .9-.3 2.8 1a9.6 9.6 0 0 1 5.1 0c1.9-1.3 2.8-1 2.8-1 .6 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.7 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10.2 10.2 0 0 0 12 1.8z"/></svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="wrap hero-top">
+      <div class="hero-text">
+        <div class="eyebrow">你和 Agent 一起写的工作日志</div>
+        <h1>Agent 记下过程，你写下<em>意义</em>。</h1>
+        <p class="lead">兰台读取 Agent 留在本机的会话，起草日报、周报和月报，每条结论都能追溯到原始对话。在它旁边，你写下会话里没有的东西。</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="#start">开始使用</a>
+          <a class="btn btn-ghost" href="https://github.com/brant-ruan/lantai">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.8a10.2 10.2 0 0 0-3.2 19.9c.5.1.7-.2.7-.5v-1.8c-2.9.6-3.5-1.2-3.5-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.3-.3-4.7-1.1-4.7-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .9-.3 2.8 1a9.6 9.6 0 0 1 5.1 0c1.9-1.3 2.8-1 2.8-1 .6 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.7 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10.2 10.2 0 0 0 12 1.8z"/></svg>
+            在 GitHub 上查看
+          </a>
+        </div>
+      </div>
+      <div class="rollup hero-figure" data-rollup role="img" aria-label="会话汇成一天，一天天汇成一周，一周周汇成一个月。"></div>
+    </div>
+
+    <div class="wrap hero-visual">
+      <div class="lt-demo" id="lantai-demo" aria-label="兰台桌面端的交互演示">
+        <noscript><p style="padding:24px">交互演示需要启用 JavaScript。</p></noscript>
+      </div>
+      <p class="demo-caption">这是一个可以操作的演示，数据均为虚构。试试切换视图、点击 <code>[#S5.T2]</code> 这样的锚点、把会话移到别的项目再点 Update，或者只看你写的内容。</p>
+      <p class="meta"><span>开源</span><span>macOS 桌面应用与命令行</span><span>早期开发中</span></p>
+    </div>
+  </section>
+
+  <!-- Problem -->
+  <section class="section" id="why">
+    <div class="wrap problem">
+      <div class="reveal">
+        <div class="eyebrow">问题</div>
+        <h2>一天的工作散落在十几个会话里，还有一部分不在任何会话里。</h2>
+        <p>改了什么、为什么改、在哪里卡住，这些都在对话里，提交记录里几乎没有。到了周五就全忘了。</p>
+        <p>而和同事的一次讨论、在真机上的一次测试、事情最后成没成，没有哪个会话看得见。Agent 能替我们做出很好的结果，却没法替我们度过这一天。</p>
+      </div>
+      <div class="scatter reveal" aria-hidden="true">
+        <div class="chip"><time>09:12</time>排查重复扣款<span class="agent">Claude Code</span></div>
+        <div class="chip"><time>10:47</time>Webhook 测试为什么不稳定？<span class="agent">Codex CLI</span></div>
+        <div class="chip"><time>13:05</time>带退避的重试队列<span class="agent">Claude Code</span></div>
+        <div class="chip chip-human"><time>14:30</time>和 Alex 过了一遍退款方案<span class="agent">你</span></div>
+        <div class="chip"><time>15:30</time>重写快速上手<span class="agent">Antigravity</span></div>
+        <div class="chip"><time>17:18</time>zsh 补全<span class="agent">Codex CLI</span></div>
+        <div class="chip chip-human"><time>19:40</time>结账流程在真机上终于跑通了<span class="agent">你</span></div>
+        <div class="chip"><time>21:40</time>先看一眼退款流程<span class="agent">Claude Code</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Two hands -->
+  <section class="section" id="hands">
+    <div class="wrap hands">
+      <div class="hands-figure reveal" data-svg="../assets/two-hands.svg">
+        <img src="../assets/two-hands.svg" alt="" width="520" height="420">
+      </div>
+      <div class="hands-text reveal">
+        <div class="eyebrow">两种笔迹，一份日志</div>
+        <h2>Agent 起草，你落笔。</h2>
+        <p class="hands-lead">两种笔迹在同一页上，每个项目一份大纲，彼此分得清。紫色是你写的，重新生成报告也不会碰它。</p>
+        <div class="hand hand-agent">
+          <h3>Agent 写</h3>
+          <ul><li>会话里发生了什么：做了什么、改了哪里、在哪里卡住</li><li>每条结论都锚定到原始轮次，由程序校验</li><li>每次重新生成或更新，都是一份新的草稿</li></ul>
+        </div>
+        <div class="hand hand-human">
+          <h3>你写</h3>
+          <ul><li>会话之外发生了什么，事情成没成</li><li>当天与项目的笔记，以及对 Agent 要点的批注</li><li>项目页上的背景与计划</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section" id="how">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="eyebrow">工作方式</div>
+        <h2>收拢、起草、落笔。</h2>
+        <p>整理日志应该是每晚几分钟的小仪式，而不是一键生成的黑箱。</p>
+      </div>
+      <div class="steps">
+        <div class="step reveal">
+          <div class="num">1</div>
+          <h3>收拢</h3>
+          <p>兰台增量读取各个 Agent 的会话文件，按天切分长会话。你把它们放进自己建好的项目，忽略无关的；规则和模型给出建议，由你确认。</p>
+        </div>
+        <div class="step reveal">
+          <div class="num">2</div>
+          <h3>起草</h3>
+          <p>每个会话先压缩成带缓存的摘要，模型再按项目起草报告：核心结论在前，细节与锚点在后。周报和月报在日报的基础上汇总。</p>
+        </div>
+        <div class="step reveal">
+          <div class="num">3</div>
+          <h3>落笔</h3>
+          <p>在草稿旁边写下只有你知道的事：当天与项目的笔记、对 Agent 要点的批注。还没生成报告时，也可以先写。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="eyebrow">功能</div>
+        <h2>不只追求快，更要经得起核对。</h2>
+        <p>报告只有能核对才有用。兰台让每一句话都能找到背后的那段工作。</p>
+      </div>
+      <div class="features reveal">
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/><path d="M14 20h6"/></svg>
+          <h3>两种笔迹，一份日志</h3>
+          <p>Agent 的草稿和你的笔记在同一页上。紫色是你写的；可以切换为两者并排、只看 Agent 或只看你写的。</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m8 12 3 3 5-6"/></svg>
+          <h3>你来归类，模型起草</h3>
+          <p>项目由你定义。目录、远程仓库规则或模型给出建议，你接受后才归入。可以框选多个会话，一次移动或忽略。</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+          <h3>每条结论可追溯</h3>
+          <p>结论带有 <code>[#S12.T5]</code> 这样的锚点，点开就是它出自的那一轮对话。锚点由程序校验，模型编造的会被剔除。</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.5-4.5L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.5 4.5L20 16"/><path d="M20 20.5V16h-4.5"/></svg>
+          <h3>你写的字经得起重写</h3>
+          <p>点 Update 只重写有变化的项目。你的笔记永远不会被改动，你改过的 Agent 原文也原样保留，并带有修订标记。</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+          <h3>日报、周报、月报</h3>
+          <p>周报按项目把一周的工作聚类成事项，月报在周报之上汇总。项目视图可以按天、周或月回顾任意项目，笔记也在其中。</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 20.5h16"/><path d="M7 17v-5M12 17V7M17 17v-8"/></svg>
+          <h3>工作统计看板</h3>
+          <p>活跃时长（并行会话只算一次）、连续活跃天数、常用工具、每天的工作节律，以及各模型的 Token 用量与缓存命中率。</p>
+        </div>
+      </div>
+      <div class="agents reveal">
+        <span class="label">支持读取</span>
+        <div class="agents-marquee">
+          <div class="agents-track">
+            <span class="a"><img src="../assets/agents/claudecode.svg" alt="" width="18" height="18">Claude Code</span>
+            <span class="a"><img src="../assets/agents/codex.svg" alt="" width="18" height="18">Codex CLI</span>
+            <span class="a"><img src="../assets/agents/antigravity.svg" alt="" width="18" height="18">Antigravity</span>
+            <span class="a"><img src="../assets/agents/deepseek.svg" alt="" width="18" height="18">DeepSeek Harness</span>
+            <span class="a"><img src="../assets/agents/workbuddy.svg" alt="" width="18" height="18">WorkBuddy</span>
+            <span class="a"><img src="../assets/agents/opencode.svg" alt="" width="18" height="18">OpenCode</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section class="section band" id="privacy">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="eyebrow">隐私</div>
+        <h2>你的会话只留在你的电脑上。</h2>
+        <p>Agent 日志里有私有代码、文件路径，有时还有密钥。兰台按这个标准对待它们。</p>
+      </div>
+      <div class="promises reveal">
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+          <div><h3>始终只读</h3><p>兰台从不写入、移动或删除 Agent 数据目录里的任何文件。这些目录里如果还有凭据，它只读会话部分。</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2.5"/><path d="M7 9h4"/><path d="M13.5 9h3.5" stroke-width="3.2"/><path d="M7 13h2.5" stroke-width="3.2"/><path d="M12 13h5M7 16.5h7"/></svg>
+          <div><h3>两次脱敏</h3><p>密钥、令牌、私钥块和 <code>.env</code> 一类的值，在写入本地数据库前清除一次，发给模型前再清除一次。</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4.5"/><path d="m11.2 11.8 8.3-8.3M16.5 6.5l2.5 2.5M14 9l2 2"/></svg>
+          <div><h3>密钥存在钥匙串</h3><p>API 密钥存在 macOS 钥匙串里，不进配置文件、数据库或日志。Git 远程地址只记 <code>host/owner/repo</code>，内嵌的令牌不保留。</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.1 8 7.5 9.5 4.4-1.5 7.5-4.9 7.5-9.5V6z"/></svg>
+          <div><h3>封闭生成</h3><p>模型写报告时禁用所有工具，也不落盘。会话里夹带的指令只被当作文字，不会被执行。</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>
+          <div><h3>模型由你选</h3><p>可用任何 OpenAI 兼容接口，包括 Ollama 或 LM Studio 运行的本地模型，数据不出电脑；也可以沿用已登录的 Claude Code。</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/><path d="M12 12v9M4 7.5l8 4.5 8-4.5"/></svg>
+          <div><h3>无账号，无遥测</h3><p>不用注册，没有云同步，也不做统计上报。所有内容都在本地 SQLite 数据库里，其中的会话数据随时可以从 Agent 日志重建。</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Get started -->
+  <section class="section" id="start">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="eyebrow">开始使用</div>
+        <h2>从源码构建。</h2>
+        <p>兰台还在早期开发，暂时没有预编译的安装包。构建只需要几分钟。</p>
+      </div>
+      <div class="start reveal">
+        <div class="start-card">
+          <h3>桌面应用</h3>
+          <p>生成 <code>build/Lantai.app</code>，拖进「应用程序」即可。</p>
+          <div class="code" id="code-app"><button class="copy" type="button" data-target="code-app">复制</button><span class="cmd">git clone https://github.com/brant-ruan/lantai.git</span>
+<span class="cmd">cd lantai/app</span>
+<span class="cmd">npm install</span>
+<span class="cmd">npm run build:app</span></div>
+        </div>
+        <div class="start-card">
+          <h3>命令行</h3>
+          <p>同一套引擎的命令行版本 <code>aj</code>，首次扫描回填最近 90 天。</p>
+          <div class="code" id="code-cli"><button class="copy" type="button" data-target="code-cli">复制</button><span class="cmd">cargo build --release</span>
+<span class="cmd">./target/release/aj scan</span>
+<span class="cmd">./target/release/aj sessions</span>
+<span class="cmd">./target/release/aj report daily</span></div>
+        </div>
+      </div>
+      <div class="requirements reveal">
+        <div><strong>平台</strong>macOS。其他平台也许能构建，但尚未测试。</div>
+        <div><strong>工具链</strong>Rust（stable）；桌面应用另需 Node.js。</div>
+        <div><strong>模型</strong>OpenAI 兼容接口、本地模型或 Claude Code。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Story -->
+  <section class="section" id="story">
+    <div class="wrap story">
+      <div class="reveal">
+        <div class="eyebrow">初衷</div>
+        <h2>Agent 没法替我们度过这一天</h2>
+        <p>如今，许多工作都交给了 Agent：开发产品、排查问题、起草邮件、做实验、写文档。人把问题说清楚，Agent 很快就把事情做完。会话之外做了什么，事情最后成没成，自己怎么看这件事，这些只有人自己知道。</p>
+      </div>
+      <blockquote class="story-quote reveal">这份记录对 Agent 也许没什么用，对项目的完成也许也没什么用，但对人有用。</blockquote>
+      <p class="story-close reveal">翻开日报、周报、月报，能看到自己和 Agent 一起做成了许多事，有些是以前没想过能做到的。这份意义属于自己。</p>
+      <p class="story-coda reveal">兰台也是一次尝试：人和 Agent 怎样一起工作，又怎样一起留下记录。如果你对其中的分寸有想法，欢迎<a href="https://github.com/brant-ruan/lantai/issues">提 Issue</a>。</p>
+    </div>
+  </section>
+
+  <!-- Name -->
+  <section class="section" id="name">
+    <div class="wrap name">
+      <div class="seal reveal" aria-hidden="true">兰台</div>
+      <div class="name-text reveal">
+        <div class="eyebrow">名字</div>
+        <h2 style="margin-bottom: 24px;">为什么叫「兰台」？</h2>
+        <p>兰台是汉代宫廷收藏典籍图书的地方。在这里任职的官员负责校勘典籍、起草文书，班固就曾在兰台修撰史书。后来，「兰台」也成了史官的代称。</p>
+        <p>兰是兰花，在中国文化里象征安静、内敛的品格：不张扬，却自有芬芳。</p>
+        <p>把每天零散的工作收拢起来、整理有序、存档备查，正是这个应用想做的事。</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>兰台 Lantai</span>
+    <nav aria-label="页脚">
+      <a href="https://github.com/brant-ruan/lantai">GitHub</a>
+      <a href="https://github.com/brant-ruan/lantai/blob/main/docs/SPEC.md">设计文档</a>
+      <a href="https://github.com/brant-ruan/lantai/issues">问题反馈</a>
+      <a href="https://afdian.com/a/bonan">爱发电</a>
+      <a href="https://github.com/sponsors/brant-ruan">GitHub Sponsors</a>
+    </nav>
+    <p class="disclaimer">报告由你配置的模型撰写。如果使用的是在线模型服务，脱敏后的会话文本会发送给该服务的提供方。Claude Code、Codex CLI、Antigravity、DeepSeek Harness、WorkBuddy 与 OpenCode 均为其各自所有者的产品，兰台与它们没有关联。</p>
+  </div>
+</footer>
+
+<script src="../assets/demo-data.js" defer></script>
+<script src="../assets/demo-data.zh.js" defer></script>
+<script src="../assets/demo.js" defer></script>
+<script src="../assets/rollup.js" defer></script>
+</body>
+</html>

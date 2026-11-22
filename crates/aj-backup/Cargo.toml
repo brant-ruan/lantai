@@ -1,0 +1,13 @@
+[package]
+name = "aj-backup"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aj-store = { version = "0.1.0", path = "../aj-store" }
+anyhow = "1.0.104"
+chrono = "0.4.45"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+zip = { version = "9.8.1", default-features = false, features = ["deflate"] }

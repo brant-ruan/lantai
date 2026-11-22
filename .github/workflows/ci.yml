@@ -1,0 +1,60 @@
+# Checks formatting, lints, tests and the frontend type check and build. Runs on macOS, the
+# only platform Lantai supports.
+#
+# Manual only while the repository is private (macOS minutes are billed at 10x there).
+# Once it is public, add these triggers back above workflow_dispatch:
+#   push:
+#     branches: [main]
+#   pull_request:
+name: CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # The Tauri crate embeds app/dist at compile time, so the frontend is built first.
+      - name: Frontend type check and build
+        working-directory: app
+        run: |
+          npm ci
+          npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets
+
+      - name: Tests
+        run: cargo test --workspace
+        env:
+          # Keep any key handling away from the runner's Keychain.
+          AJ_KEYSTORE: file

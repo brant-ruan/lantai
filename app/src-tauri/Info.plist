@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Finder and the Dock show the localized name: 兰台 on Chinese systems, Lantai elsewhere. -->
+  <key>LSHasLocalizedDisplayName</key>
+  <true/>
+</dict>
+</plist>

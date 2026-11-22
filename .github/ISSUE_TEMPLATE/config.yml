@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ideas and questions
+    url: https://github.com/brant-ruan/lantai/discussions
+    about: Issues are for bugs only. Share ideas and ask questions in Discussions.
+  - name: Privacy or security problem
+    url: https://github.com/brant-ruan/lantai/security/advisories/new
+    about: Report it privately, never in a public issue.

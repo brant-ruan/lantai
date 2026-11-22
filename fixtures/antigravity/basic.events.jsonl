@@ -1,0 +1,25 @@
+{"event":"session_meta","cwd":"/Users/alice/pjts/webapp","git_branch":null,"agent_version":null,"parent_session_id":null}
+{"event":"turn_start","source_event_id":"step:0","timestamp":"2026-11-18T01:00:00Z","user_prompt":"Fix the login timeout bug and run tests\n[image x1]"}
+{"event":"token_usage","source_event_id":"step:3:usage","timestamp":"2026-11-18T01:00:03Z","model":"gemini-test","usage":{"input_tokens":800,"output_tokens":120,"cache_read_tokens":4000,"cache_write_tokens":0}}
+{"event":"tool_action","source_event_id":"step:3:tool:0","timestamp":"2026-11-18T01:00:03Z","kind":"file_read","tool_name":"read_file","target":"/Users/alice/pjts/webapp/src/auth.rs","summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"step:3:tool:1","timestamp":"2026-11-18T01:00:03Z","kind":"file_edit","tool_name":"edit_file","target":"/Users/alice/pjts/webapp/src/auth.rs","summary":null,"diff_stat":{"added":2,"removed":1}}
+{"event":"tool_action","source_event_id":"step:3:tool:2","timestamp":"2026-11-18T01:00:03Z","kind":"file_write","tool_name":"write_file","target":"/Users/alice/pjts/webapp/tests/auth_test.rs","summary":null,"diff_stat":{"added":2,"removed":0}}
+{"event":"tool_action","source_event_id":"step:3:tool:3","timestamp":"2026-11-18T01:00:03Z","kind":"other","tool_name":"write_file","target":"plan.md","summary":"Fix timeout plan","diff_stat":null}
+{"event":"tool_action","source_event_id":"step:3:tool:5","timestamp":"2026-11-18T01:00:03Z","kind":"bash_cmd","tool_name":"run_command","target":"cargo test --lib","summary":"Run library tests","diff_stat":null}
+{"event":"tool_action","source_event_id":"step:3:tool:6","timestamp":"2026-11-18T01:00:03Z","kind":"bash_cmd","tool_name":"run_command","target":"cargo test --all","summary":"Run full test suite","diff_stat":null}
+{"event":"tool_outcome","tool_source_id":"step:3:tool:0","is_error":true,"diff_stat":null,"output_summary":"missing file: auth.rs"}
+{"event":"tool_outcome","tool_source_id":"step:3:tool:1","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"step:3:tool:2","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"step:3:tool:3","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"step:3:tool:5","is_error":false,"diff_stat":null,"output_summary":"ok 2 passed"}
+{"event":"tool_outcome","tool_source_id":"step:3:tool:6","is_error":true,"diff_stat":null,"output_summary":"error: integration timeout failed"}
+{"event":"token_usage","source_event_id":"step:11:usage","timestamp":"2026-11-18T01:00:15Z","model":"gemini-test","usage":{"input_tokens":1200,"output_tokens":340,"cache_read_tokens":4500,"cache_write_tokens":0}}
+{"event":"agent_message","source_event_id":"step:11:msg","timestamp":"2026-11-18T01:00:15Z","text":"Updated the auth timeout and added unit tests; integration test still fails."}
+{"event":"tool_action","source_event_id":"step:11:tool:0","timestamp":"2026-11-18T01:00:15Z","kind":"web_search","tool_name":"search_web","target":"tokio timeout behavior","summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"step:11:tool:1","timestamp":"2026-11-18T01:00:15Z","kind":"subagent","tool_name":"invoke_subagent","target":"research","summary":"Log Inspector","diff_stat":null}
+{"event":"tool_action","source_event_id":"step:11:tool:2","timestamp":"2026-11-18T01:00:15Z","kind":"mcp","tool_name":"mcp__demo__ping","target":null,"summary":"Ping demo service","diff_stat":null}
+{"event":"tool_action","source_event_id":"step:11:tool:3","timestamp":"2026-11-18T01:00:15Z","kind":"bash_cmd","tool_name":"run_command","target":"tail -f app.log","summary":"Tail app logs","diff_stat":null}
+{"event":"tool_outcome","tool_source_id":"step:11:tool:0","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"step:11:tool:1","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"step:11:tool:2","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"unknown","raw_type":"FUTURE_STEP"}

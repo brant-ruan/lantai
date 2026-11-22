@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lantai — a work journal for you and your agents</title>
+  <meta name="description" content="Your agents keep the record. You keep the meaning. Lantai drafts daily, weekly and monthly reports from your agent sessions, and you write what no session holds. Local-first and open source.">
+  <link rel="canonical" href="https://lantai.wohin.me/">
+  <link rel="alternate" hreflang="en" href="https://lantai.wohin.me/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lantai.wohin.me/zh/">
+  <link rel="alternate" hreflang="x-default" href="https://lantai.wohin.me/">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/icon.png">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://lantai.wohin.me/">
+  <meta property="og:title" content="Lantai — a work journal for you and your agents">
+  <meta property="og:description" content="Your agents keep the record. You keep the meaning. A local-first journal written by you and your agents.">
+  <meta property="og:image" content="https://lantai.wohin.me/assets/icon.png">
+  <meta name="twitter:card" content="summary">
+  <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="assets/site.js"></script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Lantai home">
+      <img src="assets/icon.png" alt="" width="30" height="30">
+      <span>Lantai <span class="zh">兰台</span></span>
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#hands">Two hands</a>
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#start">Get started</a>
+      <a href="#story">Story</a>
+    </nav>
+    <div class="header-actions">
+      <a class="icon-btn lang-switch" href="zh/" lang="zh-CN" hreflang="zh-CN" title="中文版">中文</a>
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="Change theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg>
+      </button>
+      <a class="icon-btn" href="https://github.com/brant-ruan/lantai" aria-label="Lantai on GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.8a10.2 10.2 0 0 0-3.2 19.9c.5.1.7-.2.7-.5v-1.8c-2.9.6-3.5-1.2-3.5-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.3-.3-4.7-1.1-4.7-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .9-.3 2.8 1a9.6 9.6 0 0 1 5.1 0c1.9-1.3 2.8-1 2.8-1 .6 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.7 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10.2 10.2 0 0 0 12 1.8z"/></svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="wrap hero-top">
+      <div class="hero-text">
+        <div class="eyebrow">A local-first journal for you and your agents</div>
+        <h1>Your agents keep the record. You keep the <em>meaning</em>.</h1>
+        <p class="lead">Lantai reads the sessions your agents leave on your machine and drafts daily, weekly and monthly reports, every point linked to its conversation. Beside them, you write what no session holds.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="#start">Get started</a>
+          <a class="btn btn-ghost" href="https://github.com/brant-ruan/lantai">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.8a10.2 10.2 0 0 0-3.2 19.9c.5.1.7-.2.7-.5v-1.8c-2.9.6-3.5-1.2-3.5-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.3-.3-4.7-1.1-4.7-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .9-.3 2.8 1a9.6 9.6 0 0 1 5.1 0c1.9-1.3 2.8-1 2.8-1 .6 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.7 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10.2 10.2 0 0 0 12 1.8z"/></svg>
+            View on GitHub
+          </a>
+        </div>
+      </div>
+      <div class="rollup hero-figure" data-rollup role="img" aria-label="Sessions gather into days, days into weeks, and weeks into a month."></div>
+    </div>
+
+    <div class="wrap hero-visual">
+      <div class="lt-demo" id="lantai-demo" aria-label="Interactive demo of the Lantai desktop app">
+        <noscript><p style="padding:24px">The interactive demo needs JavaScript.</p></noscript>
+      </div>
+      <p class="demo-caption">This is a live demo with made-up data. Switch views, click an anchor like <code>[#S5.T2]</code>, reassign a session and press Update, or show only what you wrote.</p>
+      <p class="meta"><span>Open source</span><span>macOS desktop app &amp; CLI</span><span>Early development</span></p>
+    </div>
+  </section>
+
+  <!-- Problem -->
+  <section class="section" id="why">
+    <div class="wrap problem">
+      <div class="reveal">
+        <div class="eyebrow">The problem</div>
+        <h2>A day's work is scattered across a dozen sessions. Some of it is in none of them.</h2>
+        <p>What changed, why it changed, where you got stuck: it's all in the conversations, and almost none of it is in your commits. By Friday it's gone.</p>
+        <p>And no session saw the talk with a colleague, the test on a real phone, or whether it all worked out. Agents can produce excellent results for us. They can't live the day for us.</p>
+      </div>
+      <div class="scatter reveal" aria-hidden="true">
+        <div class="chip"><time>09:12</time>Fix duplicate invoice charge<span class="agent">Claude Code</span></div>
+        <div class="chip"><time>10:47</time>Why is the webhook test flaky?<span class="agent">Codex CLI</span></div>
+        <div class="chip"><time>13:05</time>Retry queue with backoff<span class="agent">Claude Code</span></div>
+        <div class="chip chip-human"><time>14:30</time>Walked through the refund plan with Alex<span class="agent">You</span></div>
+        <div class="chip"><time>15:30</time>Quick-start rewrite<span class="agent">Antigravity</span></div>
+        <div class="chip"><time>17:18</time>zsh completion<span class="agent">Codex CLI</span></div>
+        <div class="chip chip-human"><time>19:40</time>Checkout works on a real phone, finally<span class="agent">You</span></div>
+        <div class="chip"><time>21:40</time>Refund flow, first look<span class="agent">Claude Code</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Two hands -->
+  <section class="section" id="hands">
+    <div class="wrap hands">
+      <div class="hands-figure reveal" data-svg="assets/two-hands.svg">
+        <img src="assets/two-hands.svg" alt="" width="520" height="420">
+      </div>
+      <div class="hands-text reveal">
+        <div class="eyebrow">Two hands, one journal</div>
+        <h2>The agent drafts. You write.</h2>
+        <p class="hands-lead">Both hands share one page, one outline per project, and they stay distinct. Purple is yours, and regenerating a report never touches it.</p>
+        <div class="hand hand-agent">
+          <h3>The agent writes</h3>
+          <ul><li>What happened in the sessions: what was built, what changed, where it got stuck</li><li>Every point anchored to the turn it came from, checked by the program</li><li>A fresh draft whenever you regenerate or update</li></ul>
+        </div>
+        <div class="hand hand-human">
+          <h3>You write</h3>
+          <ul><li>What happened outside them, and whether it worked</li><li>Notes on the day and on projects, and comments on the agent's points</li><li>Background and plans on each project page</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section" id="how">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="eyebrow">How it works</div>
+        <h2>Gather, draft, write.</h2>
+        <p>Writing the journal is meant to be a short evening ritual, not a one-click black box.</p>
+      </div>
+      <div class="steps">
+        <div class="step reveal">
+          <div class="num">1</div>
+          <h3>Gather</h3>
+          <p>Lantai reads each agent's session files incrementally and splits long sessions by day. You put them into projects you created and ignore the noise; rules and the model suggest, you confirm.</p>
+        </div>
+        <div class="step reveal">
+          <div class="num">2</div>
+          <h3>Draft</h3>
+          <p>Each session is condensed into a cached digest, and the model drafts the report by project: key points first, details and anchors below. Weekly and monthly reports build on the daily ones.</p>
+        </div>
+        <div class="step reveal">
+          <div class="num">3</div>
+          <h3>Write</h3>
+          <p>Add what only you know, right beside the draft: notes on the day and on projects, comments on the agent's points. You can write before anything is generated, too.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="eyebrow">Features</div>
+        <h2>Built to be trusted, not just to be fast.</h2>
+        <p>A report is only useful if you can check it. Lantai keeps a clear line from every sentence back to the work behind it.</p>
+      </div>
+      <div class="features reveal">
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/><path d="M14 20h6"/></svg>
+          <h3>Two hands, one journal</h3>
+          <p>The agent's draft and your notes share one page. Purple marks what you wrote; switch between both, the agent's part, or only yours.</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m8 12 3 3 5-6"/></svg>
+          <h3>You sort, the model drafts</h3>
+          <p>Projects are yours to define. Directory and remote rules or the model suggest where sessions belong, but nothing is filed until you accept.</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+          <h3>Every point is traceable</h3>
+          <p>Conclusions carry anchors like <code>[#S12.T5]</code> that open the exact turn they came from. Every anchor is validated, and any the model made up is dropped.</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.5-4.5L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.5 4.5L20 16"/><path d="M20 20.5V16h-4.5"/></svg>
+          <h3>Your words survive rewrites</h3>
+          <p>Update rewrites only the projects that changed. Your notes are never touched, and your edits to the agent's text stay put and stay marked.</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+          <h3>Daily, weekly, monthly</h3>
+          <p>Weekly reports cluster each project's week into a few threads of work; monthly reports build on them. The project view rolls any project up, notes included.</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 20.5h16"/><path d="M7 17v-5M12 17V7M17 17v-8"/></svg>
+          <h3>A dashboard of your work</h3>
+          <p>Active hours with parallel sessions counted once, streaks, the tools your agents reach for, your hourly rhythm, and token usage by model.</p>
+        </div>
+      </div>
+      <div class="agents reveal">
+        <span class="label">Reads sessions from</span>
+        <div class="agents-marquee">
+          <div class="agents-track">
+            <span class="a"><img src="assets/agents/claudecode.svg" alt="" width="18" height="18">Claude Code</span>
+            <span class="a"><img src="assets/agents/codex.svg" alt="" width="18" height="18">Codex CLI</span>
+            <span class="a"><img src="assets/agents/antigravity.svg" alt="" width="18" height="18">Antigravity</span>
+            <span class="a"><img src="assets/agents/deepseek.svg" alt="" width="18" height="18">DeepSeek Harness</span>
+            <span class="a"><img src="assets/agents/workbuddy.svg" alt="" width="18" height="18">WorkBuddy</span>
+            <span class="a"><img src="assets/agents/opencode.svg" alt="" width="18" height="18">OpenCode</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section class="section band" id="privacy">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="eyebrow">Privacy</div>
+        <h2>Your sessions stay on your machine.</h2>
+        <p>Agent logs hold private code, file paths and sometimes secrets. Lantai treats them that way.</p>
+      </div>
+      <div class="promises reveal">
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+          <div><h3>Read-only, always</h3><p>Lantai never writes, moves or deletes anything in your agents' data folders. Where those folders also hold credentials, it reads only the session files and nothing else.</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2.5"/><path d="M7 9h4"/><path d="M13.5 9h3.5" stroke-width="3.2"/><path d="M7 13h2.5" stroke-width="3.2"/><path d="M12 13h5M7 16.5h7"/></svg>
+          <div><h3>Redacted twice</h3><p>Keys, tokens, private-key blocks and <code>.env</code>-style values are scrubbed before anything reaches the local database, and again before any text is sent to a model.</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4.5"/><path d="m11.2 11.8 8.3-8.3M16.5 6.5l2.5 2.5M14 9l2 2"/></svg>
+          <div><h3>Keys in the Keychain</h3><p>API keys live in the macOS Keychain, never in config files, the database or logs. Git remotes are stored as <code>host/owner/repo</code>, so tokens embedded in URLs are never kept.</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.1 8 7.5 9.5 4.4-1.5 7.5-4.9 7.5-9.5V6z"/></svg>
+          <div><h3>Sealed generation</h3><p>The model writes reports with all tools disabled and nothing saved to disk. Instructions hidden inside a session are treated as plain text, never as commands to follow.</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>
+          <div><h3>Your model, your choice</h3><p>Use any OpenAI-compatible endpoint, including local models through Ollama or LM Studio, so nothing has to leave your computer. Or reuse your existing Claude Code login.</p></div>
+        </div>
+        <div class="promise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/><path d="M12 12v9M4 7.5l8 4.5 8-4.5"/></svg>
+          <div><h3>No account, no telemetry</h3><p>No sign-up, no cloud sync, no analytics. Everything lives in a local SQLite database, and the session data in it can be rebuilt from your agents' logs at any time.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Get started -->
+  <section class="section" id="start">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="eyebrow">Get started</div>
+        <h2>Build it from source.</h2>
+        <p>Lantai is in early development and there are no prebuilt downloads yet. Building takes a few minutes.</p>
+      </div>
+      <div class="start reveal">
+        <div class="start-card">
+          <h3>Desktop app</h3>
+          <p>Produces <code>build/Lantai.app</code>, a regular macOS app you can drag into your Applications folder.</p>
+          <div class="code" id="code-app"><button class="copy" type="button" data-target="code-app">Copy</button><span class="cmd">git clone https://github.com/brant-ruan/lantai.git</span>
+<span class="cmd">cd lantai/app</span>
+<span class="cmd">npm install</span>
+<span class="cmd">npm run build:app</span></div>
+        </div>
+        <div class="start-card">
+          <h3>Command line</h3>
+          <p>The same engine as a command-line tool called <code>aj</code>. The first scan backfills the last 90 days of sessions.</p>
+          <div class="code" id="code-cli"><button class="copy" type="button" data-target="code-cli">Copy</button><span class="cmd">cargo build --release</span>
+<span class="cmd">./target/release/aj scan</span>
+<span class="cmd">./target/release/aj sessions</span>
+<span class="cmd">./target/release/aj report daily</span></div>
+        </div>
+      </div>
+      <div class="requirements reveal">
+        <div><strong>Platform</strong>macOS for now. Other platforms may build but haven't been tested yet.</div>
+        <div><strong>Toolchain</strong>Rust (stable) for the engine and the CLI; Node.js as well for the desktop app.</div>
+        <div><strong>A model</strong>Any OpenAI-compatible API, a local model server, or a signed-in Claude Code.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Story -->
+  <section class="section" id="story">
+    <div class="wrap story">
+      <div class="reveal">
+        <div class="eyebrow">Why I built it</div>
+        <h2>Agents can't live the day for us</h2>
+        <p>Much of our work now goes to agents: building products, chasing down problems, drafting emails, running experiments, writing docs. We explain the problem, and an agent gets it done. What we did outside those sessions, whether things really worked out, what we made of it all: only we know.</p>
+      </div>
+      <blockquote class="story-quote reveal">A record like this may be of little use to the agents, and of little use to the projects. But to us, as people, it matters.</blockquote>
+      <p class="story-close reveal">Looking back over the days, weeks and months, you see how much you got done working alongside agents, including things you never thought you could do. That meaning is yours.</p>
+      <p class="story-coda reveal">Lantai is also an experiment in how people and agents work together, and how they keep a record together. If you have thoughts on where the line should be, <a href="https://github.com/brant-ruan/lantai/issues">open an issue</a>.</p>
+    </div>
+  </section>
+
+  <!-- Name -->
+  <section class="section" id="name">
+    <div class="wrap name">
+      <div class="seal reveal" aria-hidden="true">兰台</div>
+      <div class="name-text reveal">
+        <div class="eyebrow">The name</div>
+        <h2 style="margin-bottom: 24px;">Why “Lantai”?</h2>
+        <p>Lantai (兰台) was where the Han dynasty court kept its books and archives. Its keepers collated texts and drafted documents; the historian Ban Gu worked there while compiling the history of his age. Over time the name came to stand for the historian's office itself.</p>
+        <p>Lan (兰) is the orchid, long a symbol in Chinese culture of quiet, understated character: not showy, but with a fragrance of its own.</p>
+        <p>Gathering each day's scattered work, putting it in order and filing it away is exactly what this app sets out to do.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>Lantai 兰台</span>
+    <nav aria-label="Footer">
+      <a href="https://github.com/brant-ruan/lantai">GitHub</a>
+      <a href="https://github.com/brant-ruan/lantai/blob/main/docs/SPEC.md">Design spec</a>
+      <a href="https://github.com/brant-ruan/lantai/issues">Issues</a>
+      <a href="https://github.com/sponsors/brant-ruan">GitHub Sponsors</a>
+      <a href="https://afdian.com/a/bonan">Afdian</a>
+    </nav>
+    <p class="disclaimer">Reports are written by the model you configure. When that model is a hosted service, redacted session text is sent to its provider. Claude Code, Codex CLI, Antigravity, DeepSeek Harness, WorkBuddy and OpenCode are the property of their respective owners; Lantai is not affiliated with them.</p>
+  </div>
+</footer>
+
+<script src="assets/demo-data.js" defer></script>
+<script src="assets/demo.js" defer></script>
+<script src="assets/rollup.js" defer></script>
+</body>
+</html>

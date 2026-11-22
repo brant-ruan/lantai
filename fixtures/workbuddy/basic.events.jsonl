@@ -1,0 +1,46 @@
+{"event":"session_meta","cwd":"/Users/dev/pjts/sandbox","git_branch":null,"agent_version":null,"parent_session_id":null}
+{"event":"turn_start","source_event_id":"u1","timestamp":"2026-11-19T12:06:41Z","user_prompt":"Create calc.py with an add function, then check it."}
+{"event":"session_title","title":"Create a calculator"}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-01","timestamp":"2026-11-19T12:06:44.050Z","kind":"bash_cmd","tool_name":"Bash","target":"ls -la","summary":"List files","diff_stat":null}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-02","timestamp":"2026-11-19T12:06:44.100Z","kind":"bash_cmd","tool_name":"Bash","target":"python3 missing.py","summary":"Run a missing script","diff_stat":null}
+{"event":"token_usage","source_event_id":"usage:c2","timestamp":"2026-11-19T12:06:44.100Z","model":"hy4-flash-free","usage":{"input_tokens":30000,"output_tokens":1200,"cache_read_tokens":0,"cache_write_tokens":0}}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-01","is_error":false,"diff_stat":null,"output_summary":"total 0\nnotes.md"}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-02","is_error":true,"diff_stat":null,"output_summary":"python3: can't open file 'missing.py'"}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-03","timestamp":"2026-11-19T12:06:45.250Z","kind":"file_write","tool_name":"Write","target":"/Users/dev/pjts/sandbox/calc.py","summary":null,"diff_stat":{"added":2,"removed":0}}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-04","timestamp":"2026-11-19T12:06:45.300Z","kind":"file_edit","tool_name":"Edit","target":"/Users/dev/pjts/sandbox/calc.py","summary":null,"diff_stat":{"added":2,"removed":1}}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-05","timestamp":"2026-11-19T12:06:45.350Z","kind":"file_read","tool_name":"Read","target":"/Users/dev/pjts/sandbox/calc.py","summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-06","timestamp":"2026-11-19T12:06:45.400Z","kind":"other","tool_name":"Glob","target":"**/*.py","summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-07","timestamp":"2026-11-19T12:06:45.450Z","kind":"other","tool_name":"Grep","target":"def ","summary":null,"diff_stat":null}
+{"event":"token_usage","source_event_id":"usage:c7","timestamp":"2026-11-19T12:06:45.450Z","model":"hy4-flash-free","usage":{"input_tokens":3112,"output_tokens":500,"cache_read_tokens":29888,"cache_write_tokens":0}}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-03","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-04","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-05","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-06","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-07","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-08","timestamp":"2026-11-19T12:06:46.750Z","kind":"subagent","tool_name":"Agent","target":"general-purpose","summary":"Review calc.py","diff_stat":null}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-09","timestamp":"2026-11-19T12:06:46.800Z","kind":"web_search","tool_name":"WebSearch","target":"python 3.13 features","summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-10","timestamp":"2026-11-19T12:06:46.850Z","kind":"web_fetch","tool_name":"WebFetch","target":"https://example.com/py313","summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-11","timestamp":"2026-11-19T12:06:46.900Z","kind":"other","tool_name":"TaskCreate","target":null,"summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-12","timestamp":"2026-11-19T12:06:46.950Z","kind":"other","tool_name":"present_files","target":null,"summary":null,"diff_stat":null}
+{"event":"token_usage","source_event_id":"usage:c12","timestamp":"2026-11-19T12:06:46.950Z","model":"hy4-flash-free","usage":{"input_tokens":3104,"output_tokens":650,"cache_read_tokens":32896,"cache_write_tokens":0}}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-08","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-09","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-10","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-11","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-12","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"agent_message","source_event_id":"a1","timestamp":"2026-11-19T12:06:49.200Z","text":"Created calc.py and checked it."}
+{"event":"token_usage","source_event_id":"usage:a1","timestamp":"2026-11-19T12:06:49.200Z","model":"hy4-flash-free","usage":{"input_tokens":520,"output_tokens":300,"cache_read_tokens":36480,"cache_write_tokens":128}}
+{"event":"turn_start","source_event_id":"u2","timestamp":"2026-11-19T12:06:50.200Z","user_prompt":"What is in this image?\n[image x1]"}
+{"event":"tool_action","source_event_id":"chatcmpl-tool-13","timestamp":"2026-11-19T12:06:50.250Z","kind":"file_read","tool_name":"ViewImage","target":"/Users/dev/.workbuddy/clipboard-images/shot.png","summary":null,"diff_stat":null}
+{"event":"tool_outcome","tool_source_id":"chatcmpl-tool-13","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"agent_message","source_event_id":"a2","timestamp":"2026-11-19T12:06:51.300Z","text":"A red square and a blue circle."}
+{"event":"token_usage","source_event_id":"usage:a2","timestamp":"2026-11-19T12:06:51.300Z","model":"hy4-flash-free","usage":{"input_tokens":432,"output_tokens":200,"cache_read_tokens":37568,"cache_write_tokens":0}}
+{"event":"turn_start","source_event_id":"u3","timestamp":"2026-11-19T12:06:52.300Z","user_prompt":"Write a long essay."}
+{"event":"agent_message","source_event_id":"a3","timestamp":"2026-11-19T12:06:54.300Z","text":"The essay begins"}
+{"event":"turn_start","source_event_id":"u4","timestamp":"2026-11-19T12:06:57.300Z","user_prompt":"Write a long essay."}
+{"event":"agent_message","source_event_id":"a5","timestamp":"2026-11-19T12:06:58.300Z","text":"A short essay."}
+{"event":"token_usage","source_event_id":"usage:a5","timestamp":"2026-11-19T12:06:58.300Z","model":"hy4-flash-free","usage":{"input_tokens":1000,"output_tokens":400,"cache_read_tokens":38000,"cache_write_tokens":0}}
+{"event":"turn_start","source_event_id":"u5","timestamp":"2026-11-19T12:07:00.300Z","user_prompt":"Thanks, that is all."}
+{"event":"agent_message","source_event_id":"a6","timestamp":"2026-11-19T12:07:01.300Z","text":"You are welcome."}
+{"event":"token_usage","source_event_id":"usage:a6","timestamp":"2026-11-19T12:07:01.300Z","model":"hy4-flash-free","usage":{"input_tokens":736,"output_tokens":50,"cache_read_tokens":11264,"cache_write_tokens":0}}
+{"event":"unknown","raw_type":"brand-new-record"}

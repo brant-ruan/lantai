@@ -1,0 +1,48 @@
+{"type":"session","version":4,"id":"session-basic","createdAt":1794790800000,"cwd":"/work/app","isSeeded":false,"delegationDepth":0,"agentPreset":"standard"}
+{"type":"permission/preset","seq":0,"time":1794790800001,"data":{"preset":"standard"}}
+{"type":"sandbox/mode","seq":1,"time":1794790800001,"data":{"mode":"workspace-write"}}
+{"type":"approval/policy","seq":2,"time":1794790800001,"data":{"policy":"on-request"}}
+{"type":"agent/inbox/spliced","seq":3,"time":1794790860000,"data":{"target":"next-turn","start":0,"inserted":[{"id":"u1","role":"user","content":[{"type":"text","text":"Fix the login bug"}],"source":{"kind":"user"}}]}}
+{"type":"turn/start","seq":4,"time":1794790860001,"data":{"turn":1}}
+{"type":"step/start","seq":5,"time":1794790860002,"data":{"turn":1,"step":1}}
+{"type":"system/message","seq":6,"time":1794790860003,"data":{"turn":1,"step":1,"message":{"id":"sys","role":"system","content":[{"type":"text","text":"You are a helpful agent."}],"source":{"kind":"system-prompt"}}}}
+{"type":"user/message","seq":7,"time":1794790860004,"data":{"content":[{"type":"text","text":"Fix the login bug"},{"type":"image","attachment":{"attachmentId":"a1","name":"shot.png","mediaType":"image/png","bytes":10,"width":1,"height":1}}],"source":{"kind":"user"},"role":"user","id":"u1"}}
+{"type":"user/message","seq":8,"time":1794790860005,"data":{"content":[{"type":"text","text":"Project instructions."}],"source":{"kind":"agent-instructions"},"role":"user","id":"ctx1"}}
+{"type":"user/message","seq":9,"time":1794790860005,"data":{"content":[{"type":"text","text":"Working directory: /work/app"}],"source":{"kind":"runtime-context"},"role":"user","id":"ctx2"}}
+{"type":"user/message","seq":10,"time":1794790860005,"data":{"content":[{"type":"text","text":"Skills: none"}],"source":{"kind":"skill-catalog"},"role":"user","id":"ctx3"}}
+{"type":"user/message","seq":11,"time":1794790860005,"data":{"content":[{"type":"text","text":"Now: 2026-11-16 09:00"}],"source":{"kind":"time-context"},"role":"user","id":"ctx4"}}
+{"type":"request/header","seq":12,"time":1794790860006,"data":{"header":{"config":{"model":"deepseek-flash","provider":"deepseek"},"tools":[]},"reason":"initial"}}
+{"type":"request/context","seq":13,"time":1794790860006,"data":{"provider":"deepseek","model":"deepseek-flash","contextWindow":1000000}}
+{"type":"session/title","seq":14,"time":1794790860007,"data":{"title":"Fix the login bug","messageSeqs":[8],"source":{"kind":"fallback"}}}
+{"type":"session/title-llm-request","seq":15,"time":1794790860007,"data":{"titleProvider":"deepseek","messageSeqs":[8],"route":{},"system":"Title this.","messages":[],"maxTokens":64}}
+{"type":"session/title","seq":16,"time":1794790861000,"data":{"title":"Login bug fix","messageSeqs":[8],"source":{"kind":"provider"}}}
+{"type":"assistant/message","seq":17,"time":1794790862000,"data":{"turn":1,"step":1,"message":{"id":"a1","role":"assistant","content":[{"type":"reasoning","text":"Look at the auth module first."},{"type":"text","text":"I'll inspect the login handler."},{"type":"tool-call","id":"c1","name":"bash","arguments":"{}"}],"source":{"kind":"model","provider":"deepseek","model":"deepseek-flash"}},"usage":{"inputTokens":1200,"outputTokens":80,"cacheReadTokens":9000,"cacheWriteTokens":300,"totalTokens":10580},"stream":[]}}
+{"type":"tool/call","seq":18,"time":1794790862001,"data":{"turn":1,"step":1,"callId":"c1","name":"bash","arguments":"{\"command\": \"grep -rn login src/\", \"description\": \"Find login code\"}"}}
+{"type":"job/registered","seq":19,"time":1794790862002,"data":{"jobId":"j1","owner":"c1","kind":"bash","label":"grep","startedAt":1794790862002,"toolCall":{"callId":"c1","rootCallId":"c1"}}}
+{"type":"job/settled","seq":20,"time":1794790862100,"data":{"jobId":"j1","owner":"c1","kind":"bash","label":"grep","startedAt":1794790862002,"toolCall":{"callId":"c1","rootCallId":"c1"},"finishedAt":1794790862100,"status":"completed","cause":"exit","producerReported":true,"detail":""}}
+{"type":"tool/result","seq":21,"time":1794790862101,"data":{"turn":1,"step":1,"message":{"id":"m-c1","role":"tool","toolCallId":"c1","isError":false,"content":[{"type":"text","text":"src/auth.rs:12: fn login()"}],"source":{"kind":"tool","callId":"c1"}},"meta":{"cwd":"/work/app"}},"surfaceOp":"append","sourceEventSeqs":[]}
+{"type":"step/end","seq":22,"time":1794790862102,"data":{"turn":1,"step":1}}
+{"type":"assistant/message","seq":23,"time":1794790863000,"data":{"turn":1,"step":2,"message":{"id":"a2","role":"assistant","content":[{"type":"tool-call","id":"c2","name":"edit","arguments":"{}"}],"source":{"kind":"model","provider":"deepseek","model":"deepseek-flash"}},"usage":{"inputTokens":300,"outputTokens":40,"cacheReadTokens":10200,"cacheWriteTokens":0,"totalTokens":10540},"stream":[]}}
+{"type":"tool/call","seq":24,"time":1794790863001,"data":{"turn":1,"step":1,"callId":"c2","name":"edit","arguments":"{\"file_path\": \"/work/app/src/auth.rs\", \"old_string\": \"a\\nb\", \"new_string\": \"a\\nb\\nc\"}"}}
+{"type":"tool/result","seq":25,"time":1794790863002,"data":{"turn":1,"step":1,"message":{"id":"m-c2","role":"tool","toolCallId":"c2","isError":false,"content":[{"type":"text","text":"Edited /work/app/src/auth.rs"}],"source":{"kind":"tool","callId":"c2"}},"meta":{"diffs":[{"path":"/work/app/src/auth.rs","oldText":"a\nb","newText":"a\nb\nc"}]}},"surfaceOp":"append","sourceEventSeqs":[]}
+{"type":"tool/call","seq":26,"time":1794790863003,"data":{"turn":1,"step":1,"callId":"c3","name":"write","arguments":"{\"file_path\": \"/work/app/tests/login.rs\", \"content\": \"#[test]\\nfn t() {}\\n\"}"}}
+{"type":"tool/result","seq":27,"time":1794790863004,"data":{"turn":1,"step":1,"message":{"id":"m-c3","role":"tool","toolCallId":"c3","isError":false,"content":[{"type":"text","text":"Wrote /work/app/tests/login.rs"}],"source":{"kind":"tool","callId":"c3"}}},"surfaceOp":"append","sourceEventSeqs":[]}
+{"type":"tool/call","seq":28,"time":1794790863005,"data":{"turn":1,"step":1,"callId":"c4","name":"web_search","arguments":"{\"queries\": [\"rust session cookie\", \"axum login\"]}"}}
+{"type":"tool/result","seq":29,"time":1794790863006,"data":{"turn":1,"step":1,"message":{"id":"m-c4","role":"tool","toolCallId":"c4","isError":true,"content":[{"type":"text","text":"Error: search failed"}],"source":{"kind":"tool","callId":"c4"}},"error":{"code":"E","name":"WebError"}},"surfaceOp":"append","sourceEventSeqs":[]}
+{"type":"tool/call","seq":30,"time":1794790863007,"data":{"turn":1,"step":1,"callId":"c5","name":"subagent","arguments":"{\"name\": \"reviewer\", \"description\": \"Review the fix\", \"prompt\": \"Review it.\"}"}}
+{"type":"tool/result","seq":31,"time":1794790863008,"data":{"turn":1,"step":1,"message":{"id":"m-c5","role":"tool","toolCallId":"c5","isError":false,"content":[{"type":"text","text":"Looks good."}],"source":{"kind":"tool","callId":"c5"}}},"surfaceOp":"append","sourceEventSeqs":[]}
+{"type":"tool/call","seq":32,"time":1794790863009,"data":{"turn":1,"step":1,"callId":"c6","name":"grep","arguments":"{\"pattern\": \"session_id\", \"path\": \"src\"}"}}
+{"type":"tool/result","seq":33,"time":1794790863010,"data":{"turn":1,"step":1,"message":{"id":"m-c6","role":"tool","toolCallId":"c6","isError":false,"content":[],"source":{"kind":"tool","callId":"c6"}}},"surfaceOp":"append","sourceEventSeqs":[]}
+{"type":"tool/call","seq":34,"time":1794790863011,"data":{"turn":1,"step":1,"callId":"c7","name":"job_kill","arguments":"{\"job_id\": \"j9\", \"reason\": \"stuck\"}"}}
+{"type":"tool/result","seq":35,"time":1794790863012,"data":{"turn":1,"step":1,"message":{"id":"m-c7","role":"tool","toolCallId":"c7","isError":false,"content":[{"type":"text","text":"killed"}],"source":{"kind":"tool","callId":"c7"}}},"surfaceOp":"append","sourceEventSeqs":[]}
+{"type":"future/thing","seq":36,"time":1794790863013,"data":{"x":1}}
+{"type":"tool/call","seq":99,"time":
+{"type":"assistant/message","seq":37,"time":1794790864000,"data":{"turn":1,"step":3,"message":{"id":"a3","role":"assistant","content":[{"type":"text","text":"Fixed: the handler now checks expiry."}],"source":{"kind":"model","provider":"deepseek","model":"deepseek-flash"}},"usage":{"inputTokens":500,"outputTokens":60,"cacheReadTokens":10500,"cacheWriteTokens":0,"totalTokens":11060},"stream":[]}}
+{"type":"turn/end","seq":38,"time":1794790864001,"data":{"turn":1,"reason":{"kind":"completed"}}}
+{"type":"session/title","seq":39,"time":1794790864002,"data":{"title":"Login expiry fix","messageSeqs":[],"source":{"kind":"user"}}}
+{"type":"session/title","seq":40,"time":1794790864003,"data":{"title":"Later provider title","messageSeqs":[],"source":{"kind":"provider"}}}
+{"type":"session/end-seed","seq":41,"time":1794790864004,"data":{}}
+{"type":"user/message","seq":42,"time":1794794400000,"data":{"content":[{"type":"text","text":"Now add a regression test"}],"source":{"kind":"user"},"role":"user","id":"u2"}}
+{"type":"model/selection","seq":43,"time":1794794400001,"data":{"provider":"gateway","model":"model-a"}}
+{"type":"assistant/message","seq":44,"time":1794794401000,"data":{"turn":2,"step":1,"message":{"id":"a4","role":"assistant","content":[{"type":"reasoning","text":"..."}],"source":{"kind":"model","provider":"deepseek","model":"model-a"}},"usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"totalTokens":0},"stream":[]}}
+{"type":"assistant/message","seq":45,"time":1794794402000,"data":{"turn":2,"step":2,"message":{"id":"a5","role":"assistant","content":[{"type":"text","text":"Added the test."}],"source":{"kind":"model","provider":"deepseek","model":"model-a"}},"usage":{"inputTokens":100,"outputTokens":20,"cacheReadTokens":11000,"cacheWriteTokens":50,"totalTokens":11170},"stream":[]}}

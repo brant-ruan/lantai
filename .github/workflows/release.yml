@@ -1,0 +1,103 @@
+# Builds the macOS release when a version tag (vX.Y.Z) is pushed: a universal .dmg (Apple
+# silicon and Intel) with the aj command inside the app, signed ad hoc (Lantai has no Apple
+# Developer ID yet). It creates a draft GitHub Release whose notes are the matching
+# CHANGELOG.md section; review and publish the draft by hand.
+# Run by hand (workflow_dispatch) on a branch, it only uploads the .dmg as a build artifact.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the version
+        id: version
+        run: |
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the workspace version $version"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Build the universal app and disk image
+        working-directory: app
+        env:
+          AJ_BUNDLE_TARGET: universal-apple-darwin
+        run: npx tauri build --target universal-apple-darwin --bundles app,dmg
+
+      - name: Check the bundle
+        run: |
+          app="target/universal-apple-darwin/release/bundle/macos/Lantai.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          for bin in "$app"/Contents/MacOS/*; do
+            echo "$(basename "$bin"): $(lipo -archs "$bin")"
+          done
+
+      - name: Upload the disk image (manual runs)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lantai-${{ steps.version.outputs.version }}-universal
+          path: target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Write release notes
+        if: github.ref_type == 'tag'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no section for $VERSION"
+            exit 1
+          fi
+          cat >> notes.md <<'EOF'
+
+          ---
+
+          **Installing.** Download the `.dmg`, open it and drag Lantai into Applications. Lantai is not signed with an Apple Developer ID yet, so macOS blocks it the first time: open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. See the [README](https://github.com/brant-ruan/lantai#get-started) for details.
+          EOF
+
+      - name: Create a draft release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "Lantai $VERSION" \
+            --notes-file notes.md \
+            target/universal-apple-darwin/release/bundle/dmg/*.dmg

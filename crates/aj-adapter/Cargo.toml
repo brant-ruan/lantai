@@ -1,0 +1,10 @@
+[package]
+name = "aj-adapter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aj-ir = { version = "0.1.0", path = "../aj-ir" }
+anyhow = "1.0.104"
+zstd = "0.14.4"

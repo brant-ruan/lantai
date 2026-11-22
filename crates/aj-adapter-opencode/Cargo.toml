@@ -1,0 +1,16 @@
+[package]
+name = "aj-adapter-opencode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aj-adapter = { version = "0.1.0", path = "../aj-adapter" }
+aj-ir = { version = "0.1.0", path = "../aj-ir" }
+anyhow = "1.0.104"
+chrono = "0.4.45"
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+serde_json = "1.0.154"
+
+[dev-dependencies]
+serde_json = "1.0.154"

@@ -1,0 +1,23 @@
+[package]
+name = "aj-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aj-adapter = { version = "0.1.0", path = "../aj-adapter" }
+aj-core = { version = "0.1.0", path = "../aj-core" }
+aj-ir = { version = "0.1.0", path = "../aj-ir" }
+aj-sources = { version = "0.1.0", path = "../aj-sources" }
+aj-report = { version = "0.1.0", path = "../aj-report" }
+aj-store = { version = "0.1.0", path = "../aj-store" }
+anyhow = "1.0.104"
+chrono = "0.4.45"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+dirs = "7.0.0"
+libc = "0.2.191"
+serde_json = "1.0.154"
+
+[[bin]]
+name = "aj"
+path = "src/main.rs"

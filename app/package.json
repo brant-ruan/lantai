@@ -1,0 +1,27 @@
+{
+  "name": "lantai-app",
+  "private": true,
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "bundle-cli": "../scripts/bundle-cli.sh",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "build:app": "tauri build --bundles app && rm -rf ../build/Lantai.app && mkdir -p ../build && ditto ../target/release/bundle/macos/Lantai.app ../build/Lantai.app"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.9.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0"
+  }
+}

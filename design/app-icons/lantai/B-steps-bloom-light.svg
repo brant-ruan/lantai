@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs><filter id="sh" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity=".14"/></filter></defs>
+<rect x="100" y="100" width="824" height="824" rx="185" fill="#F2EDE3" filter="url(#sh)"/>
+<path d="M512 470 C470 420 470 352 512 300 C554 352 554 420 512 470Z" transform="rotate(0 512 470)" fill="#2E5E4E"/><path d="M512 470 C470 420 470 352 512 300 C554 352 554 420 512 470Z" transform="rotate(-52 512 470)" fill="#2E5E4E"/><path d="M512 470 C470 420 470 352 512 300 C554 352 554 420 512 470Z" transform="rotate(52 512 470)" fill="#2E5E4E"/>
+<circle cx="512" cy="470" r="20" fill="#C8553D"/>
+<line x1="512" y1="500" x2="512" y2="600" stroke="#2E5E4E" stroke-width="30" stroke-linecap="round"/>
+<g fill="#2E5E4E">
+<rect x="412" y="620" width="200" height="40" rx="14"/>
+<rect x="352" y="680" width="320" height="40" rx="14"/>
+<rect x="292" y="740" width="440" height="40" rx="14"/>
+</g>
+</svg>

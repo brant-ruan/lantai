@@ -1,0 +1,37 @@
+# Deploys the static project website in website/ to GitHub Pages.
+# Disabled until Pages is enabled for the repository: rename back to pages.yml to turn it on.
+# The custom domain (lantai.wohin.me) must also be set in Settings -> Pages;
+# website/CNAME only documents it, since artifact-based deploys ignore that file.
+name: Deploy website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: website
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,146 @@
+# Provider presets shown in Settings > Models > Add provider.
+#
+# Embedded at compile time by `aj_report::presets`; edit this file to add or change a service.
+# A preset only fills the provider form (name and base URL). It is never written to config.toml.
+#
+# Fields:
+#   id        suggested provider name; unique; letters, digits, '-' and '_'
+#   name      display name (brand names are not translated)
+#   group     "vendor" (model makers), "aggregator" (hosts many models) or "local"
+#   region    optional; "global" or "china", only where one vendor runs both sites
+#             (their keys are not interchangeable, so each site is its own preset)
+#   base_url  OpenAI-compatible root; Lantai appends /chat/completions and /models
+#   efforts   optional reasoning_effort suggestions; the values a model accepts vary,
+#             so these are only hints and the generic list is used when absent
+#
+# Only services that work with `Authorization: Bearer` + `/chat/completions` belong here.
+# Endpoints were cross-checked against each vendor's docs, LiteLLM and models.dev (2026-11).
+
+# --- Model makers -------------------------------------------------------------------------
+
+[[preset]]
+id = "openai"
+name = "OpenAI"
+group = "vendor"
+base_url = "https://api.openai.com/v1"
+efforts = ["none", "minimal", "low", "medium", "high", "xhigh"]
+
+[[preset]]
+id = "anthropic"
+name = "Anthropic"
+group = "vendor"
+base_url = "https://api.anthropic.com/v1"
+
+[[preset]]
+id = "gemini"
+name = "Google Gemini"
+group = "vendor"
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+efforts = ["none", "minimal", "low", "medium", "high"]
+
+[[preset]]
+id = "deepseek"
+name = "DeepSeek"
+group = "vendor"
+base_url = "https://api.deepseek.com/v1"
+efforts = ["none", "low", "high", "max"]
+
+[[preset]]
+id = "qwen"
+name = "Alibaba Qwen"
+group = "vendor"
+region = "global"
+base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+
+[[preset]]
+id = "qwen-cn"
+name = "Alibaba Qwen"
+group = "vendor"
+region = "china"
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+[[preset]]
+id = "kimi"
+name = "Moonshot Kimi"
+group = "vendor"
+region = "global"
+base_url = "https://api.moonshot.ai/v1"
+
+[[preset]]
+id = "kimi-cn"
+name = "Moonshot Kimi"
+group = "vendor"
+region = "china"
+base_url = "https://api.moonshot.cn/v1"
+
+[[preset]]
+id = "zai"
+name = "Z.ai GLM"
+group = "vendor"
+region = "global"
+base_url = "https://api.z.ai/api/paas/v4"
+
+[[preset]]
+id = "zhipu"
+name = "Zhipu GLM"
+group = "vendor"
+region = "china"
+base_url = "https://open.bigmodel.cn/api/paas/v4"
+
+[[preset]]
+id = "minimax"
+name = "MiniMax"
+group = "vendor"
+region = "global"
+base_url = "https://api.minimax.io/v1"
+
+[[preset]]
+id = "minimax-cn"
+name = "MiniMax"
+group = "vendor"
+region = "china"
+base_url = "https://api.minimaxi.com/v1"
+
+[[preset]]
+id = "doubao"
+name = "Volcengine Doubao"
+group = "vendor"
+region = "china"
+base_url = "https://ark.cn-beijing.volces.com/api/v3"
+
+# --- Aggregators --------------------------------------------------------------------------
+
+[[preset]]
+id = "openrouter"
+name = "OpenRouter"
+group = "aggregator"
+base_url = "https://openrouter.ai/api/v1"
+efforts = ["none", "minimal", "low", "medium", "high", "xhigh"]
+
+[[preset]]
+id = "siliconflow"
+name = "SiliconFlow"
+group = "aggregator"
+region = "global"
+base_url = "https://api.siliconflow.com/v1"
+
+[[preset]]
+id = "siliconflow-cn"
+name = "SiliconFlow"
+group = "aggregator"
+region = "china"
+base_url = "https://api.siliconflow.cn/v1"
+
+# --- Local --------------------------------------------------------------------------------
+
+[[preset]]
+id = "ollama"
+name = "Ollama"
+group = "local"
+base_url = "http://localhost:11434/v1"
+
+[[preset]]
+id = "lmstudio"
+name = "LM Studio"
+group = "local"
+base_url = "http://localhost:1234/v1"

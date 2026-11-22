@@ -1,0 +1,20 @@
+# Text the program writes for reports in this language (not sent as instructions).
+# These English texts are also used for report languages without their own prompts.
+
+# Weekday names, Monday first, used in daily report titles.
+weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+# Statistics line under each project in weekly and monthly reports.
+# Placeholders: {days} {hours} {sessions} {day_unit} {session_unit}.
+stats_line = "> {days} active {day_unit} · ~{hours} h · {sessions} {session_unit}"
+day_unit = ["day", "days"]
+session_unit = ["session", "sessions"]
+
+# Appended after the fixed report rules. {language} is the report language's English name.
+report_language = "- Write the entire report in {language}. Keep project names, code identifiers, file paths and anchors exactly as they appear in the material"
+
+# Appended to every request that returns JSON.
+json_language = "- Write all text values in the JSON in {language}"
+
+# The language's name as written in this language's own prompts.
+name = "English"

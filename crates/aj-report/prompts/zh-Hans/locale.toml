@@ -1,0 +1,19 @@
+# Text the program writes for reports in this language (not sent as instructions).
+
+# Weekday names, Monday first, used in daily report titles.
+weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
+# Statistics line under each project in weekly and monthly reports.
+# Placeholders: {days} {hours} {sessions} {day_unit} {session_unit}.
+stats_line = "> 活跃 {days} 天 · 约 {hours} 小时 · {sessions} 个会话"
+day_unit = ["天", "天"]
+session_unit = ["个会话", "个会话"]
+
+# Appended after the fixed report rules. {language} is the language's own name.
+report_language = "- 全文使用{language}书写；项目名称、代码标识符、文件路径与锚点保持素材中的原样"
+
+# Appended to every request that returns JSON.
+json_language = "- JSON 中的文字内容用{language}"
+
+# The language's name as written in this language's own prompts.
+name = "简体中文"

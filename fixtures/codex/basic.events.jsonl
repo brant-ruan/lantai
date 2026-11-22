@@ -1,0 +1,27 @@
+{"event":"session_meta","cwd":"/Users/dev/pjts/demo","git_branch":"main","agent_version":"0.169.0","parent_session_id":null}
+{"event":"turn_start","source_event_id":"u1","timestamp":"2026-11-16T01:00:01Z","user_prompt":"修复登录页的布局\n[image x1]"}
+{"event":"agent_message","source_event_id":"a1","timestamp":"2026-11-16T01:00:03Z","text":"先看一下样式文件。"}
+{"event":"token_usage","source_event_id":"usage:9200","timestamp":"2026-11-16T01:00:03.200Z","model":"gpt","usage":{"input_tokens":2000,"output_tokens":200,"cache_read_tokens":7000,"cache_write_tokens":0}}
+{"event":"token_usage","source_event_id":"usage:9200","timestamp":"2026-11-16T01:00:03.300Z","model":"gpt","usage":{"input_tokens":2000,"output_tokens":200,"cache_read_tokens":7000,"cache_write_tokens":0}}
+{"event":"tool_action","source_event_id":"call_1","timestamp":"2026-11-16T01:00:04Z","kind":"bash_cmd","tool_name":"exec_command","target":"rg -n login src","summary":null,"diff_stat":null}
+{"event":"tool_outcome","tool_source_id":"call_1","is_error":false,"diff_stat":null,"output_summary":"src/login.css:3:.login {}"}
+{"event":"tool_action","source_event_id":"call_2","timestamp":"2026-11-16T01:00:05Z","kind":"bash_cmd","tool_name":"exec_command","target":"npm test","summary":null,"diff_stat":null}
+{"event":"tool_outcome","tool_source_id":"call_2","is_error":true,"diff_stat":null,"output_summary":"1 test failed"}
+{"event":"tool_action","source_event_id":"call_3","timestamp":"2026-11-16T01:00:06Z","kind":"file_edit","tool_name":"apply_patch","target":"/Users/dev/pjts/demo/src/login.css","summary":null,"diff_stat":{"added":2,"removed":1}}
+{"event":"tool_outcome","tool_source_id":"call_3","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_action","source_event_id":"call_3#1","timestamp":"2026-11-16T01:00:06Z","kind":"file_write","tool_name":"apply_patch","target":"/Users/dev/pjts/demo/src/new.css","summary":null,"diff_stat":{"added":2,"removed":0}}
+{"event":"tool_outcome","tool_source_id":"call_3#1","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_action","source_event_id":"call_3#2","timestamp":"2026-11-16T01:00:06Z","kind":"file_edit","tool_name":"apply_patch","target":"/Users/dev/pjts/demo/src/old.css","summary":null,"diff_stat":{"added":0,"removed":1}}
+{"event":"tool_outcome","tool_source_id":"call_3#2","is_error":false,"diff_stat":null,"output_summary":null}
+{"event":"tool_action","source_event_id":"mcp1","timestamp":"2026-11-16T01:00:07Z","kind":"mcp","tool_name":"mcp__cua_repl__js","target":null,"summary":null,"diff_stat":null}
+{"event":"tool_outcome","tool_source_id":"mcp1","is_error":true,"diff_stat":null,"output_summary":"timeout"}
+{"event":"tool_action","source_event_id":"ws1","timestamp":"2026-11-16T01:00:08Z","kind":"web_search","tool_name":"web_search","target":"css flex center","summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"ext1","timestamp":"2026-11-16T01:00:09Z","kind":"web_search","tool_name":"web_search","target":"login layout","summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"img1","timestamp":"2026-11-16T01:00:11Z","kind":"file_read","tool_name":"view_image","target":"/tmp/shot.png","summary":null,"diff_stat":null}
+{"event":"tool_action","source_event_id":"sa1","timestamp":"2026-11-16T01:00:12Z","kind":"subagent","tool_name":"spawn_agent","target":"/root/css_audit","summary":null,"diff_stat":null}
+{"event":"unknown","raw_type":"item:FutureItem"}
+{"event":"agent_message","source_event_id":"a2","timestamp":"2026-11-16T01:00:16Z","text":"布局已修复，测试还有一个失败。"}
+{"event":"token_usage","source_event_id":"usage:19500","timestamp":"2026-11-16T01:00:16.100Z","model":"gpt","usage":{"input_tokens":500,"output_tokens":300,"cache_read_tokens":9500,"cache_write_tokens":0}}
+{"event":"unknown","raw_type":"future_record"}
+{"event":"turn_start","source_event_id":"u3","timestamp":"2026-11-16T02:10:00Z","user_prompt":"用方案 B"}
+{"event":"agent_message","source_event_id":"a3","timestamp":"2026-11-16T02:10:05Z","text":"好的，按方案 B。"}

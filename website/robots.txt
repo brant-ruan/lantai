@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://lantai.wohin.me/sitemap.xml
