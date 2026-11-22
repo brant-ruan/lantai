@@ -1,5 +1,6 @@
 //! Model settings commands: providers (connections and keys), model aliases,
-//! the default model, model discovery and connectivity tests.
+//! the default model, model discovery, local agent CLIs, connectivity tests and
+//! diagnosing engine errors.
 //!
 //! Thin wrappers over `aj_report::AppConfig`; every change is a locked
 //! load-modify-save of `config.toml`. Keys flow in only (when the user types
@@ -7,7 +8,8 @@
 
 use std::time::Instant;
 
-use aj_report::config::BUILTIN;
+use aj_report::diagnose::{self, Failure};
+use aj_report::local_tools::{self, Gap, ToolEngine};
 use aj_report::presets::{self, PresetGroup, PresetRegion};
 use aj_report::{AppConfig, KeyUpdate, ModelConfig, ProviderConfig};
 use serde::{Deserialize, Serialize};
@@ -25,7 +27,6 @@ pub struct ProviderDto {
     pub binary: Option<String>,
     /// Whether a key is in the key store (always false for the CLI provider).
     pub has_key: bool,
-    pub is_builtin: bool,
     pub used_by: Vec<String>,
 }
 
@@ -37,7 +38,6 @@ pub struct ModelDto {
     pub model: Option<String>,
     pub reasoning_effort: Option<String>,
     pub is_default: bool,
-    pub is_builtin: bool,
 }
 
 #[derive(Serialize)]
@@ -45,7 +45,8 @@ pub struct ModelDto {
 pub struct ModelSettingsDto {
     pub config_path: String,
     pub key_store: String,
-    pub default_model: String,
+    /// `None` when no model is configured.
+    pub default_model: Option<String>,
     pub providers: Vec<ProviderDto>,
     pub models: Vec<ModelDto>,
 }
@@ -82,6 +83,8 @@ pub struct EngineTestResultDto {
     pub ok: bool,
     pub elapsed_ms: u64,
     pub message: String,
+    /// The known case a failure belongs to.
+    pub failure: Option<Failure>,
 }
 
 impl ProviderInput {
@@ -113,7 +116,6 @@ fn provider_dto(cfg: &AppConfig, name: &str, p: &ProviderConfig) -> ProviderDto 
         timeout_secs: None,
         binary: None,
         has_key: cfg.has_key(name),
-        is_builtin: name == BUILTIN,
         used_by,
     };
     match p {
@@ -138,7 +140,7 @@ fn settings_dto(state: &AppState, cfg: &AppConfig) -> ModelSettingsDto {
     ModelSettingsDto {
         config_path: state.config_path().to_string_lossy().into_owned(),
         key_store: cfg.keystore().describe(),
-        default_model: cfg.default_model_name().to_string(),
+        default_model: cfg.default_model_name().map(str::to_string),
         providers: cfg
             .providers
             .iter()
@@ -152,8 +154,7 @@ fn settings_dto(state: &AppState, cfg: &AppConfig) -> ModelSettingsDto {
                 provider: m.provider.clone(),
                 model: m.model.clone(),
                 reasoning_effort: m.reasoning_effort.clone(),
-                is_default: alias == cfg.default_model_name(),
-                is_builtin: alias == BUILTIN,
+                is_default: Some(alias.as_str()) == cfg.default_model_name(),
             })
             .collect(),
     }
@@ -297,14 +298,99 @@ pub async fn test_model(
                 ok: true,
                 elapsed_ms: started.elapsed().as_millis() as u64,
                 message: reply.trim().chars().take(120).collect(),
+                failure: None,
             },
-            Err(e) => EngineTestResultDto {
-                ok: false,
-                elapsed_ms: started.elapsed().as_millis() as u64,
-                message: format!("{e:#}"),
-            },
+            Err(e) => {
+                let message = format!("{e:#}");
+                EngineTestResultDto {
+                    ok: false,
+                    elapsed_ms: started.elapsed().as_millis() as u64,
+                    failure: diagnose::diagnose(&message),
+                    message,
+                }
+            }
         })
     })
     .await
     .map_err(|e| format!("model test task failed: {e}"))?
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalToolDto {
+    /// Command name; also what `add_local_tool` takes.
+    pub command: String,
+    pub agent: String,
+    pub product: String,
+    pub path: String,
+    pub version: Option<String>,
+    /// `None` when the tool cannot generate reports; `gaps` says why.
+    pub engine: Option<ToolEngine>,
+    pub gaps: Vec<Gap>,
+    /// The model alias already using this exact command, if any.
+    pub configured_as: Option<String>,
+}
+
+/// Look for known agent CLIs on PATH (runs only their version commands).
+#[tauri::command]
+pub async fn find_local_tools(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<LocalToolDto>, String> {
+    let cfg = state.load_config().map_err(cmd_err)?;
+    let found = tauri::async_runtime::spawn_blocking(local_tools::find_on_path)
+        .await
+        .map_err(|e| format!("tool search failed: {e}"))?;
+    Ok(found
+        .into_iter()
+        .map(|f| {
+            let path = f.path.to_string_lossy().into_owned();
+            let configured_as = cfg
+                .providers
+                .iter()
+                .find(|(_, p)| {
+                    matches!(p, ProviderConfig::ClaudeCli { binary: Some(b) } if *b == path)
+                })
+                .and_then(|(name, _)| {
+                    cfg.models
+                        .iter()
+                        .find(|(_, m)| m.provider == *name)
+                        .map(|(alias, _)| alias.clone())
+                });
+            LocalToolDto {
+                command: f.tool.command.to_string(),
+                agent: f.tool.agent.as_str().to_string(),
+                product: f.tool.agent.product_name().to_string(),
+                path,
+                version: f.version,
+                engine: f.tool.engine,
+                gaps: f.tool.gaps.to_vec(),
+                configured_as,
+            }
+        })
+        .collect())
+}
+
+/// Add a local agent CLI the user confirmed. It is looked up again so only a tool actually
+/// found on PATH is written to `config.toml`.
+#[tauri::command]
+pub async fn add_local_tool(
+    state: tauri::State<'_, AppState>,
+    command: String,
+) -> Result<ModelSettingsDto, String> {
+    let found = tauri::async_runtime::spawn_blocking(local_tools::find_on_path)
+        .await
+        .map_err(|e| format!("tool search failed: {e}"))?;
+    let found = found
+        .into_iter()
+        .find(|f| f.tool.command == command)
+        .ok_or_else(|| format!("`{command}` was not found on PATH"))?;
+    modify(&state, |cfg| {
+        cfg.add_local_tool(found.tool, &found.path).map(|_| ())
+    })
+}
+
+/// The known case an engine error message belongs to, for hints in the interface.
+#[tauri::command]
+pub fn diagnose_error(message: String) -> Option<Failure> {
+    diagnose::diagnose(&message)
 }

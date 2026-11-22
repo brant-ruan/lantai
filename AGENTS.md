@@ -202,7 +202,12 @@ What the code does not make obvious. The design behind each is in the spec.
   `Store::open` sets a 15-second `busy_timeout` so concurrent writers wait.
 - **Models and keys:** `config.toml` has providers `[providers.*]`, model aliases `[models.*]` and
   `default_model`. Keys are stored in the macOS keychain by `keystore.rs` (through
-  `/usr/bin/security`); keys are never read from environment variables.
+  `/usr/bin/security`); keys are never read from environment variables. Nothing is built in: with
+  no alias, `build_engine` fails with `diagnose::NO_MODEL`. Agent CLIs are found only on request
+  (`aj_report::local_tools`, which runs only `--version`); a CLI becomes an engine only if it can
+  run with every tool off and leave no session (`docs/SPEC.md`, "Agent CLIs"), so do not add one
+  just because it has a print mode. Engine error text is sorted by `aj_report::diagnose`; when
+  changing an engine's error messages, keep its markers (`COMMAND_NOT_FOUND`) and its tests.
 - **Packaging:** `npm run build:app` (in `app/`) builds only the `.app` and copies it to `build/`
   (ignored). Tauri's `beforeBuildCommand` runs `scripts/bundle-cli.sh`, which builds `aj` and
   places it at `Contents/MacOS/aj` through `bundle.macOS.files`. The whole app is ad-hoc signed

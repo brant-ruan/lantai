@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 
 use anyhow::{bail, Context, Result};
 
-use crate::prompts;
+use crate::{diagnose, prompts};
 
 pub trait Engine: Sync {
     /// Engine identifier (including the model); part of the cache hash.
@@ -53,11 +53,13 @@ impl Engine for ClaudeCliEngine {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .with_context(|| {
-                format!(
-                    "failed to start `{}`; make sure the Claude Code CLI is installed",
-                    self.binary
-                )
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::NotFound => anyhow::anyhow!(
+                    "command `{}` {}; is Claude Code still installed there?",
+                    self.binary,
+                    diagnose::COMMAND_NOT_FOUND
+                ),
+                _ => anyhow::Error::new(e).context(format!("failed to start `{}`", self.binary)),
             })?;
 
         // Write stdin on a separate thread so a large prompt cannot deadlock against the child's output.

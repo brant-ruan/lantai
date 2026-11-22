@@ -2850,6 +2850,28 @@ code {
   overflow-wrap: anywhere;
 }
 
+/* Engine errors: a known case with its next step, raw text under Details. */
+.failure-raw { overflow-wrap: anywhere; white-space: pre-wrap; }
+.failure-note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+.failure-note summary { cursor: default; opacity: 0.8; width: fit-content; }
+.failure-note pre {
+  margin: 4px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.local-tool-path { overflow-wrap: anywhere; }
+
 .provider-models-panel {
   display: flex;
   flex-direction: column;

@@ -210,7 +210,7 @@ For development with hot reload, run `npm run tauri dev` instead.
 
 1. **Choose agents.** Claude Code is on by default. To add others, open **Settings → Agents**; it shows which agents were found on your machine.
 2. **Scan.** Click **Scan** in the sidebar. The first scan reads sessions from the last 90 days.
-3. **Choose a model.** If Claude Code is installed and signed in, Lantai uses it and you can skip this step. Otherwise add one in **Settings → Models** (see [Configure a model](#configure-a-model)).
+3. **Choose a model.** Open **Settings → Models**. If you use Claude Code, click **Find tools** and add it. Otherwise add a provider (see [Configure a model](#configure-a-model)).
 4. **Sort the day.** Pick a day in the sidebar. Assign each session to a project from its row (**New project…** creates one), and **Ignore** what doesn't belong in a report. When you assign a session, Lantai offers a rule for its folder, so later sessions there are suggested or filed for you.
 5. **Generate.** Click **Generate**, then add what only you know beside the draft.
 
@@ -219,7 +219,7 @@ For development with hot reload, run `npm run tauri dev` instead.
 - **Updates are manual for now.** Each new version is downloaded as a `.dmg` and, being unsigned, needs **Open Anyway** once more. Lantai can tell you when one is out: turn on update checks in **Settings → System**, or use **Check for Updates…** in the app menu.
 - **Keys and the Keychain.** API keys are stored in your login Keychain under the service `lantai`, through macOS's own `security` tool. macOS does not normally ask for permission, and the keys survive updates.
 - **Folder access.** Lantai reads each session's project folder only to find its Git repository (the `.git` folder). If your projects live in Documents, Desktop, Downloads or iCloud Drive, macOS asks once whether Lantai may access that folder. Saying no is fine: those sessions just can't be matched by repository rules.
-- **Claude Code as the model.** `claude` must be installed and signed in. Lantai loads your login shell's environment, so it finds `claude` even when opened from Finder, as long as your shell's `PATH` includes it.
+- **Claude Code as the model.** `claude` must be installed and signed in. **Find tools** searches your login shell's `PATH`, so Lantai finds `claude` even when opened from Finder. It only runs `claude --version`; use **Test** to check sign-in. Codex CLI, Antigravity and OpenCode are found too, but cannot write reports yet: Lantai only uses a CLI that can run with every tool off and without leaving a session behind.
 
 ### Command line
 
@@ -234,6 +234,7 @@ The first scan backfills the last 90 days.
 ```bash
 aj scan              # ingest new sessions
 aj sessions          # today's sessions, grouped by project
+aj models --find     # agent CLIs on this Mac; `--add claude` makes Claude Code the model
 aj report daily      # write today's report
 ```
 
@@ -261,7 +262,7 @@ aj report monthly [--month 2026-11 | --date ...] [--update]
 aj report history | show         List and print saved report versions
 aj prompt list | show | new | edit | rename | delete | default
 aj export [--session <prefix>]   Export sessions in the IR exchange format
-aj models [--test]               List model aliases; optionally test connectivity
+aj models [--test] [--find]      List model aliases, test them, or find agent CLIs (--add claude)
 aj doctor                        Show the parsing health of each source
 ```
 
@@ -271,12 +272,12 @@ Run `aj <command> --help` for every option.
 
 ### Configure a model
 
-Open **Settings → Models** in the app: add a provider (base URL and key), fetch its model list, give the models you use an alias and pick a default. Keys go to the macOS Keychain.
+Open **Settings → Models** in the app: click **Find tools** to add Claude Code, or add a provider (base URL and key), fetch its model list, give the models you use an alias and pick a default. Keys go to the macOS Keychain. The first model you add becomes the default.
 
 <details>
 <summary><b>Or edit <code>config.toml</code> by hand</b></summary>
 
-The file lives in the data directory (`~/Library/Application Support/lantai` on macOS; override with `--data-dir` or `AJ_DATA_DIR`). Without it, Lantai uses the `claude` CLI.
+The file lives in the data directory (`~/Library/Application Support/lantai` on macOS; override with `--data-dir` or `AJ_DATA_DIR`). Without it, no model is set up.
 
 ```toml
 default_model = "local"            # alias used when none is chosen
@@ -290,7 +291,11 @@ provider = "ollama"
 model = "qwen3:32b"
 # reasoning_effort = "high"        # optional; values depend on the server
 
-[models.claude]                    # built in: the signed-in Claude Code CLI
+[providers.claude]                 # the Claude Code CLI (what Find tools adds)
+type = "claude_cli"
+binary = "/Users/you/.local/bin/claude"
+
+[models."Claude Code"]             # no model id: the CLI's own default
 provider = "claude"
 
 [agents.codex]                     # which agents to scan (default: Claude Code only)

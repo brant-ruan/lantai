@@ -210,7 +210,7 @@ npm run build:app        # 生成 build/Lantai.app
 
 1. **选择 Agent。** 默认只读 Claude Code。要加入其他 Agent，打开「设置 → Agent」，这里会显示本机检测到了哪些。
 2. **扫描。** 点侧栏的「扫描」。第一次扫描读取最近 90 天的会话。
-3. **选择模型。** 如果本机装了 Claude Code 并已登录，兰台直接用它，这一步可以跳过；否则在「设置 → 模型」里添加一个（见[配置模型](#配置模型)）。
+3. **选择模型。** 打开「设置 → 模型」。如果你在用 Claude Code，点「查找本机工具」把它添加进来；否则添加一个提供方（见[配置模型](#配置模型)）。
 4. **整理当天。** 在侧栏选一天，从每条会话所在的行把它归到项目里（「新建项目…」可以新建），不该进报告的点「忽略」。归属会话时，兰台会提议为它所在的文件夹建一条规则，以后这个文件夹里的会话会被建议或自动归属。
 5. **生成。** 点「生成」，然后在草稿旁边写下只有你知道的事。
 
@@ -219,7 +219,7 @@ npm run build:app        # 生成 build/Lantai.app
 - **暂时需要手动更新。** 每个新版本都要重新下载 `.dmg`；因为没有签名，第一次打开时还要再点一次「仍要打开」。兰台可以在新版本发布时提醒你：在「设置 → 系统」里打开检查更新，或者点应用菜单里的「检查更新…」。
 - **密钥与钥匙串。** API 密钥通过 macOS 自带的 `security` 工具存进登录钥匙串，服务名为 `lantai`。系统通常不会弹窗询问，更新应用后密钥也仍然有效。
 - **文件夹访问。** 兰台读取每个会话的项目文件夹，只是为了找到它的 Git 仓库（`.git` 文件夹）。如果你的项目放在「文稿」「桌面」「下载」或 iCloud 云盘里，macOS 会询问一次是否允许兰台访问该文件夹。拒绝也没关系，只是这些会话无法按仓库规则归属。
-- **用 Claude Code 当模型。** 需要已安装并登录 `claude`。兰台会载入登录 shell 的环境，所以从访达打开也能找到 `claude`，前提是你的 shell `PATH` 里有它。
+- **用 Claude Code 当模型。** 需要已安装并登录 `claude`。「查找本机工具」会搜索登录 shell 的 `PATH`，所以从访达打开也能找到 `claude`。查找只运行 `claude --version`，是否已登录请用「测试」确认。Codex CLI、Antigravity 和 OpenCode 也能被找到，但暂时不能用来写报告：兰台只使用能关闭全部工具、且不留下会话的命令行。
 
 ### 命令行
 
@@ -234,6 +234,7 @@ export PATH="$HOME/.local/bin:$PATH"
 ```bash
 aj scan              # 增量扫描并入库
 aj sessions          # 当天的会话，按项目分组
+aj models --find     # 本机的 Agent 命令行；`--add claude` 把 Claude Code 设为模型
 aj report daily      # 生成当天的日报
 ```
 
@@ -261,7 +262,7 @@ aj report monthly [--month 2026-11 | --date ...] [--update]
 aj report history | show         查看报告的各个版本
 aj prompt list | show | new | edit | rename | delete | default
 aj export [--session <前缀>]      以 IR 交换格式导出会话
-aj models [--test]               列出模型别名，可选连通性测试
+aj models [--test] [--find]      列出模型别名、测试连通性，或查找本机 Agent 命令行（--add claude）
 aj doctor                        查看各数据源的解析状态
 ```
 
@@ -271,12 +272,12 @@ aj doctor                        查看各数据源的解析状态
 
 ### 配置模型
 
-在应用的「设置 → 模型」里配置：添加提供方（地址与密钥），拉取模型列表，为常用模型建别名并选定默认。密钥保存在 macOS 钥匙串。
+在应用的「设置 → 模型」里配置：点「查找本机工具」添加 Claude Code，或者添加提供方（地址与密钥），拉取模型列表，为常用模型建别名并选定默认。密钥保存在 macOS 钥匙串。第一个添加的模型会成为默认模型。
 
 <details>
 <summary><b>也可以直接编辑 <code>config.toml</code></b></summary>
 
-文件在数据目录下（macOS 上是 `~/Library/Application Support/lantai`，可用 `--data-dir` 或 `AJ_DATA_DIR` 修改）。没有这个文件时，兰台使用 `claude` 命令行。
+文件在数据目录下（macOS 上是 `~/Library/Application Support/lantai`，可用 `--data-dir` 或 `AJ_DATA_DIR` 修改）。没有这个文件时，不会配置任何模型。
 
 ```toml
 default_model = "local"            # 未指定模型时使用的别名
@@ -290,7 +291,11 @@ provider = "ollama"
 model = "qwen3:32b"
 # reasoning_effort = "high"        # 可选，取值由服务端决定
 
-[models.claude]                    # 内置：已登录的 Claude Code 命令行
+[providers.claude]                 # Claude Code 命令行（「查找本机工具」添加的）
+type = "claude_cli"
+binary = "/Users/you/.local/bin/claude"
+
+[models."Claude Code"]             # 不写模型 id：用命令行自己的默认模型
 provider = "claude"
 
 [agents.codex]                     # 扫描哪些 Agent（默认只有 Claude Code）

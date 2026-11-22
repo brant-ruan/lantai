@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { InfoTip } from "./InfoTip";
+import { FailureNote } from "./FailureNote";
+import { LocalToolsCard } from "./LocalToolsCard";
 import type {
   EngineTestResult,
   ModelSettings,
@@ -11,7 +13,8 @@ import type {
 } from "../types";
 import { useT } from "../i18n";
 
-/** Settings > Models: providers (connections and keys), model aliases, and the default model. */
+/** Settings > Models: the default model, agent CLIs on this Mac, model aliases and providers
+ * (connections and keys). */
 
 interface ModelsViewProps {
   /** Called after every successful change so the workbench can refresh its model list. */
@@ -311,7 +314,7 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
     } catch (e) {
       setTests((t) => ({
         ...t,
-        [alias]: { ok: false, elapsedMs: 0, message: errText(e) },
+        [alias]: { ok: false, elapsedMs: 0, message: errText(e), failure: null },
       }));
     }
   };
@@ -412,22 +415,28 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
             {tm.defaultModel}
             <InfoTip>{tm.defaultModelTip}</InfoTip>
           </div>
-          <select
-            value={settings.defaultModel}
-            disabled={busy}
-            onChange={(e) => {
-              const alias = e.target.value;
-              void apply(() => api.setDefaultModel(alias));
-            }}
-          >
-            {settings.models.map((m) => (
-              <option key={m.alias} value={m.alias}>
-                {m.alias}
-              </option>
-            ))}
-          </select>
+          {settings.defaultModel === null ? (
+            <span className="muted-line">{tm.noModel}</span>
+          ) : (
+            <select
+              value={settings.defaultModel}
+              disabled={busy}
+              onChange={(e) => {
+                const alias = e.target.value;
+                void apply(() => api.setDefaultModel(alias));
+              }}
+            >
+              {settings.models.map((m) => (
+                <option key={m.alias} value={m.alias}>
+                  {m.alias}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
+
+      <LocalToolsCard busy={busy} apply={apply} />
 
       {/* Model aliases */}
       <div className="settings-card">
@@ -442,10 +451,7 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
             disabled={busy}
             onClick={() =>
               openModelForm({
-                provider:
-                  providers.find((p) => !p.isBuiltin)?.name ??
-                  providers[0]?.name ??
-                  "",
+                provider: providers[0]?.name ?? "",
               })
             }
           >
@@ -469,7 +475,6 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                   type="text"
                   placeholder={tm.aliasPlaceholder}
                   value={modelForm.alias}
-                  disabled={modelForm.originalAlias === "claude"}
                   onChange={(e) =>
                     setModelForm({ ...modelForm, alias: e.target.value })
                   }
@@ -619,7 +624,9 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                       .join(" · ")}
                   </div>
                   {t && t !== "running" && !t.ok && (
-                    <div className="test-result-msg">{t.message}</div>
+                    <div className="test-result-msg">
+                      <FailureNote failure={t.failure} message={t.message} />
+                    </div>
                   )}
                 </div>
                 <div className="settings-item-actions">
@@ -657,20 +664,18 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                   >
                     {tr.common.edit}
                   </button>
-                  {!m.isBuiltin && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost-danger btn-xs"
-                      disabled={busy}
-                      onClick={() => {
-                        if (window.confirm(tm.deleteModel(m.alias))) {
-                          void apply(() => api.deleteModel(m.alias));
-                        }
-                      }}
-                    >
-                      {tr.common.delete}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn btn-ghost-danger btn-xs"
+                    disabled={busy}
+                    onClick={() => {
+                      if (window.confirm(tm.deleteModel(m.alias))) {
+                        void apply(() => api.deleteModel(m.alias));
+                      }
+                    }}
+                  >
+                    {tr.common.delete}
+                  </button>
                 </div>
               </div>
             );
@@ -720,7 +725,6 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                   type="text"
                   placeholder={tm.namePlaceholder}
                   value={providerForm.name}
-                  disabled={providerForm.originalName === "claude"}
                   onChange={(e) =>
                     setProviderForm({ ...providerForm, name: e.target.value })
                   }
@@ -731,7 +735,6 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                 <span>{tm.type}</span>
                 <select
                   value={providerForm.kind}
-                  disabled={providerForm.originalName === "claude"}
                   onChange={(e) =>
                     setProviderForm({
                       ...providerForm,
@@ -938,29 +941,27 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                 >
                   {tr.common.edit}
                 </button>
-                {!p.isBuiltin && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost-danger btn-xs"
-                    disabled={busy || p.usedBy.length > 0}
-                    title={
-                      p.usedBy.length > 0
-                        ? tm.usedBy
-                        : undefined
+                <button
+                  type="button"
+                  className="btn btn-ghost-danger btn-xs"
+                  disabled={busy || p.usedBy.length > 0}
+                  title={
+                    p.usedBy.length > 0
+                      ? tm.usedBy
+                      : undefined
+                  }
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        tm.deleteProvider(p.name),
+                      )
+                    ) {
+                      void apply(() => api.deleteProvider(p.name));
                     }
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          tm.deleteProvider(p.name),
-                        )
-                      ) {
-                        void apply(() => api.deleteProvider(p.name));
-                      }
-                    }}
-                  >
-                    {tr.common.delete}
-                  </button>
-                )}
+                  }}
+                >
+                  {tr.common.delete}
+                </button>
               </div>
             </div>
             {browsing === p.name && (

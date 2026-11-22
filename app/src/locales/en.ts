@@ -993,6 +993,45 @@ export const en = {
     deleteProvider: (name: string) => `Delete provider \u201c${name}\u201d and its stored key?`,
     fetchingFrom: (name: string) => `Fetching models from ${name}\u2026`,
     browseTip: "Click a model to enable it; click again to disable.",
+    noModel: "No model yet. Find an agent CLI on this Mac below, or add a provider.",
+    localTools: "Agent CLIs on this Mac",
+    localToolsTip:
+      "Lantai can write with an agent CLI you already use. Finding only runs each tool's --version, so it checks neither sign-in nor quota; Test does. A CLI is used only if it can run once with every tool turned off and without leaving a session behind.",
+    localToolsIntro:
+      "Look for Claude Code, Codex CLI, Antigravity and OpenCode on this Mac. Nothing is added until you choose.",
+    findTools: "Find tools",
+    finding: "Looking\u2026",
+    findAgain: "Find again",
+    noToolsFound: "No known agent CLI was found on PATH.",
+    addTool: "Add",
+    addedAs: (alias: string) => `Added as \u201c${alias}\u201d`,
+    cannotGenerate: "Can't generate yet",
+    gaps: {
+      tools: "its tools cannot all be turned off",
+      sessions: "every run leaves a session behind",
+    } as Record<string, string>,
+    versionUnknown: "version unknown",
+  },
+
+  failures: {
+    no_model: {
+      title: "No model is set up",
+      next: "Find an agent CLI on this Mac or add a provider in Settings \u2192 Models.",
+    },
+    command_not_found: {
+      title: "The command could not be found",
+      next: "It may have moved or been uninstalled. Find tools again in Settings \u2192 Models, or fix the provider's command.",
+    },
+    not_signed_in: {
+      title: "Not signed in, or the key was rejected",
+      next: "For Claude Code, run claude in Terminal and sign in. For an API provider, check its key in Settings \u2192 Models.",
+    },
+    quota: {
+      title: "Usage limit or quota reached",
+      next: "Wait for the limit to reset, or pick another model in the report toolbar.",
+    },
+    details: "Details",
+    openModels: "Model settings",
   },
 
   workspace: {

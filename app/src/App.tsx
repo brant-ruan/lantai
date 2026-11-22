@@ -29,6 +29,7 @@ import { useStatsView } from "./hooks/useStatsView";
 import { readItem, storeItem } from "./hooks/storage";
 import { useUpdateCheck } from "./hooks/useUpdateCheck";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { ErrorBanner } from "./components/FailureNote";
 import type {
   DayOverview,
   DayWorkbench,
@@ -786,16 +787,14 @@ export function App() {
           />
         )}
         {errorMsg && (
-          <div className="banner banner-err">
-            <span>{errorMsg}</span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs"
-              onClick={() => setErrorMsg(null)}
-            >
-              {tr.workspace.dismiss}
-            </button>
-          </div>
+          <ErrorBanner
+            message={errorMsg}
+            onDismiss={() => setErrorMsg(null)}
+            onOpenModels={() => {
+              setSettingsTab("models");
+              setSettingsOpen(true);
+            }}
+          />
         )}
         <div className="single-pane">{renderWorkspace()}</div>
       </main>

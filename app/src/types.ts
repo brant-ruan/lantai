@@ -128,7 +128,8 @@ export interface DayWorkbench {
   slices: SliceCard[];
   projects: ProjectOption[];
   prompts: PromptOption[];
-  defaultEngine: string;
+  /** Null when no model is configured. */
+  defaultEngine: string | null;
   engines: string[];
   /** Slices that ended more recently than this are live and are not pre-digested. */
   quietMinutes: number;
@@ -412,7 +413,6 @@ export interface ProviderSetting {
   binary: string | null;
   /** A key is in the key store; the key itself never reaches the frontend. */
   hasKey: boolean;
-  isBuiltin: boolean;
   usedBy: string[];
 }
 
@@ -422,13 +422,13 @@ export interface ModelSetting {
   model: string | null;
   reasoningEffort: string | null;
   isDefault: boolean;
-  isBuiltin: boolean;
 }
 
 export interface ModelSettings {
   configPath: string;
   keyStore: string;
-  defaultModel: string;
+  /** Null when no model is configured. */
+  defaultModel: string | null;
   providers: ProviderSetting[];
   models: ModelSetting[];
 }
@@ -449,10 +449,28 @@ export interface ModelInput {
 export type KeyUpdate =
   { mode: "keep" } | { mode: "set"; value: string } | { mode: "clear" };
 
+/** A known kind of engine error (`aj_report::diagnose`). */
+export type Failure = "no_model" | "command_not_found" | "not_signed_in" | "quota";
+
 export interface EngineTestResult {
   ok: boolean;
   elapsedMs: number;
   message: string;
+  failure: Failure | null;
+}
+
+/** An agent CLI found on this Mac (`aj_report::local_tools`). */
+export interface LocalTool {
+  command: string;
+  agent: string;
+  product: string;
+  path: string;
+  version: string | null;
+  /** Null when it cannot generate reports; `gaps` says why. */
+  engine: string | null;
+  gaps: string[];
+  /** The model alias already using this exact command. */
+  configuredAs: string | null;
 }
 
 export type ViewMode = "daily" | "weekly" | "monthly" | "projects" | "stats" | "search";

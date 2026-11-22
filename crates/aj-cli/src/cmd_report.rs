@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use aj_report::local_tools;
 use aj_report::monthly::{generate_monthly, MonthlyOptions};
 use aj_report::period::{Month, Week};
 use aj_report::prompt_library::{KIND_DAILY, KIND_MONTHLY, KIND_WEEKLY};
@@ -615,18 +616,18 @@ pub(crate) fn cmd_models(app: &App, test: bool, only: Option<&str>) -> Result<()
     println!(
         "Config file: {}{}",
         path.display(),
-        if path.exists() {
-            ""
-        } else {
-            " (missing; using the built-in model)"
-        }
+        if path.exists() { "" } else { " (missing)" }
     );
     println!("Key store: {}", config.keystore().describe());
+    if config.models.is_empty() {
+        println!("No model is configured. Run `aj models --find` to look for local agent CLIs,");
+        println!("or add a provider in the app's Settings → Models.");
+    }
     for name in config.models.keys() {
         if only.is_some_and(|o| o != name) {
             continue;
         }
-        let mark = if name == config.default_model_name() {
+        let mark = if Some(name.as_str()) == config.default_model_name() {
             "*"
         } else {
             " "
@@ -645,5 +646,76 @@ pub(crate) fn cmd_models(app: &App, test: bool, only: Option<&str>) -> Result<()
             }
         }
     }
+    Ok(())
+}
+
+/// `aj models --find`: known agent CLIs on PATH, and whether each can generate reports.
+pub(crate) fn cmd_find_tools() -> Result<()> {
+    let found = local_tools::find_on_path();
+    if found.is_empty() {
+        println!("No known agent CLI found on PATH.");
+    }
+    for f in &found {
+        let usable = match f.tool.engine {
+            Some(_) => format!(
+                "can generate; add with `aj models --add {}`",
+                f.tool.command
+            ),
+            None => format!(
+                "cannot generate yet ({})",
+                f.tool
+                    .gaps
+                    .iter()
+                    .map(|g| match g {
+                        local_tools::Gap::Tools => "tools cannot all be turned off",
+                        local_tools::Gap::Sessions => "every run leaves a session",
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ),
+        };
+        println!(
+            "{} ({})  {}  {}",
+            f.tool.agent.product_name(),
+            f.tool.command,
+            f.path.display(),
+            f.version.as_deref().unwrap_or("version unknown")
+        );
+        println!("    {usable}");
+    }
+    Ok(())
+}
+
+/// `aj models --add <tool>`: add a usable agent CLI found on PATH to `config.toml`.
+pub(crate) fn cmd_add_tool(app: &App, key: &str) -> Result<()> {
+    let Some(tool) = local_tools::tool(key) else {
+        bail!(
+            "unknown tool {key}; known: {}",
+            local_tools::TOOLS
+                .iter()
+                .map(|t| t.command)
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    };
+    let Some(found) = local_tools::find_on_path()
+        .into_iter()
+        .find(|f| f.tool.command == tool.command)
+    else {
+        bail!("`{}` was not found on PATH", tool.command);
+    };
+    let mut config = app.load_config()?;
+    let alias = config.add_local_tool(found.tool, &found.path)?;
+    config.save(&app.data_dir.join("config.toml"))?;
+    println!(
+        "Model {alias:?} uses {}{}",
+        found.path.display(),
+        if config.default_model_name() == Some(alias.as_str()) {
+            " (default)"
+        } else {
+            ""
+        }
+    );
+    println!("Check it with `aj models --test --model {alias:?}`.");
     Ok(())
 }

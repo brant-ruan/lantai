@@ -24,6 +24,8 @@ import type {
   DayWorkbench,
   DaysResponse,
   EngineTestResult,
+  Failure,
+  LocalTool,
   ExportResult,
   Diagnostics,
   KeyUpdate,
@@ -131,6 +133,12 @@ export const api = {
     invoke<string[]>("list_provider_models", { savedName, provider, apiKey }),
   testModel: (alias: string) =>
     invoke<EngineTestResult>("test_model", { alias }),
+  /** Looks for known agent CLIs on PATH; runs only their version commands. */
+  findLocalTools: () => invoke<LocalTool[]>("find_local_tools"),
+  addLocalTool: (command: string) =>
+    invoke<ModelSettings>("add_local_tool", { command }),
+  diagnoseError: (message: string) =>
+    invoke<Failure | null>("diagnose_error", { message }),
 
   listProjectsAndRules: () =>
     invoke<ProjectsOverview>("list_projects_and_rules"),

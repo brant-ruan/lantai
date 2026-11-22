@@ -130,7 +130,8 @@ pub struct DayWorkbenchDto {
     pub slices: Vec<SliceCardDto>,
     pub projects: Vec<ProjectOptionDto>,
     pub prompts: Vec<PromptOptionDto>,
-    pub default_engine: String,
+    /// `None` when no model is configured.
+    pub default_engine: Option<String>,
     pub engines: Vec<String>,
     /// Slices that ended more recently than this are live and are not pre-digested.
     pub quiet_minutes: i64,
@@ -612,7 +613,7 @@ fn build_workbench(
         slices,
         projects,
         prompts,
-        default_engine: cfg.default_model_name().to_string(),
+        default_engine: cfg.default_model_name().map(str::to_string),
         engines: cfg.models.keys().cloned().collect(),
         quiet_minutes: cfg.budgets().quiet_minutes,
     })

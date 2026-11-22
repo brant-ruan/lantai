@@ -53,7 +53,12 @@ The first public release. IR 0.3.0 · Schema 11.
 - **Search** across reports, notes and session text (Cmd+F or `aj search`), filtered by project,
   agent and dates, with links from session hits to the reports that cite them.
 - **Models:** any OpenAI-compatible endpoint, including local servers, with presets for common
-  services, or the signed-in Claude Code CLI. API keys are stored in the macOS keychain.
+  services, or the signed-in Claude Code CLI, which **Find tools** (or `aj models --find`) picks
+  up from your `PATH` when you ask. Nothing is set up behind your back: the first model you add
+  becomes the default. Codex CLI, Antigravity and OpenCode are recognised but not used to write
+  reports, since they cannot run with every tool off and without leaving a session behind. Common
+  failures (no model, command not found, not signed in, quota reached) say what to do next and
+  keep the full error under Details. API keys are stored in the macOS keychain.
 - **Languages:** English and Simplified Chinese, chosen separately for the interface and for
   reports, each with its own tuned prompts.
 - **Data:** everything stays on your Mac; text is redacted before it is stored and again before

@@ -955,6 +955,44 @@ export const zhHans = {
     deleteProvider: (name: string) => `删除提供方「${name}」及其保存的密钥？`,
     fetchingFrom: (name: string) => `正在从 ${name} 获取模型…`,
     browseTip: "点击模型即可启用，再次点击停用。",
+    noModel: "还没有模型。可以在下方查找本机的 Agent 命令行，或者添加一个提供方。",
+    localTools: "本机的 Agent 命令行",
+    localToolsTip:
+      "兰台可以借用你已经在用的 Agent 命令行来写日志。查找只运行各工具的 --version，不检查登录状态和额度，这些请用「测试」确认。只有能关闭全部工具、单次运行且不留下会话的命令行才会被使用。",
+    localToolsIntro: "在本机查找 Claude Code、Codex CLI、Antigravity 和 OpenCode。你确认之前不会添加任何东西。",
+    findTools: "查找本机工具",
+    finding: "正在查找…",
+    findAgain: "重新查找",
+    noToolsFound: "PATH 里没有找到已知的 Agent 命令行。",
+    addTool: "添加",
+    addedAs: (alias: string) => `已添加为「${alias}」`,
+    cannotGenerate: "暂不能用于生成",
+    gaps: {
+      tools: "无法关闭全部工具",
+      sessions: "每次运行都会留下会话",
+    } as Record<string, string>,
+    versionUnknown: "版本未知",
+  },
+
+  failures: {
+    no_model: {
+      title: "还没有设置模型",
+      next: "在 设置 → 模型 里查找本机的 Agent 命令行，或者添加一个提供方。",
+    },
+    command_not_found: {
+      title: "找不到命令",
+      next: "它可能被移动或卸载了。在 设置 → 模型 里重新查找本机工具，或修改提供方的命令。",
+    },
+    not_signed_in: {
+      title: "没有登录，或密钥被拒绝",
+      next: "Claude Code：在终端运行 claude 并登录。API 提供方：在 设置 → 模型 里检查它的密钥。",
+    },
+    quota: {
+      title: "用量上限或额度已用完",
+      next: "等额度恢复，或者在报告工具栏里换一个模型。",
+    },
+    details: "详细信息",
+    openModels: "模型设置",
   },
 
   workspace: {

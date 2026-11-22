@@ -9,16 +9,16 @@
 //! base_url = "https://example.com/v1"
 //! timeout_secs = 300               # optional
 //!
-//! [providers.claude]               # built in; always present
+//! [providers.claude]              # an agent CLI, added by finding local tools
 //! type = "claude_cli"
-//! # binary = "/path/to/claude"
+//! binary = "/path/to/claude"       # optional; `claude` on PATH when unset
 //!
 //! [models.flash]                   # an alias the user picks in the app or with --model
 //! provider = "gateway"
 //! model = "model-a"
 //! reasoning_effort = "high"
 //!
-//! [models.claude]                  # built in; the CLI's own default model
+//! [models."Claude Code"]           # no `model`: the CLI's own default
 //! provider = "claude"
 //!
 //! [agents.claude]      # optional; which session sources to use
@@ -43,7 +43,8 @@
 //! batch_concurrency = 2        # concurrent daily reports generated in a sidebar batch
 //! ```
 //!
-//! A model alias resolves to an [`Engine`]. Keys never appear in `config.toml`;
+//! Nothing is built in: without aliases, [`AppConfig::build_engine`] fails with
+//! [`diagnose::NO_MODEL`]. A model alias resolves to an [`Engine`]. Keys never appear in `config.toml`;
 //! a provider without a stored key is called without authentication. Edits are in-memory except
 //! for key changes, which go to the key store immediately; [`AppConfig::save`]
 //! writes `config.toml`.
@@ -57,14 +58,13 @@ use serde::{Deserialize, Serialize};
 
 use aj_ir::AgentId;
 
+use crate::diagnose;
 use crate::engine::{ClaudeCliEngine, Engine};
 use crate::keystore::KeyStore;
 use crate::lang::{self, Language};
+use crate::local_tools::{ToolDescriptor, ToolEngine};
 use crate::openai::{ApiKey, OpenAiCompatEngine};
 use crate::summarize::Budgets;
-
-/// Name of the built-in provider and of the built-in model alias that uses it.
-pub const BUILTIN: &str = "claude";
 
 /// Model ids the Claude CLI accepts as `--model` shorthands.
 pub const CLAUDE_CLI_MODELS: &[&str] = &["haiku", "opus", "sonnet"];
@@ -280,7 +280,7 @@ pub fn validate_model_alias(alias: &str) -> Result<()> {
 }
 
 impl AppConfig {
-    /// Load the configuration. A missing file yields only the built-in provider and model.
+    /// Load the configuration. A missing file yields no providers and no models.
     pub fn load(path: &Path, keystore: KeyStore) -> Result<Self> {
         let mut cfg = match std::fs::read_to_string(path) {
             Ok(text) => toml::from_str::<AppConfig>(&text)
@@ -299,16 +299,6 @@ impl AppConfig {
             Err(e) => return Err(e).with_context(|| format!("failed to read {}", path.display())),
         };
         cfg.keystore = keystore;
-        cfg.providers
-            .entry(BUILTIN.to_string())
-            .or_insert(ProviderConfig::ClaudeCli { binary: None });
-        cfg.models
-            .entry(BUILTIN.to_string())
-            .or_insert(ModelConfig {
-                provider: BUILTIN.to_string(),
-                model: None,
-                reasoning_effort: None,
-            });
         if let Some(h) = cfg.slicing.day_boundary_hour {
             if h > MAX_DAY_BOUNDARY_HOUR {
                 bail!(
@@ -333,6 +323,16 @@ impl AppConfig {
         let registered = |k: &str| AgentId::parse(k).is_ok_and(|a| a.registration().is_some());
         if let Some(unknown) = cfg.agents.keys().find(|k| !registered(k)) {
             bail!("unknown agent [agents.{unknown}] in {}", path.display());
+        }
+        if let Some(d) = cfg
+            .default_model
+            .as_deref()
+            .filter(|d| !cfg.models.contains_key(*d))
+        {
+            bail!(
+                "default_model {d} is not defined under [models] in {}",
+                path.display()
+            );
         }
         for (alias, m) in &cfg.models {
             if !cfg.providers.contains_key(&m.provider) {
@@ -456,8 +456,11 @@ impl AppConfig {
         }
     }
 
-    pub fn default_model_name(&self) -> &str {
-        self.default_model.as_deref().unwrap_or(BUILTIN)
+    /// The alias set as default, else the first alias by name; `None` without any alias.
+    pub fn default_model_name(&self) -> Option<&str> {
+        self.default_model
+            .as_deref()
+            .or_else(|| self.models.keys().next().map(String::as_str))
     }
 
     // ---- providers ----
@@ -478,19 +481,11 @@ impl AppConfig {
             bail!("a provider named {name} already exists");
         }
         if let Some(old) = original {
-            let Some(existing) = self.providers.get(old) else {
+            if !self.providers.contains_key(old) {
                 bail!("no provider named {old}");
-            };
-            if old == BUILTIN
-                && std::mem::discriminant(existing) != std::mem::discriminant(&provider)
-            {
-                bail!("the built-in provider {BUILTIN} must stay a Claude CLI provider");
             }
         }
         if let Some(old) = original.filter(|o| *o != name) {
-            if old == BUILTIN {
-                bail!("the built-in provider {BUILTIN} cannot be renamed");
-            }
             self.providers.remove(old);
             self.keystore.rename(old, name)?;
             for m in self.models.values_mut().filter(|m| m.provider == old) {
@@ -510,9 +505,6 @@ impl AppConfig {
 
     /// Remove a provider and its stored key. Fails while a model alias still uses it.
     pub fn remove_provider(&mut self, name: &str) -> Result<()> {
-        if name == BUILTIN {
-            bail!("the built-in provider {BUILTIN} cannot be deleted");
-        }
         let users: Vec<&str> = self
             .models
             .iter()
@@ -611,9 +603,6 @@ impl AppConfig {
             bail!("a model named {alias} already exists");
         }
         if let Some(old) = original.filter(|o| *o != alias) {
-            if old == BUILTIN {
-                bail!("the built-in model {BUILTIN} cannot be renamed");
-            }
             if self.models.remove(old).is_none() {
                 bail!("no model named {old}");
             }
@@ -621,14 +610,15 @@ impl AppConfig {
                 self.default_model = Some(alias.to_string());
             }
         }
+        // The first alias becomes the default, so later additions do not take its place.
+        if self.default_model.is_none() && self.models.is_empty() {
+            self.default_model = Some(alias.to_string());
+        }
         self.models.insert(alias.to_string(), model);
         Ok(())
     }
 
     pub fn remove_model(&mut self, alias: &str) -> Result<()> {
-        if alias == BUILTIN {
-            bail!("the built-in model {BUILTIN} cannot be deleted");
-        }
         if self.models.remove(alias).is_none() {
             bail!("no model named {alias}");
         }
@@ -642,7 +632,7 @@ impl AppConfig {
         if !self.models.contains_key(alias) {
             bail!("no model named {alias}");
         }
-        self.default_model = (alias != BUILTIN).then(|| alias.to_string());
+        self.default_model = Some(alias.to_string());
         Ok(())
     }
 
@@ -672,9 +662,48 @@ impl AppConfig {
         }
     }
 
+    /// Add a local agent CLI found on this machine: a provider named after its agent identifier
+    /// (with a numeric suffix if taken) running `binary`, and a model alias named after the
+    /// product. Returns the alias. A tool already configured with the same command is not added
+    /// twice; its existing alias is returned.
+    pub fn add_local_tool(&mut self, tool: &ToolDescriptor, binary: &Path) -> Result<String> {
+        let Some(engine) = tool.engine else {
+            bail!("{} cannot generate reports yet", tool.agent.product_name());
+        };
+        let binary = binary.to_string_lossy().into_owned();
+        let provider = match engine {
+            ToolEngine::ClaudeCli => ProviderConfig::ClaudeCli {
+                binary: Some(binary),
+            },
+        };
+        if let Some((name, _)) = self.providers.iter().find(|(_, p)| **p == provider) {
+            if let Some((alias, _)) = self.models.iter().find(|(_, m)| m.provider == *name) {
+                return Ok(alias.clone());
+            }
+        }
+        let name = free_name(tool.agent.as_str(), |n| self.providers.contains_key(n));
+        self.upsert_provider(None, &name, provider, KeyUpdate::Keep)?;
+        let alias = free_name(tool.agent.product_name(), |a| self.models.contains_key(a));
+        self.upsert_model(
+            None,
+            &alias,
+            ModelConfig {
+                provider: name,
+                model: None,
+                reasoning_effort: None,
+            },
+        )?;
+        Ok(alias)
+    }
+
     /// Build the engine for a model alias (the default alias when `None`).
     pub fn build_engine(&self, alias: Option<&str>, runner_dir: &Path) -> Result<Box<dyn Engine>> {
-        let alias = alias.unwrap_or_else(|| self.default_model_name());
+        let Some(alias) = alias.or_else(|| self.default_model_name()) else {
+            bail!(
+                "{}; add one in Settings → Models (or run `aj models --find`)",
+                diagnose::NO_MODEL
+            );
+        };
         let Some(m) = self.models.get(alias) else {
             bail!(
                 "no model named {alias}; available: {}",
@@ -703,6 +732,15 @@ impl AppConfig {
             }),
         })
     }
+}
+
+/// `base`, or `base-2`, `base-3`, … (`base 2` for aliases with spaces) — the first not `taken`.
+fn free_name(base: &str, taken: impl Fn(&str) -> bool) -> String {
+    let sep = if base.contains(' ') { " " } else { "-" };
+    std::iter::once(base.to_string())
+        .chain((2..).map(|i| format!("{base}{sep}{i}")))
+        .find(|n| !taken(n))
+        .expect("an unbounded sequence has a free name")
 }
 
 #[cfg(test)]
@@ -736,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_config_and_adds_builtins() {
+    fn parses_config_without_builtins() {
         let dir = temp_dir("parse");
         let path = dir.join("config.toml");
         std::fs::write(
@@ -771,8 +809,8 @@ batch_concurrency = 4
         assert_eq!(cfg.budgets().chunk_chars, 1234);
         assert_eq!(cfg.budgets().batch_concurrency, 4);
         assert_eq!(cfg.budgets().stage2_chars, Budgets::default().stage2_chars);
-        assert_eq!(cfg.default_model_name(), "flash");
-        assert!(cfg.providers.contains_key(BUILTIN) && cfg.models.contains_key(BUILTIN));
+        assert_eq!(cfg.default_model_name(), Some("flash"));
+        assert_eq!(cfg.providers.len(), 1);
         assert!(cfg.describe_model("flash").contains("key none"));
 
         let engine = cfg.build_engine(None, &dir).unwrap();
@@ -780,9 +818,14 @@ batch_concurrency = 4
         assert!(matches!(cfg.api_key("school"), ApiKey::None));
         assert!(cfg.build_engine(Some("nope"), &dir).is_err());
 
-        // Without a config file, fall back to the built-in model; bad files are errors.
+        // Without a config file there is no model, and generating says so; bad files are errors.
         let empty = AppConfig::load(&dir.join("missing.toml"), file_store(&dir)).unwrap();
-        assert_eq!(empty.default_model_name(), BUILTIN);
+        assert_eq!(empty.default_model_name(), None);
+        let err = format!("{:#}", empty.build_engine(None, &dir).err().unwrap());
+        assert_eq!(
+            crate::diagnose::diagnose(&err),
+            Some(crate::diagnose::Failure::NoModel)
+        );
         assert_eq!(empty.budgets().batch_concurrency, 2);
         std::fs::write(
             &path,
@@ -793,6 +836,8 @@ batch_concurrency = 4
         std::fs::write(&path, "[agents.cursor]\nenabled = true").unwrap();
         assert!(AppConfig::load(&path, file_store(&dir)).is_err());
         std::fs::write(&path, "[models.x]\nprovider = \"ghost\"\nmodel = \"m\"").unwrap();
+        assert!(AppConfig::load(&path, file_store(&dir)).is_err());
+        std::fs::write(&path, "default_model = \"ghost\"").unwrap();
         assert!(AppConfig::load(&path, file_store(&dir)).is_err());
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -857,7 +902,7 @@ batch_concurrency = 4
         assert!(text.contains("base_url = \"https://example.com/v1\""));
 
         let mut cfg = AppConfig::load(&path, file_store(&dir)).unwrap();
-        assert_eq!(cfg.default_model_name(), "fast2");
+        assert_eq!(cfg.default_model_name(), Some("fast2"));
         assert_eq!(cfg.models["fast2"].provider, "q");
         assert_eq!(cfg.models["Fast Model (v2)"].model.as_deref(), Some("m3"));
         assert!(cfg
@@ -883,15 +928,65 @@ batch_concurrency = 4
         assert!(cfg
             .upsert_provider(None, "bad name", openai(), KeyUpdate::Keep)
             .is_err());
-        assert!(cfg.remove_model(BUILTIN).is_err());
+        assert!(cfg.remove_model("ghost").is_err());
 
         cfg.remove_model("fast2").unwrap();
         cfg.remove_model("Fast Model (v2)").unwrap();
-        assert_eq!(cfg.default_model_name(), BUILTIN);
+        assert_eq!(cfg.default_model_name(), None);
         cfg.upsert_provider(Some("q"), "q", openai(), KeyUpdate::Clear)
             .unwrap();
         assert!(!cfg.has_key("q"));
         cfg.remove_provider("q").unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn first_model_becomes_default_and_removal_falls_back() {
+        let dir = temp_dir("default");
+        let mut cfg = AppConfig::load(&dir.join("none.toml"), file_store(&dir)).unwrap();
+        cfg.upsert_provider(None, "p", openai(), KeyUpdate::Keep)
+            .unwrap();
+        cfg.upsert_model(None, "b", model("p", "m")).unwrap();
+        cfg.upsert_model(None, "a", model("p", "m")).unwrap();
+        assert_eq!(cfg.default_model_name(), Some("b"));
+        cfg.remove_model("b").unwrap();
+        assert_eq!(cfg.default_model_name(), Some("a"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn local_tools_are_added_once_and_only_if_usable() {
+        use crate::local_tools::tool;
+        let dir = temp_dir("tools");
+        let mut cfg = AppConfig::load(&dir.join("none.toml"), file_store(&dir)).unwrap();
+        let claude = tool("claude").unwrap();
+        let alias = cfg
+            .add_local_tool(claude, Path::new("/opt/bin/claude"))
+            .unwrap();
+        assert_eq!(alias, "Claude Code");
+        assert_eq!(cfg.default_model_name(), Some("Claude Code"));
+        assert_eq!(
+            cfg.providers["claude"],
+            ProviderConfig::ClaudeCli {
+                binary: Some("/opt/bin/claude".into())
+            }
+        );
+        // The same command again reuses its alias; another path gets suffixed names.
+        assert_eq!(
+            cfg.add_local_tool(claude, Path::new("/opt/bin/claude"))
+                .unwrap(),
+            "Claude Code"
+        );
+        assert_eq!(
+            cfg.add_local_tool(claude, Path::new("/usr/bin/claude"))
+                .unwrap(),
+            "Claude Code 2"
+        );
+        assert_eq!(cfg.models["Claude Code 2"].provider, "claude-2");
+        assert_eq!(cfg.default_model_name(), Some("Claude Code"));
+        assert!(cfg
+            .add_local_tool(tool("codex").unwrap(), Path::new("/opt/bin/codex"))
+            .is_err());
         std::fs::remove_dir_all(&dir).ok();
     }
 

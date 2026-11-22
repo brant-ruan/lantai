@@ -18,7 +18,7 @@ use app::{find_session, resolve_date, title, App};
 use cmd_browse::*;
 use cmd_project::{AssignArgs, ProjectCmd, RuleCmd};
 use cmd_prompt::PromptCmd;
-use cmd_report::{cmd_models, ReportKind};
+use cmd_report::{cmd_add_tool, cmd_find_tools, cmd_models, ReportKind};
 use cmd_search::SearchArgs;
 
 #[derive(Parser)]
@@ -129,7 +129,7 @@ enum Cmd {
         #[arg(long)]
         session: Option<String>,
     },
-    /// List the configured model aliases and their providers
+    /// List the configured model aliases and their providers; find and add local agent CLIs
     Models {
         /// Send a tiny request to each model (or the one given by --model) to check connectivity
         #[arg(long)]
@@ -137,6 +137,12 @@ enum Cmd {
         /// Only list/test this model alias
         #[arg(long)]
         model: Option<String>,
+        /// Look for known agent CLIs on PATH and say which can generate reports (runs only `--version`)
+        #[arg(long, conflicts_with_all = ["test", "model"])]
+        find: bool,
+        /// Add a local agent CLI found on PATH as a provider and model (e.g. `claude`)
+        #[arg(long, value_name = "TOOL", conflicts_with_all = ["test", "model", "find"])]
+        add: Option<String>,
     },
     /// Show the parsing health of each source
     Doctor,
@@ -204,7 +210,11 @@ fn main() -> Result<()> {
             project,
             all,
         } => cmd_project::cmd_accept(&app, &targets, date.as_deref(), project.as_deref(), all),
-        Cmd::Models { test, model } => cmd_models(&app, test, model.as_deref()),
+        Cmd::Models { find: true, .. } => cmd_find_tools(),
+        Cmd::Models {
+            add: Some(tool), ..
+        } => cmd_add_tool(&app, &tool),
+        Cmd::Models { test, model, .. } => cmd_models(&app, test, model.as_deref()),
         Cmd::Export { session } => cmd_export(&app, session.as_deref()),
         Cmd::Doctor => cmd_doctor(&app),
     }

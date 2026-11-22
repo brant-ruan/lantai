@@ -39,7 +39,8 @@ interface ReportPanelProps {
   reportState: DailyReportState | null;
   prompts: PromptOption[];
   engines: string[];
-  defaultEngine: string;
+  /** Null when no model is configured. */
+  defaultEngine: string | null;
   selectedPrompt: string;
   selectedEngine: string;
   onSelectPrompt: (name: string) => void;
@@ -389,7 +390,7 @@ export function ReportPanel({
                 <label className="dropdown-field">
                   <span>{t.model}</span>
                   <select
-                    value={selectedEngine || defaultEngine}
+                    value={selectedEngine || defaultEngine || ""}
                     onChange={(e) => onSelectEngine(e.target.value)}
                   >
                     {engines.map((name) => (

@@ -420,7 +420,7 @@ aj project / rule / assign / unassign / accept
 aj prompt …                           report prompts
 aj report daily|weekly|monthly        generate (--update, --dry-run, --lang); history / show
 aj export                             IR events in the exchange format
-aj models [--test]                    model aliases and connectivity
+aj models [--test] [--find] [--add T] model aliases, connectivity, local tools
 aj doctor                             parse health and source status
 ```
 
@@ -1043,22 +1043,26 @@ type = "openai_compat"
 base_url = "https://example.com/v1"
 timeout_secs = 300            # optional
 
-[providers.claude]            # built in, always present
+[providers.claude]            # added by "Find tools on this Mac"
 type = "claude_cli"
+binary = "/Users/me/.local/bin/claude"
 
 [models.fast]
 provider = "gateway"
 model = "model-a"
 reasoning_effort = "high"     # optional, values depend on the service
 
-[models.claude]               # built in: Claude Code's default model
+[models."Claude Code"]        # the CLI's own default model
 provider = "claude"
 ```
 
-The built-in `claude` provider and alias always exist. The Models settings page edits providers
-and aliases, lists a provider's models (`GET /models`; `sonnet` / `opus` / `haiku` for Claude
-Code), tests connectivity and sets the default; the report toolbar can pick another alias for one
-run. Comments in the file are not preserved on write.
+Nothing is built in: a fresh installation has no provider and no model. `default_model` is the
+alias set as default, else the first alias by name; with no alias at all, generation stops with
+"no model is configured" and the app points to the Models settings page. The first alias added
+becomes the default. The Models settings page edits providers and aliases, finds local tools (see
+below), lists a provider's models (`GET /models`; `sonnet` / `opus` / `haiku` for Claude Code),
+tests connectivity and sets the default; the report toolbar can pick another alias for one run.
+Comments in the file are not preserved on write.
 
 **Provider presets** (`crates/aj-report/presets/providers.toml`, embedded at build time) cover
 common services (major model vendors, aggregators, local servers). A preset fills in the name and
@@ -1085,7 +1089,7 @@ through. Network errors, 429 and 5xx are retried; other errors report the server
 
 ### Agent CLIs
 
-**Claude Code** (the default without a config file):
+**Claude Code:**
 
 ```text
 claude -p --tools "" --no-session-persistence --output-format text --system-prompt …
@@ -1099,6 +1103,51 @@ claude -p --tools "" --no-session-persistence --output-format text --system-prom
 
 Prompts also start with the fingerprint described under [Scanning and adapters](#scanning-and-adapters),
 as a second line of defence.
+
+**The bar for an agent CLI.** A CLI becomes an engine only when one invocation is
+non-interactive, can switch off **every** tool, and leaves **no** session behind. The second keeps
+session content data (a prompt built from someone's sessions must not be able to run commands or
+read files); the third keeps Lantai's own calls out of its scans. A list of individual features to
+turn off does not count: it changes between versions and cannot be checked without running it.
+Checked against the versions current in November 2026:
+
+| Tool | Command | Engine | Why not |
+| :--- | :--- | :--- | :--- |
+| Claude Code | `claude` | yes | |
+| Codex CLI | `codex` | no | `exec --ephemeral` keeps no session, but tools can only be turned off one feature at a time |
+| Antigravity | `agy` | no | `--print` runs once, but tools cannot be turned off and conversations are kept |
+| OpenCode | `opencode` | no | `run` always stores the session in its database |
+
+### Finding local tools
+
+`aj_report::local_tools` holds a table of known agent CLIs (agent identifier, command name,
+version arguments, whether it passes the bar above and, if not, which parts it misses). Adding a
+tool is one row; making one an engine also needs an `Engine` implementation.
+
+- Finding runs only when the user asks (the "Find tools on this Mac" button on the Models page, or
+  `aj models --find`; `aj models --add claude` adds one). It looks for each command on `PATH` (the app imports the login shell's
+  environment) and runs `<command> --version` with a five-second limit; it never runs a prompt,
+  so it checks neither sign-in nor quota. That is what Test is for.
+- Results list every tool found with its path and version. Tools that pass the bar can be added;
+  the others show as "installed, cannot generate yet" with the reason. Nothing is written until
+  the user adds a tool: adding one creates a provider named after the agent identifier (with a
+  numeric suffix if taken) with the absolute path found, and a model alias named after the
+  product, which becomes the default if there was none.
+
+### Failures
+
+Engine errors keep their full text: a CLI's stderr and stdout, an API's status and response body
+(clipped). `aj_report::diagnose` sorts an error's text into a few known cases, each with a fixed
+hint and next step in the interface; the raw text stays available under "Details".
+
+| Case | Recognised by | Next step |
+| :--- | :--- | :--- |
+| No model | no alias configured | open Models, find tools or add a provider |
+| Command not found | the CLI could not be started | find tools again or fix the path |
+| Not signed in / key rejected | "not logged in", "/login", "invalid api key", HTTP 401 / 403 | sign in to the CLI in Terminal, or check the key |
+| Quota or rate limit | "usage limit", "quota", "credit balance", HTTP 429 | wait, or pick another model |
+
+Anything else shows the raw text as before.
 
 ## Privacy and security
 
