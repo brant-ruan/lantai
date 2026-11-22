@@ -89,6 +89,11 @@ stale once; that is expected.
 
 ### Smaller items
 
+- **Regenerate digests.** A digest that came out wrong stays cached until the model, the turns or
+  the note change, so there is no direct way to redo it. Add "Regenerate digest" to the session
+  drawer, and an option on a daily report's Update to redo that day's digests too. It bypasses the
+  cache once and stores the new digest; the report then shows as stale and Update rewrites only
+  the affected project's section.
 - A ledger of Lantai's own model calls (stage, model, tokens, time, outcome) for the dashboard's
   "Lantai itself" panel. Needs a new table.
 - A model per stage: a cheap, fast model for digests and a stronger one for reports.
@@ -113,6 +118,16 @@ stale once; that is expected.
   directly; the hand-written home page stays as it is.
 - **Search:** highlight hits after jumping to a report; semantic search with embeddings; "ask
   Lantai" (answer questions from search results with a model).
+- **Extra digest instructions, not editable digest prompts.** Digests are material for the
+  program, not prose for people: they must keep a fixed JSON shape (points with turn numbers, an
+  outcome, a project suggestion) that report generation parses and anchors are checked against,
+  so a free-form edit could break reports far from where it was made. A prompt edit must also
+  enter the cache key, which would invalidate every digest at once. Tone, length and focus belong
+  in report prompts, which are already editable. If a need shows up in real use, offer one field
+  of extra instructions (e.g. "note performance numbers") appended after the fixed format rules,
+  as report prompts get their anchor rules appended. It enters the cache key but applies to new
+  digests only; redoing old ones is the user's choice of a date range, after seeing roughly how
+  many model calls it takes.
 - **Engines:** Anthropic's native API (for prompt caching). Codex CLI, Antigravity (`agy`) and
   OpenCode as engines once they can run with every tool off and without leaving a session (see
   SPEC.md, "Agent CLIs"); check again when they release new versions.
