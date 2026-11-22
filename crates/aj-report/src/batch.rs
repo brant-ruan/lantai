@@ -218,7 +218,7 @@ mod tests {
     use crate::prompt_library;
     use crate::{generate_daily, DailyOptions, ReportMode};
     use aj_core::{slice::reslice_session, Config};
-    use aj_ir::{AgentKind, IrEvent};
+    use aj_ir::{AgentId, IrEvent};
     use chrono::{DateTime, FixedOffset};
 
     fn t(s: &str) -> DateTime<Utc> {
@@ -228,7 +228,7 @@ mod tests {
     fn add_session(store: &mut Store, tz: &FixedOffset, sid: &str, project: i64, at: &str) -> i64 {
         let id = store
             .ingest(
-                AgentKind::Claude,
+                &AgentId::CLAUDE,
                 sid,
                 &[IrEvent::TurnStart {
                     source_event_id: "u1".into(),

@@ -123,7 +123,7 @@ enum Cmd {
         #[command(subcommand)]
         kind: ReportKind,
     },
-    /// Export IR events as JSONL (parsed straight from the source files)
+    /// Export sessions in the IR exchange format: a header line per session, then its events (parsed straight from the source files)
     Export {
         /// Only export sessions whose ID starts with this
         #[arg(long)]

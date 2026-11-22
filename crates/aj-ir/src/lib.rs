@@ -3,69 +3,146 @@
 //! Adapters translate each agent's raw records into a stream of [`IrEvent`]s; the core layer merges events into storage.
 //! This crate does no IO and contains no agent-specific fields.
 
+use std::borrow::Cow;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// IR version. Adding an optional field bumps the minor version; a breaking change bumps the major version.
-pub const IR_VERSION: &str = "0.2.0";
+pub const IR_VERSION: &str = "0.3.0";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AgentKind {
-    Claude,
-    Codex,
-    Antigravity,
+/// The agent that produced a session: an open identifier, not a closed list, so data from agents
+/// without an adapter can still be stored, counted and exported (docs/SPEC.md, "Agent
+/// identifiers").
+///
+/// Lowercase ASCII starting with a letter, then letters, digits, `-`, `_` or `.`, at most 64
+/// characters. Registered identifiers are in [`REGISTRY`]; others start with `x-` or are a
+/// reverse domain name.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct AgentId(Cow<'static, str>);
+
+impl AgentId {
+    pub const CLAUDE: AgentId = AgentId(Cow::Borrowed("claude"));
+    pub const CODEX: AgentId = AgentId(Cow::Borrowed("codex"));
+    pub const ANTIGRAVITY: AgentId = AgentId(Cow::Borrowed("antigravity"));
     /// DeepSeek Harness.
-    Dsh,
-    WorkBuddy,
-    OpenCode,
+    pub const DSH: AgentId = AgentId(Cow::Borrowed("dsh"));
+    pub const WORKBUDDY: AgentId = AgentId(Cow::Borrowed("workbuddy"));
+    pub const OPENCODE: AgentId = AgentId(Cow::Borrowed("opencode"));
+
+    /// Checks the form; any well-formed identifier is accepted, registered or not.
+    pub fn parse(s: &str) -> Result<Self, InvalidAgentId> {
+        let mut chars = s.chars();
+        let well_formed = s.len() <= 64
+            && chars.next().is_some_and(|c| c.is_ascii_lowercase())
+            && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "-_.".contains(c));
+        if !well_formed {
+            return Err(InvalidAgentId(s.to_string()));
+        }
+        Ok(REGISTRY
+            .iter()
+            .find(|r| r.id.as_str() == s)
+            .map_or_else(|| AgentId(Cow::Owned(s.to_string())), |r| r.id.clone()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn registration(&self) -> Option<&'static Registration> {
+        REGISTRY.iter().find(|r| r.id == *self)
+    }
+
+    /// The product name of a registered agent, or the identifier itself.
+    pub fn product_name(&self) -> &str {
+        self.registration().map_or(self.as_str(), |r| r.product)
+    }
 }
 
-impl AgentKind {
-    /// Every agent kind, in display order.
-    pub const ALL: [AgentKind; 6] = [
-        AgentKind::Claude,
-        AgentKind::Codex,
-        AgentKind::Antigravity,
-        AgentKind::Dsh,
-        AgentKind::WorkBuddy,
-        AgentKind::OpenCode,
-    ];
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            AgentKind::Claude => "claude",
-            AgentKind::Codex => "codex",
-            AgentKind::Antigravity => "antigravity",
-            AgentKind::Dsh => "dsh",
-            AgentKind::WorkBuddy => "workbuddy",
-            AgentKind::OpenCode => "opencode",
-        }
+impl std::fmt::Display for AgentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
     }
+}
 
-    /// Product name shown to users (sessions list, slice details, diagnostics).
-    pub fn display_name(self) -> &'static str {
-        match self {
-            AgentKind::Claude => "Claude Code",
-            AgentKind::Codex => "Codex CLI",
-            AgentKind::Antigravity => "Antigravity",
-            AgentKind::Dsh => "DeepSeek Harness",
-            AgentKind::WorkBuddy => "WorkBuddy",
-            AgentKind::OpenCode => "OpenCode",
-        }
+impl TryFrom<String> for AgentId {
+    type Error = InvalidAgentId;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        AgentId::parse(&s)
     }
+}
 
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "claude" => Some(AgentKind::Claude),
-            "codex" => Some(AgentKind::Codex),
-            "antigravity" => Some(AgentKind::Antigravity),
-            "dsh" => Some(AgentKind::Dsh),
-            "workbuddy" => Some(AgentKind::WorkBuddy),
-            "opencode" => Some(AgentKind::OpenCode),
-            _ => None,
-        }
+impl From<AgentId> for String {
+    fn from(id: AgentId) -> String {
+        id.0.into_owned()
     }
+}
+
+/// An agent identifier that is not well formed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvalidAgentId(pub String);
+
+impl std::fmt::Display for InvalidAgentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "invalid agent identifier {:?}", self.0)
+    }
+}
+
+impl std::error::Error for InvalidAgentId {}
+
+/// A registered agent identifier.
+#[derive(Debug)]
+pub struct Registration {
+    pub id: AgentId,
+    /// Product name shown to users.
+    pub product: &'static str,
+    /// IR version in which the identifier was registered.
+    pub since_ir: &'static str,
+}
+
+/// Registered agents, in display order. Identifiers are never renamed or reused.
+pub const REGISTRY: [Registration; 6] = [
+    Registration {
+        id: AgentId::CLAUDE,
+        product: "Claude Code",
+        since_ir: "0.3.0",
+    },
+    Registration {
+        id: AgentId::CODEX,
+        product: "Codex CLI",
+        since_ir: "0.3.0",
+    },
+    Registration {
+        id: AgentId::ANTIGRAVITY,
+        product: "Antigravity",
+        since_ir: "0.3.0",
+    },
+    Registration {
+        id: AgentId::DSH,
+        product: "DeepSeek Harness",
+        since_ir: "0.3.0",
+    },
+    Registration {
+        id: AgentId::WORKBUDDY,
+        product: "WorkBuddy",
+        since_ir: "0.3.0",
+    },
+    Registration {
+        id: AgentId::OPENCODE,
+        product: "OpenCode",
+        since_ir: "0.3.0",
+    },
+];
+
+/// Header line opening a session in the exchange format (docs/SPEC.md, "Exchange format"); the
+/// event lines after it belong to this session until the next header.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "record", rename = "session")]
+pub struct SessionHeader {
+    pub ir_version: String,
+    pub agent: AgentId,
+    pub session_id: String,
 }
 
 /// Normalized tool category.
@@ -231,6 +308,42 @@ mod tests {
         assert!(s.contains(r#""event":"tool_action""#));
         assert!(s.contains(r#""kind":"file_edit""#));
         assert_eq!(serde_json::from_str::<IrEvent>(&s).unwrap(), e);
+    }
+
+    #[test]
+    fn agent_ids() {
+        assert_eq!(AgentId::parse("claude").unwrap(), AgentId::CLAUDE);
+        assert_eq!(AgentId::CLAUDE.product_name(), "Claude Code");
+        let custom = AgentId::parse("x-mytool").unwrap();
+        assert_eq!(custom.product_name(), "x-mytool");
+        assert!(custom.registration().is_none());
+        assert!(AgentId::parse("com.example.tool").is_ok());
+        for bad in ["", "Claude", "1abc", "has space", "a/b", &"a".repeat(65)] {
+            assert!(AgentId::parse(bad).is_err(), "{bad}");
+        }
+        assert!(REGISTRY
+            .iter()
+            .all(|r| AgentId::parse(r.id.as_str()).is_ok() && !r.id.as_str().contains('.')));
+        let json = serde_json::to_string(&AgentId::WORKBUDDY).unwrap();
+        assert_eq!(json, r#""workbuddy""#);
+        assert!(serde_json::from_str::<AgentId>(r#""Bad""#).is_err());
+    }
+
+    #[test]
+    fn session_header_shape() {
+        let h = SessionHeader {
+            ir_version: IR_VERSION.into(),
+            agent: AgentId::CODEX,
+            session_id: "s1".into(),
+        };
+        let s = serde_json::to_string(&h).unwrap();
+        assert_eq!(
+            s,
+            format!(
+                r#"{{"record":"session","ir_version":"{IR_VERSION}","agent":"codex","session_id":"s1"}}"#
+            )
+        );
+        assert_eq!(serde_json::from_str::<SessionHeader>(&s).unwrap(), h);
     }
 
     #[test]

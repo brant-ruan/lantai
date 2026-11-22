@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use aj_ir::{AgentKind, IrEvent, ToolKind};
+use aj_ir::{AgentId, IrEvent, ToolKind};
 use anyhow::{Context, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
@@ -65,7 +65,7 @@ pub struct SourceHealth {
 #[derive(Debug, Clone)]
 pub struct SessionRow {
     pub id: i64,
-    pub agent: AgentKind,
+    pub agent: AgentId,
     pub source_session_id: String,
     pub project_id: Option<i64>,
     /// `manual` | `rule` | `unassigned`
@@ -252,15 +252,11 @@ pub(crate) const SESSION_COLS: &str = "id, agent, source_session_id, project_id,
      git_branch, COALESCE(title, fallback_title), user_note, ignored, first_active_at, last_active_at, \
      suggested_project_id, suggestion_source, suggestion_reason, git_root, git_remote";
 
-/// Read an agent key column, failing on values this build does not know.
-pub(crate) fn agent_at(r: &Row, idx: usize) -> rusqlite::Result<AgentKind> {
+/// Read an agent identifier column. Unknown identifiers are fine; only a malformed one fails.
+pub(crate) fn agent_at(r: &Row, idx: usize) -> rusqlite::Result<AgentId> {
     let agent: String = r.get(idx)?;
-    AgentKind::parse(&agent).ok_or_else(|| {
-        rusqlite::Error::FromSqlConversionFailure(
-            idx,
-            rusqlite::types::Type::Text,
-            format!("unknown agent kind: {agent}").into(),
-        )
+    AgentId::parse(&agent).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(idx, rusqlite::types::Type::Text, e.into())
     })
 }
 
@@ -372,7 +368,7 @@ impl Store {
 
     // ---- Scan cursors ------------------------------------------------------
 
-    pub fn cursor(&self, agent: AgentKind, source_session_id: &str) -> Result<Option<CursorRow>> {
+    pub fn cursor(&self, agent: &AgentId, source_session_id: &str) -> Result<Option<CursorRow>> {
         Ok(self
             .conn
             .query_row(
@@ -396,7 +392,7 @@ impl Store {
     #[allow(clippy::too_many_arguments)]
     pub fn save_cursor(
         &self,
-        agent: AgentKind,
+        agent: &AgentId,
         source_session_id: &str,
         cursor: &CursorRow,
         reset_counters: bool,
@@ -472,7 +468,7 @@ impl Store {
     /// Merge a batch of events into a session, inside a single transaction.
     pub fn ingest(
         &mut self,
-        agent: AgentKind,
+        agent: &AgentId,
         source_session_id: &str,
         events: &[IrEvent],
     ) -> Result<IngestStats> {
@@ -515,7 +511,7 @@ impl Store {
     }
 
     /// Number of stored sessions per agent, including those of agents no longer scanned.
-    pub fn session_counts_by_agent(&self) -> Result<Vec<(AgentKind, u64)>> {
+    pub fn session_counts_by_agent(&self) -> Result<Vec<(AgentId, u64)>> {
         let mut stmt = self
             .conn
             .prepare("SELECT agent, COUNT(*) FROM sessions GROUP BY agent ORDER BY agent")?;
@@ -523,8 +519,7 @@ impl Store {
         let mut out = Vec::new();
         for row in rows {
             let (agent, n) = row?;
-            let kind = AgentKind::parse(&agent)
-                .with_context(|| format!("unknown agent in database: {agent}"))?;
+            let kind = AgentId::parse(&agent)?;
             out.push((kind, n as u64));
         }
         Ok(out)
@@ -851,7 +846,7 @@ impl Store {
 
 fn ingest_tx(
     tx: &Transaction,
-    agent: AgentKind,
+    agent: &AgentId,
     source_session_id: &str,
     events: &[IrEvent],
 ) -> Result<IngestStats> {
@@ -1209,9 +1204,9 @@ mod tests {
     fn ingest_is_idempotent() {
         let mut store = Store::open_in_memory().unwrap();
         let events = sample_events();
-        let first = store.ingest(AgentKind::Claude, "s1", &events).unwrap();
+        let first = store.ingest(&AgentId::CLAUDE, "s1", &events).unwrap();
         assert_eq!((first.new_turns, first.new_items), (1, 2));
-        let second = store.ingest(AgentKind::Claude, "s1", &events).unwrap();
+        let second = store.ingest(&AgentId::CLAUDE, "s1", &events).unwrap();
         assert_eq!((second.new_turns, second.new_items), (0, 0));
 
         let session = store.session(first.session_id).unwrap().unwrap();
@@ -1244,21 +1239,33 @@ mod tests {
     fn session_counts_are_grouped_by_agent() {
         let mut store = Store::open_in_memory().unwrap();
         let events = sample_events();
-        store.ingest(AgentKind::Claude, "s1", &events).unwrap();
-        store.ingest(AgentKind::Claude, "s2", &events).unwrap();
-        store.ingest(AgentKind::OpenCode, "s1", &events).unwrap();
+        store.ingest(&AgentId::CLAUDE, "s1", &events).unwrap();
+        store.ingest(&AgentId::CLAUDE, "s2", &events).unwrap();
+        store.ingest(&AgentId::OPENCODE, "s1", &events).unwrap();
         assert_eq!(
             store.session_counts_by_agent().unwrap(),
-            [(AgentKind::Claude, 2), (AgentKind::OpenCode, 1)]
+            [(AgentId::CLAUDE, 2), (AgentId::OPENCODE, 1)]
         );
+    }
+
+    #[test]
+    fn unregistered_agents_are_stored_and_read_back() {
+        let mut store = Store::open_in_memory().unwrap();
+        let custom = AgentId::parse("x-mytool").unwrap();
+        let id = store
+            .ingest(&custom, "s1", &sample_events())
+            .unwrap()
+            .session_id;
+        assert_eq!(store.session(id).unwrap().unwrap().agent, custom);
+        assert_eq!(store.session_counts_by_agent().unwrap(), [(custom, 1)]);
     }
 
     #[test]
     fn items_in_later_batch_attach_to_last_turn() {
         let mut store = Store::open_in_memory().unwrap();
         let events = sample_events();
-        store.ingest(AgentKind::Claude, "s1", &events[..2]).unwrap();
-        let stats = store.ingest(AgentKind::Claude, "s1", &events[2..]).unwrap();
+        store.ingest(&AgentId::CLAUDE, "s1", &events[..2]).unwrap();
+        let stats = store.ingest(&AgentId::CLAUDE, "s1", &events[2..]).unwrap();
         assert_eq!((stats.new_turns, stats.new_items), (0, 2));
         assert_eq!(store.all_turns(stats.session_id).unwrap().len(), 1);
     }
@@ -1267,7 +1274,7 @@ mod tests {
     fn activity_before_any_prompt_gets_implicit_turn() {
         let mut store = Store::open_in_memory().unwrap();
         let events = sample_events();
-        let stats = store.ingest(AgentKind::Claude, "s1", &events[4..]).unwrap();
+        let stats = store.ingest(&AgentId::CLAUDE, "s1", &events[4..]).unwrap();
         let turns = store.all_turns(stats.session_id).unwrap();
         assert_eq!(turns.len(), 1);
         assert_eq!(turns[0].user_prompt, "");
@@ -1277,7 +1284,7 @@ mod tests {
     fn slices_keep_digest_across_replace() {
         let mut store = Store::open_in_memory().unwrap();
         let sid = store
-            .ingest(AgentKind::Claude, "s1", &sample_events())
+            .ingest(&AgentId::CLAUDE, "s1", &sample_events())
             .unwrap()
             .session_id;
         let mut slice = NewSlice {
@@ -1323,7 +1330,7 @@ mod tests {
     fn moved_slice_keeps_ignore_state_and_override() {
         let mut store = Store::open_in_memory().unwrap();
         let sid = store
-            .ingest(AgentKind::Claude, "s1", &sample_events())
+            .ingest(&AgentId::CLAUDE, "s1", &sample_events())
             .unwrap()
             .session_id;
         let slice = |date: &str, start: i64, end: i64| NewSlice {
@@ -1369,7 +1376,7 @@ mod tests {
         let add = |store: &mut Store, sid: &str, date: &str, mins: i64| -> (i64, i64) {
             let session_id = store
                 .ingest(
-                    AgentKind::Claude,
+                    &AgentId::CLAUDE,
                     sid,
                     &[IrEvent::TurnStart {
                         source_event_id: "u1".into(),
@@ -1482,7 +1489,7 @@ mod tests {
                 })
                 .collect();
             let session_id = store
-                .ingest(AgentKind::Claude, sid, &events)
+                .ingest(&AgentId::CLAUDE, sid, &events)
                 .unwrap()
                 .session_id;
             let slices: Vec<NewSlice> = dates

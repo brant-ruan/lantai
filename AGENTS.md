@@ -95,10 +95,10 @@ decided by the owner.**
 
 | Path | Responsibility |
 | :--- | :--- |
-| `crates/aj-ir` | IR types and version, no IO |
+| `crates/aj-ir` | IR types and version, agent identifiers and their registry, the exchange format header; no IO |
 | `crates/aj-adapter` | `SourceAdapter` and shared helpers (line reading, zstd that tolerates an incomplete last frame, `text` for tag stripping and truncation) |
 | `crates/aj-adapter-*` | one adapter per agent: `claude`, `codex`, `antigravity`, `dsh` (DeepSeek Harness), `workbuddy`, `opencode` |
-| `crates/aj-sources` | agent registry: session folders, detection, adapter construction; the only map from agent to adapter |
+| `crates/aj-sources` | per agent: session folders, detection, adapter construction; the only map from agent to adapter |
 | `crates/aj-store` | SQLite persistence and statistics queries |
 | `crates/aj-core` | scanning, daily slices, dehydration and redaction, statistics; `project/` splits rule matching (pure), Git detection (read-only file system) and assignment |
 | `crates/aj-report` | digests, reports, engines, anchors, export, human journal |
@@ -188,7 +188,9 @@ What the code does not make obvious. The design behind each is in the spec.
   roll-ups keep working.
 - **Agents:** an adapter's `probe` judges by the version of the local data; the Agents settings
   page never claims support just because a folder exists. Agents are identified by
-  `aj_ir::AgentKind` (`as_str` is the stable stored key; unknown values are an error).
+  `aj_ir::AgentId`, an open string; registered identifiers and product names are in `aj_ir`'s
+  registry, and unknown but well-formed identifiers are stored, counted and shown as is (never an
+  error); only registered agents with an adapter are scanned.
   `[agents.<key>]` in `config.toml` decides which agents are scanned and pre-digested (only Claude
   Code by default); re-evaluating assignments uses every supported adapter.
 - **Day boundary:** changing `[slicing] day_boundary_hour` calls `aj_core::slice::reslice_all`;

@@ -260,7 +260,7 @@ aj report weekly  [--week 2026-W47 | --date ...] [--update]
 aj report monthly [--month 2026-11 | --date ...] [--update]
 aj report history | show         查看报告的各个版本
 aj prompt list | show | new | edit | rename | delete | default
-aj export [--session <前缀>]      以 JSONL 导出 IR 事件
+aj export [--session <前缀>]      以 IR 交换格式导出会话
 aj models [--test]               列出模型别名，可选连通性测试
 aj doctor                        查看各数据源的解析状态
 ```
@@ -319,7 +319,7 @@ stage2_chars = 60000               # 单次报告请求的素材上限
 - **备份与恢复**在「设置 → 系统」里。备份是一个 zip 文件，包含数据库和设置；API 密钥留在钥匙串里，不在备份中。恢复之前会先保留一份被替换的数据。
 - **beta 期间的更新：**先看该版本的 **Breaking** 部分。新版本改变数据库格式时，兰台会在迁移前把旧数据库复制一份放在旁边（`journal.sqlite.bak-schema-<n>`）。
 - **卸载：**删除应用和上面的文件夹；如果装了命令行工具，再删除 `~/.local/bin/aj`；最后在「钥匙串访问」里删除 `lantai` 条目。
-- **导出数据：**报告可以导出为 Markdown；`aj export` 把会话导出为 JSONL，格式是兰台带版本号的中间表示，见 [docs/SPEC.md](docs/SPEC.md)。
+- **导出数据：**报告可以导出为 Markdown；`aj export` 按兰台中间表示的交换格式（每行一个 JSON）导出会话，格式带版本号，见 [docs/SPEC.md](docs/SPEC.md)。
 
 ## 架构
 

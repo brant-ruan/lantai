@@ -121,7 +121,7 @@ pub fn evaluate_all(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aj_ir::{AgentKind, IrEvent};
+    use aj_ir::{AgentId, IrEvent};
     use aj_store::NewRule;
 
     fn setup() -> (Store, i64) {
@@ -143,7 +143,7 @@ mod tests {
             },
         ];
         let sid = store
-            .ingest(AgentKind::Claude, "s1", &events)
+            .ingest(&AgentId::CLAUDE, "s1", &events)
             .unwrap()
             .session_id;
         (store, sid)

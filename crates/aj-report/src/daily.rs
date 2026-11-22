@@ -384,7 +384,7 @@ mod tests {
     use crate::engine::testing::MockEngine;
     use crate::lang::{EN, ZH_HANS};
     use aj_core::{slice::reslice_session, Config};
-    use aj_ir::{AgentKind, IrEvent};
+    use aj_ir::{AgentId, IrEvent};
     use chrono::{DateTime, FixedOffset, Utc};
     use std::sync::atomic::Ordering;
 
@@ -416,7 +416,7 @@ mod tests {
         events: &[IrEvent],
     ) {
         let id = store
-            .ingest(AgentKind::Claude, sid, events)
+            .ingest(&AgentId::CLAUDE, sid, events)
             .unwrap()
             .session_id;
         store.assign_manual(id, Some(project)).unwrap();
@@ -813,7 +813,7 @@ mod tests {
         };
         let s_free = store
             .ingest(
-                AgentKind::Claude,
+                &AgentId::CLAUDE,
                 "free",
                 &events("f", "revise the Atlas paper"),
             )
@@ -823,7 +823,7 @@ mod tests {
 
         let s_none = store
             .ingest(
-                AgentKind::Claude,
+                &AgentId::CLAUDE,
                 "explicit-none",
                 &events("n", "random chat"),
             )
@@ -834,7 +834,7 @@ mod tests {
 
         let s_ruled = store
             .ingest(
-                AgentKind::Claude,
+                &AgentId::CLAUDE,
                 "rule-suggested",
                 &events("r", "something else"),
             )
@@ -1222,7 +1222,7 @@ mod tests {
         let long_id = store.find_sessions_by_prefix("long").unwrap()[0].id;
         store
             .ingest(
-                AgentKind::Claude,
+                &AgentId::CLAUDE,
                 "long",
                 &[turn(
                     "u2",
@@ -1331,7 +1331,7 @@ mod tests {
         // Codex reviews from a worktree, Claude Code edits in the main checkout hours later.
         for (agent, sid, events) in [
             (
-                AgentKind::Codex,
+                AgentId::CODEX,
                 "review",
                 session(
                     "/wt/app",
@@ -1341,12 +1341,12 @@ mod tests {
                 ),
             ),
             (
-                AgentKind::Claude,
+                AgentId::CLAUDE,
                 "fix",
                 session("/repo", "u1", "2026-11-16T06:00:00Z", "/repo/src/login.css"),
             ),
         ] {
-            let id = store.ingest(agent, sid, &events).unwrap().session_id;
+            let id = store.ingest(&agent, sid, &events).unwrap().session_id;
             store.set_session_git(id, Some("/repo"), None).unwrap();
             store.assign_manual(id, Some(pid)).unwrap();
             reslice_session(&mut store, id, &Config::default(), &tz).unwrap();

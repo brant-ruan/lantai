@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use aj_ir::{AgentKind, Usage};
+use aj_ir::{AgentId, Usage};
 use aj_store::TokenAggregateRow;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,7 +20,7 @@ pub struct TokenStats {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokenModelStat {
-    pub agent: AgentKind,
+    pub agent: AgentId,
     /// `None` when the source did not name the model.
     pub model: Option<String>,
     pub calls: u64,
@@ -30,7 +30,7 @@ pub struct TokenModelStat {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokenAgentStat {
-    pub agent: AgentKind,
+    pub agent: AgentId,
     pub calls: u64,
     pub usage: Usage,
     pub share_pct: f64,
@@ -51,15 +51,17 @@ pub fn cache_hit_pct(u: &Usage) -> f64 {
 pub fn compute_token_stats(rows: &[TokenAggregateRow]) -> TokenStats {
     let mut calls = 0u64;
     let mut usage = Usage::default();
-    let mut by_model: HashMap<(AgentKind, Option<String>), (u64, Usage)> = HashMap::new();
-    let mut by_agent: HashMap<AgentKind, (u64, Usage)> = HashMap::new();
+    let mut by_model: HashMap<(AgentId, Option<String>), (u64, Usage)> = HashMap::new();
+    let mut by_agent: HashMap<AgentId, (u64, Usage)> = HashMap::new();
     for r in rows {
         calls += r.calls;
         add_usage(&mut usage, &r.usage);
-        let m = by_model.entry((r.agent, r.model.clone())).or_default();
+        let m = by_model
+            .entry((r.agent.clone(), r.model.clone()))
+            .or_default();
         m.0 += r.calls;
         add_usage(&mut m.1, &r.usage);
-        let a = by_agent.entry(r.agent).or_default();
+        let a = by_agent.entry(r.agent.clone()).or_default();
         a.0 += r.calls;
         add_usage(&mut a.1, &r.usage);
     }
@@ -114,7 +116,7 @@ mod tests {
 
     fn row(
         date: &str,
-        agent: AgentKind,
+        agent: AgentId,
         model: Option<&str>,
         calls: u64,
         u: (u64, u64, u64, u64),
@@ -138,19 +140,13 @@ mod tests {
         let rows = [
             row(
                 "2026-11-10",
-                AgentKind::Claude,
+                AgentId::CLAUDE,
                 Some("opus"),
                 3,
                 (100, 50, 800, 50),
             ),
-            row(
-                "2026-11-11",
-                AgentKind::Claude,
-                Some("opus"),
-                1,
-                (0, 0, 0, 0),
-            ),
-            row("2026-11-11", AgentKind::Codex, None, 2, (200, 100, 0, 0)),
+            row("2026-11-11", AgentId::CLAUDE, Some("opus"), 1, (0, 0, 0, 0)),
+            row("2026-11-11", AgentId::CODEX, None, 2, (200, 100, 0, 0)),
         ];
         let s = compute_token_stats(&rows);
         assert_eq!(s.calls, 6);
@@ -161,7 +157,7 @@ mod tests {
         assert_eq!(s.models[0].model.as_deref(), Some("opus"));
         assert_eq!(s.models[0].calls, 4);
         assert_eq!(s.models[1].model, None);
-        assert_eq!(s.agents[0].agent, AgentKind::Claude);
+        assert_eq!(s.agents[0].agent, AgentId::CLAUDE);
         assert!((s.agents[1].share_pct - 300.0 / 1300.0 * 100.0).abs() < 1e-9);
     }
 

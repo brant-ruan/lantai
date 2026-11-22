@@ -1,6 +1,6 @@
 //! Classification and totals for Lantai's own state (report coverage, digest cache). Pure logic.
 
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use chrono::NaiveDate;
 
 /// Whether a slice's digest can be reused as is.
@@ -140,7 +140,7 @@ pub struct DayDigest {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentDigest {
-    pub agent: AgentKind,
+    pub agent: AgentId,
     pub tally: DigestTally,
 }
 
@@ -169,10 +169,17 @@ pub struct SelfStats {
     pub project_briefs: u64,
 }
 
-/// Agents in display order with their tallies, dropping agents without slices.
-pub fn agent_rows(mut tallies: Vec<(AgentKind, DigestTally)>) -> Vec<AgentDigest> {
+/// Agents in display order (registered ones first, then the rest by identifier) with their
+/// tallies, dropping agents without slices.
+pub fn agent_rows(mut tallies: Vec<(AgentId, DigestTally)>) -> Vec<AgentDigest> {
     tallies.retain(|(_, t)| t.active() + t.ignored > 0);
-    tallies.sort_by_key(|(a, _)| AgentKind::ALL.iter().position(|k| k == a));
+    let rank = |a: &AgentId| {
+        aj_ir::REGISTRY
+            .iter()
+            .position(|r| r.id == *a)
+            .unwrap_or(usize::MAX)
+    };
+    tallies.sort_by(|(a, _), (b, _)| rank(a).cmp(&rank(b)).then_with(|| a.cmp(b)));
     tallies
         .into_iter()
         .map(|(agent, tally)| AgentDigest { agent, tally })
@@ -239,11 +246,11 @@ mod tests {
             ..Default::default()
         };
         let rows = agent_rows(vec![
-            (AgentKind::Codex, busy),
-            (AgentKind::Dsh, DigestTally::default()),
-            (AgentKind::Claude, busy),
+            (AgentId::CODEX, busy),
+            (AgentId::DSH, DigestTally::default()),
+            (AgentId::CLAUDE, busy),
         ]);
-        let agents: Vec<_> = rows.iter().map(|r| r.agent).collect();
-        assert_eq!(agents, [AgentKind::Claude, AgentKind::Codex]);
+        let agents: Vec<_> = rows.iter().map(|r| r.agent.clone()).collect();
+        assert_eq!(agents, [AgentId::CLAUDE, AgentId::CODEX]);
     }
 }

@@ -278,7 +278,7 @@ pub fn truncate_middle(text: &str, max_chars: usize) -> String {
 mod tests {
     use super::*;
     use crate::{slice::reslice_session, Config};
-    use aj_ir::{AgentKind, DiffStat, IrEvent};
+    use aj_ir::{AgentId, DiffStat, IrEvent};
     use chrono::{DateTime, FixedOffset, Utc};
 
     fn t(s: &str) -> DateTime<Utc> {
@@ -342,7 +342,7 @@ mod tests {
             },
         ];
         let sid = store
-            .ingest(AgentKind::Claude, "s", &events)
+            .ingest(&AgentId::CLAUDE, "s", &events)
             .unwrap()
             .session_id;
         reslice_session(&mut store, sid, &Config::default(), &tz).unwrap();

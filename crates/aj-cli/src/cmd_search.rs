@@ -3,10 +3,10 @@
 use std::io::IsTerminal;
 
 use aj_core::search::SnippetPart;
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use aj_report::search::{search, ReportRef, SearchLayer, SearchRequest};
 use aj_store::SliceFilter;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::Args;
 
 use crate::app::{clip, App};
@@ -86,10 +86,7 @@ pub(crate) fn cmd_search(app: &App, args: SearchArgs) -> Result<()> {
         None => None,
     };
     let agent = match &args.agent {
-        Some(key) => match AgentKind::parse(key) {
-            Some(a) => Some(a),
-            None => bail!("unknown agent {key:?}"),
-        },
+        Some(key) => Some(AgentId::parse(key)?),
         None => None,
     };
     let req = SearchRequest {
@@ -146,7 +143,7 @@ pub(crate) fn cmd_search(app: &App, args: SearchArgs) -> Result<()> {
                 "  {}  S{}  {}  {}  {}{}",
                 s.local_date,
                 s.slice_id,
-                s.agent.display_name(),
+                s.agent.product_name(),
                 s.project_name.as_deref().unwrap_or("Unassigned"),
                 clip(s.title.as_deref().unwrap_or("(untitled)"), 60),
                 if s.ignored { "  [ignored]" } else { "" }

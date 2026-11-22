@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use aj_adapter::{read_zstd_lines, ParseOutput, SourceAdapter, SourceFile};
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use anyhow::Result;
 
 mod parse;
@@ -33,8 +33,8 @@ impl DshAdapter {
 }
 
 impl SourceAdapter for DshAdapter {
-    fn agent(&self) -> AgentKind {
-        AgentKind::Dsh
+    fn agent(&self) -> AgentId {
+        AgentId::DSH
     }
 
     fn discover(&self) -> Result<Vec<SourceFile>> {

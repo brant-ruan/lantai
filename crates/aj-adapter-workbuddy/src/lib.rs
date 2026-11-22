@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use aj_adapter::{read_complete_lines, ParseOutput, SourceAdapter, SourceFile};
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use anyhow::Result;
 
 mod parse;
@@ -30,8 +30,8 @@ impl WorkBuddyAdapter {
 }
 
 impl SourceAdapter for WorkBuddyAdapter {
-    fn agent(&self) -> AgentKind {
-        AgentKind::WorkBuddy
+    fn agent(&self) -> AgentId {
+        AgentId::WORKBUDDY
     }
 
     fn discover(&self) -> Result<Vec<SourceFile>> {

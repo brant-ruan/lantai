@@ -666,7 +666,7 @@ export function App() {
         <SearchView
           search={search}
           projects={projectsOverview?.projects ?? []}
-          agents={preDigest.agentSources.filter((a) => a.supported)}
+          agents={preDigest.agentSources}
           onOpenReport={openReport}
           onOpenSlice={(sliceId, turnIndex) => void drawer.open(sliceId, turnIndex)}
           drawerOpen={drawer.detail !== null || drawer.loading}

@@ -368,7 +368,7 @@ mod tests {
 
     fn store_with_two_days() -> Store {
         use crate::{slice::reslice_session, Config};
-        use aj_ir::{AgentKind, IrEvent, ToolKind};
+        use aj_ir::{AgentId, IrEvent, ToolKind};
         use chrono::{FixedOffset, Utc};
 
         let t = |s: &str| s.parse::<chrono::DateTime<Utc>>().unwrap();
@@ -413,7 +413,7 @@ mod tests {
             },
         ];
         let sid = store
-            .ingest(AgentKind::Claude, "s", &events)
+            .ingest(&AgentId::CLAUDE, "s", &events)
             .unwrap()
             .session_id;
         reslice_session(&mut store, sid, &Config::default(), &tz).unwrap();

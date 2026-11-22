@@ -29,9 +29,7 @@ export function AgentsView({
           <div className="agent-row-main">
             <div className="settings-row-title agent-row-title">
               {s.name}
-              {!s.supported ? (
-                <span className="badge">{t.comingSoon}</span>
-              ) : !s.detected ? (
+              {!s.detected ? (
                 <span className="badge">{t.notFound}</span>
               ) : s.compatibility === "unsupported" ? (
                 <span className="badge badge-warn">{t.unsupported}</span>
@@ -56,7 +54,7 @@ export function AgentsView({
               </div>
             )}
             {s.storedSessions > 0 &&
-              (s.supported && !s.enabled ? (
+              (!s.enabled ? (
                 <div className="agent-stored frozen">
                   {t.storedFrozen(s.storedSessions)}
                 </div>
@@ -69,14 +67,10 @@ export function AgentsView({
               </div>
             )}
           </div>
-          <label
-            className={`toggle-row ${s.supported ? "" : "disabled"}`}
-            title={s.supported ? undefined : t.noAdapter}
-          >
+          <label className="toggle-row">
             <input
               type="checkbox"
               checked={s.enabled}
-              disabled={!s.supported}
               onChange={(e) =>
                 onUpdate(
                   s.agent,

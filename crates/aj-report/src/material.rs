@@ -326,7 +326,7 @@ fn render_links(links: &[TaskLink], items: &[&Material]) -> String {
         items
             .iter()
             .find(|m| m.slice.id == id)
-            .map(|m| m.session.agent.display_name())
+            .map(|m| m.session.agent.product_name())
             .unwrap_or("")
     };
     let mut out = String::from(
@@ -365,7 +365,7 @@ where
         p,
         "\n### Slice S{} ({} session \"{}\", {start}-{end}, ~{} active min",
         m.slice.id,
-        m.session.agent.display_name(),
+        m.session.agent.product_name(),
         m.title(),
         m.slice.active_minutes
     );

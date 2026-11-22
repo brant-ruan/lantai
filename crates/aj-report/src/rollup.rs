@@ -202,7 +202,7 @@ fn add_note_periods(
 mod tests {
     use super::*;
     use aj_core::{slice::reslice_session, Config};
-    use aj_ir::{AgentKind, IrEvent};
+    use aj_ir::{AgentId, IrEvent};
     use aj_store::NewReportVersion;
     use chrono::FixedOffset;
 
@@ -232,7 +232,7 @@ mod tests {
         for (sid, at) in [("a", "2026-11-10T02:00:00Z"), ("b", "2026-11-17T02:00:00Z")] {
             let id = store
                 .ingest(
-                    AgentKind::Claude,
+                    &AgentId::CLAUDE,
                     sid,
                     &[IrEvent::TurnStart {
                         source_event_id: "u1".into(),
@@ -344,7 +344,7 @@ mod tests {
         // 2026-11-30 is Monday of 2026-W49 (Thursday 2026-12-03 -> December).
         let id = store
             .ingest(
-                AgentKind::Claude,
+                &AgentId::CLAUDE,
                 "c",
                 &[IrEvent::TurnStart {
                     source_event_id: "u1".into(),

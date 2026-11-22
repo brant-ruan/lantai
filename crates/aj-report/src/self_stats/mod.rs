@@ -8,7 +8,7 @@ mod tally;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use aj_store::{ReportSummaryRow, Store};
 use anyhow::Result;
 use chrono::{NaiveDate, TimeZone};
@@ -66,7 +66,7 @@ where
     let mut days = Vec::new();
     let mut digest_days = Vec::new();
     let mut digest = DigestTally::default();
-    let mut agents: HashMap<AgentKind, DigestTally> = HashMap::new();
+    let mut agents: HashMap<AgentId, DigestTally> = HashMap::new();
     let mut split_slices = 0;
     let mut incremental_updates = 0;
     let mut week_cells = Vec::with_capacity(weeks.len());
@@ -95,7 +95,10 @@ where
                         m.prior.is_some() || m.slice.digest_json.is_some(),
                     );
                     tally.add(state);
-                    agents.entry(m.session.agent).or_default().add(state);
+                    agents
+                        .entry(m.session.agent.clone())
+                        .or_default()
+                        .add(state);
                     split_slices += u64::from(!m.cached_parts.is_empty());
                     incremental_updates += u64::from(m.slice.digest_update_count);
                 }
@@ -226,7 +229,7 @@ mod tests {
     fn add_session(store: &mut Store, tz: &FixedOffset, sid: &str, project: i64, at: &str) -> i64 {
         let id = store
             .ingest(
-                AgentKind::Claude,
+                &AgentId::CLAUDE,
                 sid,
                 &[IrEvent::TurnStart {
                     source_event_id: "u1".into(),

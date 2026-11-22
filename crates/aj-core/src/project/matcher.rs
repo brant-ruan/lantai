@@ -251,7 +251,7 @@ mod tests {
     fn uncovered_path_detects_missing_and_covered_roots() {
         let mut session = SessionRow {
             id: 1,
-            agent: aj_ir::AgentKind::Claude,
+            agent: aj_ir::AgentId::CLAUDE,
             source_session_id: "s1".into(),
             project_id: None,
             assignment_source: "unassigned".into(),

@@ -270,14 +270,16 @@ pub(crate) fn cmd_export(app: &App, session_prefix: Option<&str>) -> Result<()> 
                 continue;
             }
             let parsed = adapter.parse(&file, 0)?;
+            // The exchange format (docs/SPEC.md, "Exchange format"): a session header, then the
+            // session's events, one per line.
+            let header = aj_ir::SessionHeader {
+                ir_version: aj_ir::IR_VERSION.to_string(),
+                agent: adapter.agent(),
+                session_id: file.source_session_id.clone(),
+            };
+            writeln!(out, "{}", serde_json::to_string(&header)?)?;
             for event in parsed.events {
-                let line = serde_json::json!({
-                    "ir_version": aj_ir::IR_VERSION,
-                    "agent": adapter.agent(),
-                    "session": file.source_session_id,
-                    "data": event,
-                });
-                writeln!(out, "{line}")?;
+                writeln!(out, "{}", serde_json::to_string(&event)?)?;
             }
         }
     }
@@ -320,7 +322,7 @@ pub(crate) fn cmd_doctor(app: &App) -> Result<()> {
             Compatibility::Partial => "partly supported",
             Compatibility::Unsupported => "not supported",
         };
-        println!("\n{} local data: {verdict}", kind.display_name());
+        println!("\n{} local data: {verdict}", kind.product_name());
         if !probe.versions.is_empty() {
             println!("  versions found: {}", probe.versions.join(", "));
         }

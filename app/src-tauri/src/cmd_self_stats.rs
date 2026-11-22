@@ -144,7 +144,7 @@ fn to_dto(s: SelfStats, engine: String) -> LantaiStatsDto {
             .into_iter()
             .map(|a| AgentDigestDto {
                 agent: a.agent.as_str().to_string(),
-                name: a.agent.display_name().to_string(),
+                name: a.agent.product_name().to_string(),
                 tally: a.tally.into(),
             })
             .collect(),

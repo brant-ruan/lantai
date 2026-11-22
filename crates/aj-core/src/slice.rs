@@ -130,7 +130,7 @@ pub fn reslice_all<Tz: TimeZone>(store: &mut Store, cfg: &Config, tz: &Tz) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aj_ir::{AgentKind, IrEvent};
+    use aj_ir::{AgentId, IrEvent};
     use chrono::FixedOffset;
 
     fn t(s: &str) -> DateTime<Utc> {
@@ -185,7 +185,7 @@ mod tests {
             turn("c", "2026-11-17T02:00:00Z"), // 10:00 in UTC+8, 11-17
         ];
         let sid = store
-            .ingest(AgentKind::Claude, "s", &events)
+            .ingest(&AgentId::CLAUDE, "s", &events)
             .unwrap()
             .session_id;
         reslice_session(&mut store, sid, &Config::default(), &tz).unwrap();

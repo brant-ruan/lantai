@@ -8,7 +8,7 @@ use std::time::UNIX_EPOCH;
 
 use aj_adapter::text::{strip_tag_blocks, tag_content, truncate_middle, truncate_tail};
 use aj_adapter::{peek_type, read_complete_lines, ParseOutput, SourceAdapter, SourceFile};
-use aj_ir::{AgentKind, DiffStat, IrEvent, ToolKind, Usage};
+use aj_ir::{AgentId, DiffStat, IrEvent, ToolKind, Usage};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -57,8 +57,8 @@ impl ClaudeAdapter {
 }
 
 impl SourceAdapter for ClaudeAdapter {
-    fn agent(&self) -> AgentKind {
-        AgentKind::Claude
+    fn agent(&self) -> AgentId {
+        AgentId::CLAUDE
     }
 
     fn discover(&self) -> Result<Vec<SourceFile>> {

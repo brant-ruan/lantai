@@ -224,12 +224,10 @@ export const en = {
   },
 
   agents: {
-    comingSoon: "Coming soon",
     detected: "Detected",
     notFound: "Not found",
     dirExists: "Directory exists",
     dirMissing: "Directory not found",
-    noAdapter: "No adapter for this agent yet",
     enabled: "Enabled",
     partial: "Partly supported",
     unsupported: "Version not supported",

@@ -4,7 +4,7 @@
 //! Matching here is a substring scan (`LIKE`, ASCII case-insensitive) on one needle; combining
 //! several terms, snippets and ranking live in `aj-core` and `aj-report`.
 
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use anyhow::Result;
 use rusqlite::{named_params, params_from_iter};
 
@@ -23,7 +23,7 @@ pub struct SliceFilter {
     pub since: Option<String>,
     pub until: Option<String>,
     pub project_id: Option<i64>,
-    pub agent: Option<AgentKind>,
+    pub agent: Option<AgentId>,
     pub include_ignored: bool,
 }
 
@@ -57,7 +57,7 @@ pub struct SliceRef {
     pub slice_id: i64,
     pub local_date: String,
     pub session_id: i64,
-    pub agent: AgentKind,
+    pub agent: AgentId,
     pub title: Option<String>,
     pub project_id: Option<i64>,
     pub project_name: Option<String>,
@@ -171,7 +171,7 @@ impl Store {
                     ":since": filter.since,
                     ":until": filter.until,
                     ":project": filter.project_id,
-                    ":agent": filter.agent.map(AgentKind::as_str),
+                    ":agent": filter.agent.as_ref().map(AgentId::as_str),
                     ":ignored": i32::from(filter.include_ignored),
                     ":limit": limit as i64,
                 },
@@ -293,7 +293,7 @@ impl Store {
                     ":since": filter.since,
                     ":until": filter.until,
                     ":project": filter.project_id,
-                    ":agent": filter.agent.map(AgentKind::as_str),
+                    ":agent": filter.agent.as_ref().map(AgentId::as_str),
                     ":ignored": i32::from(filter.include_ignored),
                     ":limit": limit as i64,
                 },

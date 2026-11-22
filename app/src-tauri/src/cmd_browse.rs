@@ -229,7 +229,7 @@ fn build_slice_card(
         source_session_id: session.source_session_id.clone(),
         short_id: session.source_session_id.chars().take(8).collect(),
         agent: session.agent.as_str().to_string(),
-        agent_name: session.agent.display_name().to_string(),
+        agent_name: session.agent.product_name().to_string(),
         title: session
             .title
             .clone()
@@ -836,8 +836,8 @@ pub fn diagnostics(state: tauri::State<'_, AppState>) -> Result<DiagnosticsDto, 
         .map_err(cmd_err)?
         .into_iter()
         .map(|h| SourceHealthDto {
-            agent: aj_ir::AgentKind::parse(&h.agent)
-                .map_or(h.agent, |a| a.display_name().to_string()),
+            agent: aj_ir::AgentId::parse(&h.agent)
+                .map_or(h.agent, |a| a.product_name().to_string()),
             files: h.files,
             error_count: h.error_count,
             unknown_count: h.unknown_count,

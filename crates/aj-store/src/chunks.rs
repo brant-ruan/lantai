@@ -131,7 +131,7 @@ impl Store {
 mod tests {
     use super::*;
     use crate::NewSlice;
-    use aj_ir::{AgentKind, IrEvent};
+    use aj_ir::{AgentId, IrEvent};
 
     #[test]
     fn chunks_are_replaced_as_a_set_and_follow_their_slice() {
@@ -143,7 +143,7 @@ mod tests {
             user_prompt: "hello".into(),
         }];
         let sid = store
-            .ingest(AgentKind::Claude, "s1", &events)
+            .ingest(&AgentId::CLAUDE, "s1", &events)
             .unwrap()
             .session_id;
         let slice = NewSlice {

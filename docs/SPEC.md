@@ -109,8 +109,53 @@ flowchart TD
   (migration, reading old formats, or a rescan) is decided case by case; see `AGENTS.md`.
 - Two layers: the **event layer** (what adapters emit, streamable) and the **storage layer**
   (merged tables in SQLite). Adapters only produce events.
-- External consumers either open the SQLite database read-only or use `aj export` (event layer as
-  JSONL).
+- External consumers either open the SQLite database read-only or use `aj export`, which writes
+  the event layer in the exchange format below.
+
+### Agent identifiers
+
+Every session names the agent that produced it with an **agent identifier** (`aj_ir::AgentId`),
+an open string rather than a closed list, so data from agents Lantai has no adapter for can still
+be stored, counted and exported.
+
+- **Form:** lowercase ASCII, starting with a letter, then letters, digits, `-`, `_` or `.`; at
+  most 64 characters.
+- **Registered identifiers** match `[a-z][a-z0-9_-]*` and are listed below. Once registered, an
+  identifier is never renamed or reused. `aj-ir` holds the table (identifier, product name, IR
+  version of registration) and a constant for each.
+- **Unregistered identifiers** start with `x-` (`x-mytool`) or are a reverse domain name
+  (`com.example.tool`), so they can never collide with a later registration.
+- **Unknown identifiers are not an error.** Storage, statistics and reports accept any
+  well-formed identifier and show it as is; only registered agents with an adapter are scanned.
+
+| Identifier | Product | Registered in IR |
+| :--- | :--- | :--- |
+| `claude` | Claude Code | 0.3.0 |
+| `codex` | Codex CLI | 0.3.0 |
+| `antigravity` | Antigravity | 0.3.0 |
+| `dsh` | DeepSeek Harness | 0.3.0 |
+| `workbuddy` | WorkBuddy | 0.3.0 |
+| `opencode` | OpenCode | 0.3.0 |
+
+### Exchange format
+
+The event layer as a stream of JSON lines, used by `aj export` and meant for anything that
+produces or consumes IR outside Lantai.
+
+```jsonl
+{"record":"session","ir_version":"0.3.0","agent":"claude","session_id":"5f0c…"}
+{"event":"session_meta","cwd":"/work/app","git_branch":"main","agent_version":"2.1.0","parent_session_id":null}
+{"event":"turn_start","source_event_id":"u1","timestamp":"2026-11-16T01:00:00Z","user_prompt":"…"}
+{"record":"session","ir_version":"0.3.0","agent":"codex","session_id":"019a…"}
+{"event":"turn_start", …}
+```
+
+- A **session header** (`"record": "session"`) opens each session; every event line after it
+  belongs to that session until the next header. Lines must be read in order.
+- One stream may hold any number of sessions, from any agents.
+- Event lines are exactly the serialized `IrEvent`s above (`"event"` is the tag).
+- `ir_version` is on every header, so streams can be concatenated. A reader rejects a major
+  version it does not know; earlier formats are not read.
 
 ### Events
 
@@ -186,7 +231,7 @@ Notes:
 
 ```rust
 trait SourceAdapter {
-    fn agent(&self) -> AgentKind;
+    fn agent(&self) -> AgentId;
     fn discover(&self) -> Result<Vec<SourceFile>>;                // one entry per session
     fn parse(&self, file: &SourceFile, from_offset: u64) -> Result<ParseOutput>;
     fn normalize_cwd(&self, cwd: &str) -> String;                 // e.g. agent worktree → repository
@@ -374,7 +419,7 @@ aj note / ignore / include            notes and ignore state
 aj project / rule / assign / unassign / accept
 aj prompt …                           report prompts
 aj report daily|weekly|monthly        generate (--update, --dry-run, --lang); history / show
-aj export                             IR events as JSONL
+aj export                             IR events in the exchange format
 aj models [--test]                    model aliases and connectivity
 aj doctor                             parse health and source status
 ```

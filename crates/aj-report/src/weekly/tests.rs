@@ -1,7 +1,7 @@
 use super::*;
 use crate::engine::testing::MockEngine;
 use aj_core::{slice::reslice_session, Config};
-use aj_ir::{AgentKind, IrEvent};
+use aj_ir::{AgentId, IrEvent};
 use chrono::FixedOffset;
 
 fn t(s: &str) -> DateTime<Utc> {
@@ -19,7 +19,7 @@ fn turn(id: &str, at: &str, prompt: &str) -> IrEvent {
 /// Short sessions: their digests pass through without a model call.
 fn add_session(store: &mut Store, tz: &FixedOffset, sid: &str, project: i64, events: &[IrEvent]) {
     let id = store
-        .ingest(AgentKind::Claude, sid, events)
+        .ingest(&AgentId::CLAUDE, sid, events)
         .unwrap()
         .session_id;
     store.assign_manual(id, Some(project)).unwrap();

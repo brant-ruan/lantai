@@ -80,7 +80,7 @@ impl From<TokenStats> for TokenStatsDto {
                 .into_iter()
                 .map(|m| TokenModelDto {
                     agent: m.agent.as_str().to_string(),
-                    agent_name: m.agent.display_name().to_string(),
+                    agent_name: m.agent.product_name().to_string(),
                     model: m.model,
                     calls: m.calls,
                     usage: m.usage.into(),
@@ -92,7 +92,7 @@ impl From<TokenStats> for TokenStatsDto {
                 .into_iter()
                 .map(|a| TokenAgentDto {
                     agent: a.agent.as_str().to_string(),
-                    name: a.agent.display_name().to_string(),
+                    name: a.agent.product_name().to_string(),
                     calls: a.calls,
                     usage: a.usage.into(),
                     share_pct: a.share_pct,
@@ -245,7 +245,7 @@ impl From<StatsReport> for StatsReportDto {
                 .into_iter()
                 .map(|a| StatsAgentItemDto {
                     agent: a.agent.as_str().to_string(),
-                    name: a.agent.display_name().to_string(),
+                    name: a.agent.product_name().to_string(),
                     active_minutes: a.active_minutes,
                     share_pct: a.share_pct,
                     sessions: a.sessions,

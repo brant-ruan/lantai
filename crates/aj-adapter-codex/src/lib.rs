@@ -16,7 +16,7 @@ use std::time::UNIX_EPOCH;
 
 use aj_adapter::text::{strip_tag_blocks, truncate_middle, truncate_tail, unwrap_tag};
 use aj_adapter::{read_complete_lines, read_zstd_lines, ParseOutput, SourceAdapter, SourceFile};
-use aj_ir::{AgentKind, DiffStat, IrEvent, ToolKind, Usage};
+use aj_ir::{AgentId, DiffStat, IrEvent, ToolKind, Usage};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -65,8 +65,8 @@ impl CodexAdapter {
 }
 
 impl SourceAdapter for CodexAdapter {
-    fn agent(&self) -> AgentKind {
-        AgentKind::Codex
+    fn agent(&self) -> AgentId {
+        AgentId::CODEX
     }
 
     fn discover(&self) -> Result<Vec<SourceFile>> {

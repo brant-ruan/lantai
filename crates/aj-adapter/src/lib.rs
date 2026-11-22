@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
-use aj_ir::{AgentKind, IrEvent};
+use aj_ir::{AgentId, IrEvent};
 use anyhow::{Context, Result};
 
 /// A source file, corresponding to one session.
@@ -42,7 +42,7 @@ pub struct ParseOutput {
 }
 
 pub trait SourceAdapter {
-    fn agent(&self) -> AgentKind;
+    fn agent(&self) -> AgentId;
 
     /// Discover all source files.
     fn discover(&self) -> Result<Vec<SourceFile>>;

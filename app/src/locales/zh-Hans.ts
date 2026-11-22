@@ -212,12 +212,10 @@ export const zhHans = {
   },
 
   agents: {
-    comingSoon: "即将支持",
     detected: "已检测到",
     notFound: "未找到",
     dirExists: "目录存在",
     dirMissing: "目录不存在",
-    noAdapter: "还没有这个 Agent 的适配器",
     enabled: "启用",
     partial: "部分支持",
     unsupported: "版本暂不支持",

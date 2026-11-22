@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use aj_adapter::{Compatibility, ParseOutput, SourceAdapter, SourceFile, SourceProbe};
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use anyhow::Result;
 use rusqlite::Connection;
 
@@ -64,8 +64,8 @@ impl OpenCodeAdapter {
 }
 
 impl SourceAdapter for OpenCodeAdapter {
-    fn agent(&self) -> AgentKind {
-        AgentKind::OpenCode
+    fn agent(&self) -> AgentId {
+        AgentId::OPENCODE
     }
 
     fn discover(&self) -> Result<Vec<SourceFile>> {

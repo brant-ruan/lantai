@@ -528,8 +528,6 @@ export interface AgentSource {
   name: string;
   roots: { path: string; exists: boolean }[];
   detected: boolean;
-  /** False until Lantai has an adapter for this agent. */
-  supported: boolean;
   enabled: boolean;
   preDigest: boolean;
   /** Whether the local data's format (agent version) is one the adapter reads. */

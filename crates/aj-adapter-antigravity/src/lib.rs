@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use aj_adapter::{read_complete_lines, ParseOutput, SourceAdapter, SourceFile};
-use aj_ir::{AgentKind, IrEvent};
+use aj_ir::{AgentId, IrEvent};
 use anyhow::{Context, Result};
 
 mod cwd;
@@ -34,8 +34,8 @@ impl AntigravityAdapter {
 }
 
 impl SourceAdapter for AntigravityAdapter {
-    fn agent(&self) -> AgentKind {
-        AgentKind::Antigravity
+    fn agent(&self) -> AgentId {
+        AgentId::ANTIGRAVITY
     }
 
     fn discover(&self) -> Result<Vec<SourceFile>> {

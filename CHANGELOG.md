@@ -14,7 +14,7 @@ stored data or exported IR is affected:
 
 ## [Unreleased]
 
-The first public release. IR 0.2.0 · Schema 11.
+The first public release. IR 0.3.0 · Schema 11.
 
 ### Added
 
@@ -23,7 +23,9 @@ The first public release. IR 0.2.0 · Schema 11.
   Agent folders are only read; OpenCode's database is copied before it is opened. Settings →
   Agents shows which agents were found, which versions wrote their data, and whether that format
   is fully, partly or not yet supported. Turning an agent off stops scanning it and keeps what is
-  already stored.
+  already stored. Agents are named by open identifiers from a registry, so sessions from agents
+  without an adapter can still be stored and counted; `aj export` writes the IR exchange format
+  (a header line per session, then its events).
 - **The evening review.** Each day's sessions laid out with time, turns and changed files;
   details in a drawer; user-defined projects with folder, remote and regex rules plus model
   suggestions; ignore, include and bulk moves; batch generate or update across days; a

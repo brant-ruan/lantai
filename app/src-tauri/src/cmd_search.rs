@@ -1,7 +1,7 @@
 //! Thin Tauri command exposing `aj_report::search` to the Search view.
 
 use aj_core::search::{FieldSnippet, SnippetPart};
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use aj_report::search::{search, ReportRef, SearchLayer, SearchRequest, DEFAULT_TURN_LIMIT};
 use aj_store::SliceFilter;
 use serde::{Deserialize, Serialize};
@@ -72,8 +72,8 @@ pub struct SliceHitDto {
     pub slice_id: i64,
     pub local_date: String,
     pub session_id: i64,
-    pub agent: &'static str,
-    pub agent_name: &'static str,
+    pub agent: String,
+    pub agent_name: String,
     pub title: Option<String>,
     pub project_id: Option<i64>,
     pub project_name: Option<String>,
@@ -129,7 +129,7 @@ pub fn search_all(
     params: SearchParams,
 ) -> Result<SearchResultsDto, String> {
     let agent = match params.agent.as_deref() {
-        Some(key) => Some(AgentKind::parse(key).ok_or_else(|| format!("unknown agent: {key}"))?),
+        Some(key) => Some(AgentId::parse(key).map_err(|e| e.to_string())?),
         None => None,
     };
     let req = SearchRequest {
@@ -159,8 +159,8 @@ pub fn search_all(
                 slice_id: s.slice_id,
                 local_date: s.local_date.clone(),
                 session_id: s.session_id,
-                agent: s.agent.as_str(),
-                agent_name: s.agent.display_name(),
+                agent: s.agent.to_string(),
+                agent_name: s.agent.product_name().to_string(),
                 title: s.title.clone(),
                 project_id: s.project_id,
                 project_name: s.project_name.clone(),

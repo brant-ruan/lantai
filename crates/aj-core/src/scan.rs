@@ -1,7 +1,7 @@
 //! Incremental scan: discover source files, parse from the cursor, ingest, reslice, assign projects.
 
 use aj_adapter::{head_hash, ParseOutput, SourceAdapter, SourceFile};
-use aj_ir::{AgentKind, IrEvent};
+use aj_ir::{AgentId, IrEvent};
 use aj_store::{CursorRow, SessionRow, Store};
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
@@ -51,7 +51,7 @@ pub fn scan<Tz: TimeZone>(
             Err(e) => {
                 report
                     .failures
-                    .push(format!("{}: {e:#}", adapter.agent().display_name()));
+                    .push(format!("{}: {e:#}", adapter.agent().product_name()));
                 continue;
             }
         };
@@ -83,7 +83,7 @@ fn scan_file<Tz: TimeZone>(
 ) -> Result<()> {
     let agent = adapter.agent();
     let path_str = file.path.to_string_lossy().into_owned();
-    let cursor = store.cursor(agent, &file.source_session_id)?;
+    let cursor = store.cursor(&agent, &file.source_session_id)?;
 
     let from_offset = match &cursor {
         None => {
@@ -129,10 +129,10 @@ fn scan_file<Tz: TimeZone>(
 
     // Nothing to ingest (e.g. a session the adapter excludes): remember the cursor without creating an empty session.
     if parsed.events.is_empty() {
-        return save_cursor(store, agent, file, path_str, &parsed, reset, 0);
+        return save_cursor(store, &agent, file, path_str, &parsed, reset, 0);
     }
 
-    let stats = store.ingest(agent, &file.source_session_id, &parsed.events)?;
+    let stats = store.ingest(&agent, &file.source_session_id, &parsed.events)?;
     report.new_turns += stats.new_turns;
     report.new_items += stats.new_items;
     report.unknown_records += stats.unknown;
@@ -149,12 +149,12 @@ fn scan_file<Tz: TimeZone>(
         store.set_session_ignored(stats.session_id, true)?;
     }
 
-    save_cursor(store, agent, file, path_str, &parsed, reset, stats.unknown)
+    save_cursor(store, &agent, file, path_str, &parsed, reset, stats.unknown)
 }
 
 fn save_cursor(
     store: &Store,
-    agent: AgentKind,
+    agent: &AgentId,
     file: &SourceFile,
     current_path: String,
     parsed: &ParseOutput,
@@ -202,8 +202,8 @@ mod tests {
     }
 
     impl SourceAdapter for Versioned {
-        fn agent(&self) -> AgentKind {
-            AgentKind::OpenCode
+        fn agent(&self) -> AgentId {
+            AgentId::OPENCODE
         }
 
         fn discover(&self) -> Result<Vec<SourceFile>> {

@@ -550,7 +550,7 @@ impl Store {
 mod tests {
     use super::*;
     use crate::NewSlice;
-    use aj_ir::{AgentKind, IrEvent};
+    use aj_ir::{AgentId, IrEvent};
 
     fn store_with_session() -> (Store, i64) {
         let mut store = Store::open_in_memory().unwrap();
@@ -560,7 +560,7 @@ mod tests {
             user_prompt: "hello".into(),
         }];
         let id = store
-            .ingest(AgentKind::Claude, "s1", &events)
+            .ingest(&AgentId::CLAUDE, "s1", &events)
             .unwrap()
             .session_id;
         (store, id)

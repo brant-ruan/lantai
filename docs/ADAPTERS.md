@@ -14,8 +14,10 @@ change their formats without notice; the golden tests are meant to notice first.
    sub-agents, interruption, resume, forking, context compaction. Note where the agent keeps
    credentials or other private files next to its sessions; the adapter must read only the
    session files.
-2. **Add the agent kind** to `aj_ir::AgentKind`. Its `as_str` is the stable key stored in the
-   database and used in `config.toml` (`[agents.<key>]`); it never changes once released.
+2. **Register the agent identifier**: add a row to the table in `docs/SPEC.md` ("Agent
+   identifiers") and to `aj_ir`'s registry, with a constant. The identifier is the stable key
+   stored in the database and used in `config.toml` (`[agents.<key>]`); it is never renamed or
+   reused.
 3. **Create `crates/aj-adapter-<name>`** implementing `aj_adapter::SourceAdapter`:
    `discover` lists one `SourceFile` per session, `parse` turns records from an offset into IR
    events, `normalize_cwd` optionally maps agent-made worktrees back to their repository, and

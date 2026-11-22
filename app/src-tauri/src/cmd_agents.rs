@@ -3,7 +3,7 @@
 //! switches stored in `config.toml`.
 
 use aj_adapter::{CompatReason, Compatibility, SourceProbe};
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use aj_report::{AgentSettings, AppConfig};
 use anyhow::bail;
 use serde::Serialize;
@@ -24,7 +24,6 @@ pub struct AgentSourceDto {
     pub name: String,
     pub roots: Vec<SourceRootDto>,
     pub detected: bool,
-    pub supported: bool,
     pub enabled: bool,
     pub pre_digest: bool,
     /// `unchecked` | `supported` | `partial` | `unsupported`: whether the local data's format
@@ -79,15 +78,15 @@ fn sources_dto(state: &AppState, cfg: &AppConfig) -> Result<Vec<AgentSourceDto>,
     Ok(aj_sources::all_sources()
         .into_iter()
         .map(|src| {
-            let settings = cfg.agent(src.kind);
+            let settings = cfg.agent(&src.agent);
             let probe = probes
                 .iter()
-                .find(|(k, _)| *k == src.kind)
+                .find(|(k, _)| *k == src.agent)
                 .map(|(_, p)| p.clone())
                 .unwrap_or_else(SourceProbe::default);
             AgentSourceDto {
-                agent: src.kind.as_str().to_string(),
-                name: src.kind.display_name().to_string(),
+                agent: src.agent.as_str().to_string(),
+                name: src.agent.product_name().to_string(),
                 detected: src.detected(),
                 roots: src
                     .roots
@@ -97,16 +96,14 @@ fn sources_dto(state: &AppState, cfg: &AppConfig) -> Result<Vec<AgentSourceDto>,
                         exists: r.is_dir(),
                     })
                     .collect(),
-                // An agent without an adapter is never effectively on.
-                enabled: src.supported && settings.enabled,
-                pre_digest: src.supported && settings.enabled && settings.pre_digest,
-                supported: src.supported,
+                enabled: settings.enabled,
+                pre_digest: settings.enabled && settings.pre_digest,
                 compatibility: compatibility_str(probe.compatibility),
                 versions: probe.versions,
                 compat_reason: probe.reason.map(Into::into),
                 stored_sessions: stored
                     .iter()
-                    .find(|(k, _)| *k == src.kind)
+                    .find(|(k, _)| *k == src.agent)
                     .map_or(0, |(_, n)| *n),
             }
         })
@@ -129,14 +126,9 @@ pub fn set_agent_settings(
 ) -> Result<Vec<AgentSourceDto>, String> {
     let cfg = state
         .modify_config(|cfg| {
-            let Some(kind) = AgentKind::parse(&agent) else {
-                bail!("unknown agent: {agent}");
-            };
-            let supported = aj_sources::all_sources()
-                .iter()
-                .any(|s| s.kind == kind && s.supported);
-            if enabled && !supported {
-                bail!("{} is not supported yet", kind.display_name());
+            let kind = AgentId::parse(&agent)?;
+            if !aj_sources::is_supported(&kind) {
+                bail!("Lantai cannot read {} yet", kind.product_name());
             }
             cfg.set_agent(
                 kind,

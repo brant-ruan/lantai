@@ -55,7 +55,7 @@ use std::time::Duration;
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 
 use crate::engine::{ClaudeCliEngine, Engine};
 use crate::keystore::KeyStore;
@@ -78,7 +78,7 @@ pub struct AppConfig {
     pub providers: BTreeMap<String, ProviderConfig>,
     #[serde(default)]
     pub models: BTreeMap<String, ModelConfig>,
-    /// Per-agent source settings, keyed by [`AgentKind::as_str`].
+    /// Per-agent source settings, keyed by [`AgentId::as_str`].
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub agents: BTreeMap<String, AgentSettings>,
     /// Size limits; tune them to the context window of the model in use.
@@ -112,9 +112,9 @@ pub struct AgentSettings {
 
 impl AgentSettings {
     /// Claude Code is on by default; other agents are opt-in.
-    pub fn default_for(kind: AgentKind) -> Self {
+    pub fn default_for(kind: &AgentId) -> Self {
         Self {
-            enabled: kind == AgentKind::Claude,
+            enabled: *kind == AgentId::CLAUDE,
             pre_digest: false,
         }
     }
@@ -329,7 +329,9 @@ impl AppConfig {
         {
             bail!("[ui] language must not be empty in {}", path.display());
         }
-        if let Some(unknown) = cfg.agents.keys().find(|k| AgentKind::parse(k).is_none()) {
+        // Only registered agents can be scanned, so other keys are mistakes.
+        let registered = |k: &str| AgentId::parse(k).is_ok_and(|a| a.registration().is_some());
+        if let Some(unknown) = cfg.agents.keys().find(|k| !registered(k)) {
             bail!("unknown agent [agents.{unknown}] in {}", path.display());
         }
         for (alias, m) in &cfg.models {
@@ -358,9 +360,8 @@ impl AppConfig {
         &self.keystore
     }
 
-    /// The size limits to use: defaults with the configured overrides applied.
     /// The agent's settings, or its defaults when `config.toml` does not mention it.
-    pub fn agent(&self, kind: AgentKind) -> AgentSettings {
+    pub fn agent(&self, kind: &AgentId) -> AgentSettings {
         self.agents
             .get(kind.as_str())
             .copied()
@@ -432,7 +433,7 @@ impl AppConfig {
         self.ui.check_updates = on;
     }
 
-    pub fn set_agent(&mut self, kind: AgentKind, settings: AgentSettings) {
+    pub fn set_agent(&mut self, kind: AgentId, settings: AgentSettings) {
         self.agents.insert(kind.as_str().to_string(), settings);
     }
 
@@ -764,9 +765,9 @@ batch_concurrency = 4
         .unwrap();
         let cfg = AppConfig::load(&path, file_store(&dir)).unwrap();
         // Unlisted agents use their defaults: only Claude Code is on.
-        assert!(cfg.agent(AgentKind::Claude).enabled);
-        assert!(!cfg.agent(AgentKind::Antigravity).enabled);
-        assert!(cfg.agent(AgentKind::Codex).pre_digest);
+        assert!(cfg.agent(&AgentId::CLAUDE).enabled);
+        assert!(!cfg.agent(&AgentId::ANTIGRAVITY).enabled);
+        assert!(cfg.agent(&AgentId::CODEX).pre_digest);
         assert_eq!(cfg.budgets().chunk_chars, 1234);
         assert_eq!(cfg.budgets().batch_concurrency, 4);
         assert_eq!(cfg.budgets().stage2_chars, Budgets::default().stage2_chars);

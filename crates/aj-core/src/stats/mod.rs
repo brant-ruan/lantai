@@ -11,7 +11,7 @@ pub use tokens::{TokenAgentStat, TokenModelStat, TokenStats};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use aj_ir::{AgentKind, ToolKind, Usage};
+use aj_ir::{AgentId, ToolKind, Usage};
 use aj_store::{StatsSliceRow, Store, TokenAggregateRow, ToolAggregateRow};
 use anyhow::Result;
 use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Timelike, Utc};
@@ -133,7 +133,7 @@ pub struct ProjectStat {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentStat {
-    pub agent: AgentKind,
+    pub agent: AgentId,
     pub active_minutes: i64,
     pub share_pct: f64,
     pub sessions: u64,
@@ -244,7 +244,7 @@ pub fn compute_stats<Tz: TimeZone>(
     let mut total_turns: u64 = 0;
 
     let mut project_accs: HashMap<Option<i64>, ProjectAcc> = HashMap::new();
-    let mut agent_accs: HashMap<AgentKind, AgentAcc> = HashMap::new();
+    let mut agent_accs: HashMap<AgentId, AgentAcc> = HashMap::new();
     let mut all_intervals: Vec<Interval> = Vec::new();
     let mut parsed_slices: Vec<(NaiveDate, &StatsSliceRow)> = Vec::with_capacity(slices.len());
 
@@ -284,7 +284,7 @@ pub fn compute_stats<Tz: TimeZone>(
         p_acc.turns += s.turn_count;
         p_acc.files.extend(files.iter().cloned());
 
-        let a_acc = agent_accs.entry(s.agent).or_default();
+        let a_acc = agent_accs.entry(s.agent.clone()).or_default();
         a_acc
             .by_day
             .entry(date)
@@ -598,8 +598,8 @@ fn build_projects(accs: HashMap<Option<i64>, ProjectAcc>) -> Vec<ProjectStat> {
         .collect()
 }
 
-fn build_agents(accs: HashMap<AgentKind, AgentAcc>) -> Vec<AgentStat> {
-    let mut rows: Vec<(AgentKind, AgentAcc, i64)> = accs
+fn build_agents(accs: HashMap<AgentId, AgentAcc>) -> Vec<AgentStat> {
+    let mut rows: Vec<(AgentId, AgentAcc, i64)> = accs
         .into_iter()
         .map(|(agent, acc)| {
             let mins = sum_daily_union_minutes(&acc.by_day);
@@ -765,7 +765,7 @@ mod tests {
         id: i64,
         session_id: i64,
         local_date: &str,
-        agent: AgentKind,
+        agent: AgentId,
         project: Option<(i64, &str)>,
         cwd: Option<&str>,
         git_root: Option<&str>,
@@ -802,7 +802,7 @@ mod tests {
                 1,
                 10,
                 "2026-11-18",
-                AgentKind::Claude,
+                AgentId::CLAUDE,
                 Some((1, "App")),
                 Some("/work/app"),
                 Some("/work/app"),
@@ -815,7 +815,7 @@ mod tests {
                 2,
                 20,
                 "2026-11-18",
-                AgentKind::Codex,
+                AgentId::CODEX,
                 Some((1, "App")),
                 Some("/work/app/.claude/worktrees/wt1"),
                 Some("/work/app"),
@@ -831,7 +831,7 @@ mod tests {
                 3,
                 30,
                 "2026-11-18",
-                AgentKind::Antigravity,
+                AgentId::ANTIGRAVITY,
                 Some((2, "Other")),
                 Some("/work/other"),
                 Some("/work/other"),
@@ -902,7 +902,7 @@ mod tests {
                 1,
                 1,
                 "2026-11-13",
-                AgentKind::Claude,
+                AgentId::CLAUDE,
                 Some((1, "Alpha")),
                 None,
                 None,
@@ -914,7 +914,7 @@ mod tests {
                 2,
                 2,
                 "2026-11-18",
-                AgentKind::Claude,
+                AgentId::CLAUDE,
                 Some((2, "Beta")),
                 None,
                 None,
@@ -947,7 +947,7 @@ mod tests {
                 1,
                 1,
                 "2026-10-01",
-                AgentKind::Claude,
+                AgentId::CLAUDE,
                 None,
                 None,
                 None,
@@ -959,7 +959,7 @@ mod tests {
                 2,
                 2,
                 "2026-11-18",
-                AgentKind::Claude,
+                AgentId::CLAUDE,
                 None,
                 None,
                 None,
@@ -983,7 +983,7 @@ mod tests {
             1,
             1,
             "2026-11-18",
-            AgentKind::Claude,
+            AgentId::CLAUDE,
             None,
             None,
             None,
@@ -1070,7 +1070,7 @@ mod tests {
         let today = d("2026-11-18");
         let row = |date: &str, input| TokenAggregateRow {
             local_date: date.into(),
-            agent: AgentKind::Claude,
+            agent: AgentId::CLAUDE,
             model: None,
             calls: 1,
             usage: Usage {

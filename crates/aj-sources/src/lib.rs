@@ -1,9 +1,9 @@
-//! Registry of the coding agents Lantai knows about: where each one keeps its
-//! session files, whether an adapter exists for it yet, and construction of the
-//! adapters the shells (CLI, desktop) scan with.
+//! Where each registered agent keeps its sessions and how to build its adapter: the session
+//! roots the shells (CLI, desktop) scan and the adapters they scan with.
 //!
-//! This is the only place that maps an [`AgentKind`] to a concrete adapter, so
-//! adding an agent means adding its adapter crate and one arm here.
+//! This is the only place that maps an [`AgentId`] to a concrete adapter, so adding an agent
+//! means adding its adapter crate and one row to [`SOURCES`]. Identifiers and product names are
+//! registered in `aj_ir`.
 
 use std::path::{Path, PathBuf};
 
@@ -14,17 +14,15 @@ use aj_adapter_codex::CodexAdapter;
 use aj_adapter_dsh::DshAdapter;
 use aj_adapter_opencode::OpenCodeAdapter;
 use aj_adapter_workbuddy::WorkBuddyAdapter;
-use aj_ir::AgentKind;
+use aj_ir::AgentId;
 use anyhow::{Context, Result};
 
 /// One agent's session source on this machine.
 #[derive(Debug, Clone)]
 pub struct SourceInfo {
-    pub kind: AgentKind,
+    pub agent: AgentId,
     /// Directories the agent writes sessions to (the first is the primary one).
     pub roots: Vec<PathBuf>,
-    /// Whether Lantai has an adapter for this agent yet.
-    pub supported: bool,
 }
 
 impl SourceInfo {
@@ -34,127 +32,141 @@ impl SourceInfo {
     }
 }
 
-/// Session directories per agent. `AJ_CLAUDE_ROOT`, `AJ_CODEX_ROOT`, `AJ_ANTIGRAVITY_ROOT`, `AJ_DSH_ROOT`, `AJ_WORKBUDDY_ROOT`, and `AJ_OPENCODE_ROOT` override
-/// the default roots (a Codex or Antigravity override replaces the multiple default directories).
-fn roots(kind: AgentKind) -> Vec<PathBuf> {
-    let home = dirs::home_dir().unwrap_or_default();
-    match kind {
-        AgentKind::Claude => match std::env::var_os("AJ_CLAUDE_ROOT") {
-            Some(r) => vec![PathBuf::from(r)],
-            None => ClaudeAdapter::default_root().into_iter().collect(),
+/// Builds an adapter from its session roots and Lantai's data directory.
+type Build = fn(Vec<PathBuf>, &Path) -> Result<Box<dyn SourceAdapter>>;
+
+/// How Lantai reads one registered agent.
+struct Source {
+    agent: AgentId,
+    /// Environment variable whose value replaces all default roots.
+    env: &'static str,
+    default_roots: fn(home: &Path) -> Vec<PathBuf>,
+    build: Build,
+}
+
+fn first(roots: Vec<PathBuf>, what: &str) -> Result<PathBuf> {
+    roots
+        .into_iter()
+        .next()
+        .with_context(|| format!("no {what} directory"))
+}
+
+/// Agents with an adapter, in display order.
+const SOURCES: [Source; 6] = [
+    Source {
+        agent: AgentId::CLAUDE,
+        env: "AJ_CLAUDE_ROOT",
+        default_roots: |_| ClaudeAdapter::default_root().into_iter().collect(),
+        build: |roots, _| {
+            Ok(Box::new(ClaudeAdapter::new(first(
+                roots,
+                "Claude Code session",
+            )?)))
         },
-        AgentKind::Codex => match std::env::var_os("AJ_CODEX_ROOT") {
-            Some(r) => vec![PathBuf::from(r)],
-            None => vec![
+    },
+    Source {
+        agent: AgentId::CODEX,
+        env: "AJ_CODEX_ROOT",
+        default_roots: |home| {
+            vec![
                 home.join(".codex").join("sessions"),
                 home.join(".codex").join("archived_sessions"),
-            ],
+            ]
         },
-        AgentKind::Antigravity => match std::env::var_os("AJ_ANTIGRAVITY_ROOT") {
-            Some(r) => vec![PathBuf::from(r)],
-            None => vec![
+        build: |roots, _| Ok(Box::new(CodexAdapter::new(roots))),
+    },
+    Source {
+        agent: AgentId::ANTIGRAVITY,
+        env: "AJ_ANTIGRAVITY_ROOT",
+        default_roots: |home| {
+            vec![
                 home.join(".gemini").join("antigravity").join("brain"),
                 home.join(".gemini").join("antigravity-ide").join("brain"),
-            ],
+            ]
         },
-        AgentKind::Dsh => match std::env::var_os("AJ_DSH_ROOT") {
-            Some(r) => vec![PathBuf::from(r)],
-            None => vec![home.join(".dsh").join("sessions")],
+        build: |roots, _| Ok(Box::new(AntigravityAdapter::new(roots))),
+    },
+    Source {
+        agent: AgentId::DSH,
+        env: "AJ_DSH_ROOT",
+        default_roots: |home| vec![home.join(".dsh").join("sessions")],
+        build: |roots, _| {
+            Ok(Box::new(DshAdapter::new(first(
+                roots,
+                "DeepSeek Harness session",
+            )?)))
         },
-        AgentKind::WorkBuddy => match std::env::var_os("AJ_WORKBUDDY_ROOT") {
-            Some(r) => vec![PathBuf::from(r)],
-            None => vec![home.join(".workbuddy").join("projects")],
+    },
+    Source {
+        agent: AgentId::WORKBUDDY,
+        env: "AJ_WORKBUDDY_ROOT",
+        default_roots: |home| vec![home.join(".workbuddy").join("projects")],
+        build: |roots, _| {
+            Ok(Box::new(WorkBuddyAdapter::new(first(
+                roots,
+                "WorkBuddy session",
+            )?)))
         },
+    },
+    Source {
+        agent: AgentId::OPENCODE,
+        env: "AJ_OPENCODE_ROOT",
         // The directory holding `opencode.db`; OpenCode follows XDG on macOS too.
-        AgentKind::OpenCode => match std::env::var_os("AJ_OPENCODE_ROOT") {
-            Some(r) => vec![PathBuf::from(r)],
-            None => match std::env::var_os("XDG_DATA_HOME").filter(|v| !v.is_empty()) {
-                Some(d) => vec![PathBuf::from(d).join("opencode")],
-                None => vec![home.join(".local").join("share").join("opencode")],
-            },
+        default_roots: |home| match std::env::var_os("XDG_DATA_HOME").filter(|v| !v.is_empty()) {
+            Some(d) => vec![PathBuf::from(d).join("opencode")],
+            None => vec![home.join(".local").join("share").join("opencode")],
         },
+        // OpenCode's database is copied before it is opened; the copy lives under `cache/`.
+        build: |roots, data_dir| {
+            let cache = data_dir.join("cache").join("opencode");
+            Ok(Box::new(OpenCodeAdapter::new(
+                first(roots, "OpenCode data")?,
+                cache,
+            )))
+        },
+    },
+];
+
+/// Session directories of one source: its environment override, or the defaults.
+fn roots(src: &Source) -> Vec<PathBuf> {
+    match std::env::var_os(src.env) {
+        Some(r) => vec![PathBuf::from(r)],
+        None => (src.default_roots)(&dirs::home_dir().unwrap_or_default()),
     }
 }
 
-fn supported(kind: AgentKind) -> bool {
-    matches!(
-        kind,
-        AgentKind::Claude
-            | AgentKind::Codex
-            | AgentKind::Antigravity
-            | AgentKind::Dsh
-            | AgentKind::WorkBuddy
-            | AgentKind::OpenCode
-    )
-}
-
-/// Every known agent, in display order.
+/// Every agent Lantai can read, in display order.
 pub fn all_sources() -> Vec<SourceInfo> {
-    AgentKind::ALL
+    SOURCES
         .iter()
-        .map(|&kind| SourceInfo {
-            kind,
-            roots: roots(kind),
-            supported: supported(kind),
+        .map(|src| SourceInfo {
+            agent: src.agent.clone(),
+            roots: roots(src),
         })
         .collect()
 }
 
-/// Adapters for the supported agents that `include` accepts. `data_dir` is Lantai's data
-/// directory; adapters that must copy their source before reading it keep the copy under `cache/`.
-pub fn build_adapters(
-    data_dir: &Path,
-    include: impl Fn(AgentKind) -> bool,
-) -> Result<Vec<Box<dyn SourceAdapter>>> {
-    let mut out: Vec<Box<dyn SourceAdapter>> = Vec::new();
-    for src in all_sources() {
-        if !src.supported || !include(src.kind) {
-            continue;
-        }
-        match src.kind {
-            AgentKind::Claude => {
-                let root = src
-                    .roots
-                    .into_iter()
-                    .next()
-                    .context("no Claude Code session directory")?;
-                out.push(Box::new(ClaudeAdapter::new(root)));
-            }
-            AgentKind::Codex => out.push(Box::new(CodexAdapter::new(src.roots))),
-            AgentKind::Antigravity => out.push(Box::new(AntigravityAdapter::new(src.roots))),
-            AgentKind::Dsh => {
-                let root = src
-                    .roots
-                    .into_iter()
-                    .next()
-                    .context("no DeepSeek Harness session directory")?;
-                out.push(Box::new(DshAdapter::new(root)));
-            }
-            AgentKind::WorkBuddy => {
-                let root = src
-                    .roots
-                    .into_iter()
-                    .next()
-                    .context("no WorkBuddy session directory")?;
-                out.push(Box::new(WorkBuddyAdapter::new(root)));
-            }
-            AgentKind::OpenCode => {
-                let root = src
-                    .roots
-                    .into_iter()
-                    .next()
-                    .context("no OpenCode data directory")?;
-                let cache = data_dir.join("cache").join("opencode");
-                out.push(Box::new(OpenCodeAdapter::new(root, cache)));
-            }
-        }
-    }
-    Ok(out)
+/// Whether Lantai has an adapter for this agent.
+pub fn is_supported(agent: &AgentId) -> bool {
+    SOURCES.iter().any(|s| s.agent == *agent)
 }
 
-/// Compatibility of each supported agent's local data, for the settings page. A probe that
-/// fails (e.g. a database being written) is reported in the note instead of failing the listing.
-pub fn probe_all(data_dir: &Path) -> Result<Vec<(AgentKind, SourceProbe)>> {
+/// Adapters for the agents that `include` accepts. `data_dir` is Lantai's data directory;
+/// adapters that must copy their source before reading it keep the copy under `cache/`.
+pub fn build_adapters(
+    data_dir: &Path,
+    include: impl Fn(&AgentId) -> bool,
+) -> Result<Vec<Box<dyn SourceAdapter>>> {
+    SOURCES
+        .iter()
+        .filter(|src| include(&src.agent))
+        .map(|src| (src.build)(roots(src), data_dir))
+        .collect()
+}
+
+/// Compatibility of each agent's local data, for the settings page. A probe that fails (e.g. a
+/// database being written) is reported in the note instead of failing the listing.
+pub fn probe_all(data_dir: &Path) -> Result<Vec<(AgentId, SourceProbe)>> {
     Ok(build_adapters(data_dir, |_| true)?
         .iter()
         .map(|a| {
@@ -172,14 +184,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lists_every_agent_and_builds_only_supported_ones() {
+    fn every_source_is_registered_and_builds() {
         let all = all_sources();
-        assert_eq!(all.len(), AgentKind::ALL.len());
+        assert_eq!(all.len(), SOURCES.len());
         assert!(all.iter().all(|s| !s.roots.is_empty()));
+        assert!(all.iter().all(|s| s.agent.registration().is_some()));
         let built = build_adapters(Path::new("/nonexistent"), |_| true).unwrap();
-        assert_eq!(built.len(), all.iter().filter(|s| s.supported).count());
+        assert_eq!(built.len(), all.len());
+        assert!(built.iter().zip(&all).all(|(a, s)| a.agent() == s.agent));
         assert!(build_adapters(Path::new("/nonexistent"), |_| false)
             .unwrap()
             .is_empty());
+        assert!(!is_supported(&AgentId::parse("x-mytool").unwrap()));
     }
 }

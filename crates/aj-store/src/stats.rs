@@ -2,7 +2,7 @@
 //!
 //! This module only fetches filtered slice facts and tool aggregates; deduplication and charting logic live in `aj-core`.
 
-use aj_ir::{AgentKind, ToolKind, Usage};
+use aj_ir::{AgentId, ToolKind, Usage};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use rusqlite::params;
@@ -14,7 +14,7 @@ pub struct StatsSliceRow {
     pub slice_id: i64,
     pub session_id: i64,
     pub local_date: String,
-    pub agent: AgentKind,
+    pub agent: AgentId,
     pub project_id: Option<i64>,
     pub project_name: Option<String>,
     pub detected_cwd: Option<String>,
@@ -29,7 +29,7 @@ pub struct StatsSliceRow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenAggregateRow {
     pub local_date: String,
-    pub agent: AgentKind,
+    pub agent: AgentId,
     pub model: Option<String>,
     pub calls: u64,
     pub usage: Usage,
@@ -72,14 +72,7 @@ impl Store {
             .query_map(
                 params![since_date, until_date, i32::from(include_ignored)],
                 |r| {
-                    let agent_raw: String = r.get(3)?;
-                    let agent = AgentKind::parse(&agent_raw).ok_or_else(|| {
-                        rusqlite::Error::FromSqlConversionFailure(
-                            3,
-                            rusqlite::types::Type::Text,
-                            format!("unknown agent kind: {agent_raw}").into(),
-                        )
-                    })?;
+                    let agent = crate::agent_at(r, 3)?;
                     let start_turn: i64 = r.get(8)?;
                     let end_turn: i64 = r.get(9)?;
                     let intervals_json: String = r.get(10)?;
@@ -149,14 +142,7 @@ impl Store {
             .query_map(
                 params![since_date, until_date, i32::from(include_ignored)],
                 |r| {
-                    let agent_raw: String = r.get(1)?;
-                    let agent = AgentKind::parse(&agent_raw).ok_or_else(|| {
-                        rusqlite::Error::FromSqlConversionFailure(
-                            1,
-                            rusqlite::types::Type::Text,
-                            format!("unknown agent kind: {agent_raw}").into(),
-                        )
-                    })?;
+                    let agent = crate::agent_at(r, 1)?;
                     Ok(TokenAggregateRow {
                         local_date: r.get(0)?,
                         agent,
@@ -281,7 +267,7 @@ mod tests {
             None,
         ));
         let sid1 = store
-            .ingest(AgentKind::Claude, "s1", &events1)
+            .ingest(&AgentId::CLAUDE, "s1", &events1)
             .unwrap()
             .session_id;
         store.assign_manual(sid1, Some(p_main)).unwrap();
@@ -338,7 +324,7 @@ mod tests {
             Some((4, 0)),
         ));
         let sid2 = store
-            .ingest(AgentKind::Codex, "s2", &events2)
+            .ingest(&AgentId::CODEX, "s2", &events2)
             .unwrap()
             .session_id;
         store.set_session_ignored(sid2, true).unwrap();
@@ -379,7 +365,7 @@ mod tests {
         assert_eq!(active[0].project_name.as_deref(), Some("Side"));
         assert!(!active[0].ignored);
         assert_eq!(active[1].local_date, "2026-11-16");
-        assert_eq!(active[1].agent, AgentKind::Codex);
+        assert_eq!(active[1].agent, AgentId::CODEX);
         assert!(!active[1].ignored);
 
         // Date filter [2026-11-16, 2026-11-16] excludes earlier slices and counts only FileWrite.
@@ -444,13 +430,13 @@ mod tests {
             tu("u2", "2026-11-10T03:00:03Z", "m2", usage(1, 2, 3)),
         ];
         let sid = store
-            .ingest(AgentKind::Claude, "s1", &events)
+            .ingest(&AgentId::CLAUDE, "s1", &events)
             .unwrap()
             .session_id;
         // A later batch repeating an earlier call stays idempotent.
         store
             .ingest(
-                AgentKind::Claude,
+                &AgentId::CLAUDE,
                 "s1",
                 &[tu("u1", "2026-11-10T03:00:01Z", "m1", usage(10, 5, 100))],
             )

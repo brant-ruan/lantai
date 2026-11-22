@@ -260,7 +260,7 @@ aj report weekly  [--week 2026-W47 | --date ...] [--update]
 aj report monthly [--month 2026-11 | --date ...] [--update]
 aj report history | show         List and print saved report versions
 aj prompt list | show | new | edit | rename | delete | default
-aj export [--session <prefix>]   Export IR events as JSONL
+aj export [--session <prefix>]   Export sessions in the IR exchange format
 aj models [--test]               List model aliases; optionally test connectivity
 aj doctor                        Show the parsing health of each source
 ```
@@ -319,7 +319,7 @@ Everything lives in `~/Library/Application Support/lantai`: the database `journa
 - **Back up and restore** in **Settings → System**. A backup is one zip file with the database and settings; API keys stay in the Keychain and are not included. Restoring first keeps a copy of what it replaces.
 - **Updating during the beta:** read the release's **Breaking** section first. When a new version changes the database format, Lantai keeps a copy of the old database next to it (`journal.sqlite.bak-schema-<n>`) before migrating.
 - **Uninstalling:** delete the app, the folder above and `~/.local/bin/aj` if you installed the command-line tool, and remove the `lantai` items in Keychain Access.
-- **Getting the data out:** reports export as Markdown; `aj export` writes the sessions as JSONL in Lantai's versioned intermediate representation, described in [docs/SPEC.md](docs/SPEC.md).
+- **Getting the data out:** reports export as Markdown; `aj export` writes the sessions in the exchange format of Lantai's versioned intermediate representation (JSON lines), described in [docs/SPEC.md](docs/SPEC.md).
 
 ## Architecture
 
