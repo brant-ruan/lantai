@@ -167,19 +167,32 @@
     while (d <= TODAY) { weekMondays[weekKey(d)] = d; d = addDays(d, 7); }
   })();
 
-  // Synthetic activity before the detailed schedule starts (for the year heatmap and month list).
+  // Synthetic sessions before the detailed schedule starts, each in a project and at about the
+  // pace of the detailed weeks, so the month list, the monthly reports' stats lines and the
+  // project counts all agree.
   var FIRST_DETAILED = datesWithSessions[0];
+  var HISTORY_START = mondayOf("2026-08-31");
+  var HISTORY_MIX = ["B", "B", "B", "D", "D", "C", "C", "F", "F"]; // Billing is the main project.
   function syntheticDay(date) {
+    if (date < HISTORY_START || date >= FIRST_DETAILED) return null;
     var wd = weekday(date);
     var h = hash("syn" + date);
     if ((wd === 0 || wd === 6) && h % 3 !== 0) return null;
-    return { slices: 2 + (h % 6), minutes: 90 + (h % 300) };
+    var out = [];
+    for (var i = 0, n = 1 + (h % 4); i < n; i++) {
+      var hi = hash("syn" + date + "#" + i);
+      out.push({ date: date, minutes: 20 + (hi % 60), projectId: projByKey[HISTORY_MIX[hi % HISTORY_MIX.length]].id, ignored: false });
+    }
+    return out;
+  }
+  function syntheticSlices(dates) {
+    return [].concat.apply([], dates.map(function (d) { return syntheticDay(d) || []; }));
   }
 
   function dayOverview(date) {
     if (date < FIRST_DETAILED) {
       var syn = syntheticDay(date);
-      return syn ? { date: date, slices: syn.slices, minutes: syn.minutes, unassigned: 0, status: "final" } : null;
+      return syn ? { date: date, slices: syn.length, minutes: syn.reduce(function (a, s) { return a + s.minutes; }, 0), unassigned: 0, status: "final" } : null;
     }
     var list = slicesOn(date);
     if (!list.length) return null;
@@ -268,19 +281,20 @@
     return "> Active " + days + (days === 1 ? " day" : " days") + " · ~" + hours + " h · " + sessions + (sessions === 1 ? " session" : " sessions");
   }
 
+  function monthDates(m) { return [].concat.apply([], monthWeeks(m).map(weekDates)); }
   function periodSlices(kind, key) {
     if (kind === "daily") return slicesOn(key);
-    var dates = kind === "weekly" ? weekDates(key) : [].concat.apply([], monthWeeks(key).map(weekDates));
+    var dates = kind === "weekly" ? weekDates(key) : monthDates(key);
     return slices.filter(function (s) { return dates.indexOf(s.date) >= 0; });
   }
 
   function buildSections(kind, key, list) {
     if (kind === "monthly") {
       var hand = DATA.monthly[key] || {};
+      var all = reportable(list).concat(syntheticSlices(monthDates(key)));
       return projects.filter(function (p) { return hand[p.key]; }).map(function (p) {
-        var mine = reportable(list).filter(function (s) { return s.projectId === p.id; });
-        var stat = mine.length ? statsLine(mine) : statsText(6 + (hash(key + p.key) % 9), (8 + (hash(p.key + key) % 30)) + ".0", 7 + (hash(key) % 12));
-        return { name: p.name, lines: [stat].concat(hand[p.key].map(function (t) { return "- " + t; })) };
+        var mine = all.filter(function (s) { return s.projectId === p.id; });
+        return { name: p.name, lines: (mine.length ? [statsLine(mine)] : []).concat(hand[p.key].map(function (t) { return "- " + t; })) };
       });
     }
     return byProject(list).map(function (g) {
@@ -566,7 +580,11 @@
   // the project page.
   function sectionBody(lines, idPrefix, expandAll, pn, source, noteId) {
     if (source === "human") return noteBox(pn.top, noteId + ".t", "dm-htop") + (pn.ann ? annotatedContext(lines, pn.ann, noteId) : "") + noteBox(pn.bottom, noteId + ".b", "dm-hbottom");
-    return noteBox(pn.top, noteId + ".t", "dm-htop") + (lines ? renderOutline(lines, idPrefix, expandAll, pn.ann, noteId) : "") + noteBox(pn.bottom, noteId + ".b", "dm-hbottom");
+    return noteBox(pn.top, noteId + ".t", "dm-htop") + (lines ? renderOutline(lines, idPrefix, expandAll, pn.ann, noteId) : detachedNotes(pn.ann, noteId)) + noteBox(pn.bottom, noteId + ".b", "dm-hbottom");
+  }
+  // Annotations whose report section is missing: shown on their own rather than lost.
+  function detachedNotes(ann, noteId) {
+    return ann ? Object.keys(ann).map(function (k) { return noteBox(ann[k], noteId + ".a" + k, "dm-hann", true); }).join("") : "";
   }
   function projectCard(name, p, inner) {
     var html = '<section class="dm-card"><div class="dm-card-head"><span class="dm-bar"></span><h4>' + esc(name) + "</h4>";
@@ -737,10 +755,21 @@
     });
     return html + "</div></div>";
   }
+  // Synthetic sessions per project, counted once.
+  var historyCounts = null;
+  function historyCount(projectId) {
+    if (!historyCounts) {
+      historyCounts = {};
+      for (var d = HISTORY_START; d < FIRST_DETAILED; d = addDays(d, 1)) {
+        (syntheticDay(d) || []).forEach(function (s) { historyCounts[s.projectId] = (historyCounts[s.projectId] || 0) + 1; });
+      }
+    }
+    return historyCounts[projectId] || 0;
+  }
   function renderProjectList() {
     var html = '<div class="dm-section dm-list-wrap"><div class="dm-label-row"><span class="dm-label">Projects</span><button type="button" class="dm-btn dm-btn-ghost dm-btn-xs" data-act="unavailable">+ New</button></div><div class="dm-list" data-scroll="projects">';
     projects.forEach(function (p) {
-      var n = slices.filter(function (s) { return s.projectId === p.id && !s.ignored; }).length;
+      var n = slices.filter(function (s) { return s.projectId === p.id; }).length + historyCount(p.id);
       html += rowShell(p.id === state.projectId, esc(p.name), "<span>" + n + "</span>", "project", 'data-project="' + p.id + '"');
     });
     return html + "</div></div>";

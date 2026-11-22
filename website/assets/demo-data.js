@@ -173,8 +173,7 @@ window.LANTAI_DEMO_DATA = {
       "2026-11-19": {
         projects: {
           B: {
-            top: ["Refunds go out on Friday once finance signs off."],
-            ann: { 1: ["Checked five of the 37 by hand against the provider's dashboard: all real."] },
+            top: [["Refunds go out on Friday once finance signs off.", ["Checked five of the 37 by hand against the provider's dashboard: all real."]]],
           },
         },
       },
