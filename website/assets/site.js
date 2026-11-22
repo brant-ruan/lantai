@@ -36,6 +36,8 @@
     var last = null;
     for (var n = walker.nextNode(); n; n = walker.nextNode()) if (/\S/.test(n.data)) last = n;
     if (!last || !CJK.test(last.data)) return;
+    // Buttons are one line and flex containers: a split would show up as a gap between items.
+    if (last.parentNode.closest(".btn")) return;
     var text = last.data.replace(/\s+$/, "");
     var start = text.length, count = 0;
     while (start > 0 && count < TAIL) { start--; if (!/\s/.test(text[start])) count++; }
