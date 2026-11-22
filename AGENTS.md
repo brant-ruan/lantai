@@ -78,8 +78,9 @@ decided by the owner.**
    expected output. Whether to migrate is the owner's call (principle 2).
 5. **Timestamps are stored in UTC.** Local dates are computed only when slicing and displaying.
 6. **Privacy.** Sessions can contain secrets and private code.
-   - Redact before storage and again before sending to a model (`aj-core/src/redact.rs`). When a
-     new secret shape turns up, add a rule and a test.
+   - Redact before storage and again before sending to a model (`aj-core/src/redact.rs`). The
+     second pass is `Engine::complete`, which redacts the whole prompt; engines implement `send`
+     and callers always use `complete`. When a new secret shape turns up, add a rule and a test.
    - Remote URLs in `.git/config` can embed access tokens (this is common). The raw URL may appear
      only inside `aj-core/src/project/git.rs`; everything else sees the normalized
      `host/owner/repo`.
@@ -265,6 +266,10 @@ What the code does not make obvious. The design behind each is in the spec.
 - **README screenshots** `docs/images/demo-{light,dark}.png` come from the website's demo with
   made-up data (headless Chrome rendering only `#lantai-demo`, 2× resolution, transparent
   background), never from real sessions. Retake them when the demo changes noticeably.
+- **Website demo:** after any change to the app's interface (layout, labels, controls, flows),
+  check whether the website's interactive demo (`website/assets/demo*.js`, `demo.css`, both
+  pages) still matches, and update it by hand if not; it shares no code with `app/` (see
+  [docs/WEBSITE.md](docs/WEBSITE.md), "The interactive demo").
 - **Design first:** change [docs/SPEC.md](docs/SPEC.md) before the code. Reference spec sections
   by title (`docs/SPEC.md, "Distribution"`), not by number.
 - **Adapters** need fixtures and golden tests for their parsing behaviour.

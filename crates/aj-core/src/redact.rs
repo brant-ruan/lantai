@@ -5,6 +5,9 @@ use std::sync::OnceLock;
 use aj_ir::IrEvent;
 use regex::Regex;
 
+/// A key name that suggests a secret (`DB_PASSWORD`, `api_key`, `accessToken`, …).
+const SECRET_KEY: &str = r"[A-Za-z0-9_\-]*(?:password|passwd|secret|token|api[_\-]?key|access[_\-]?key|private[_\-]?key)[A-Za-z0-9_\-]*";
+
 struct Rule {
     re: Regex,
     replacement: &'static str,
@@ -32,11 +35,19 @@ fn rules() -> &'static [Rule] {
             // JWT
             rule(r"\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}", "[REDACTED:token]"),
             rule(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/\-]{16,}=*", "$1 [REDACTED:token]"),
-            // Credentials inside a URL
+            // Credentials inside a URL: user:password, or a long token alone in the user position
             rule(r"(?i)\b([a-z][a-z0-9+.\-]*://[^\s:/@]+):[^\s@/]+@", "$1:[REDACTED]@"),
-            // Assignments such as PASSWORD=xxx or api_key: "xxx"; the key name is kept
+            rule(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s:/@\[\]]{16,}@", "$1[REDACTED]@"),
+            // A YAML block value (`secret: |` and indented lines); masks every indented line
+            // that follows, which may include a sibling key: better too much than too little
             rule(
-                r#"(?i)\b([A-Za-z0-9_\-]*(?:password|passwd|secret|token|api[_\-]?key|access[_\-]?key|private[_\-]?key)[A-Za-z0-9_\-]*)("?\s*[=:]\s*)("[^"\s]{6,}"|'[^'\s]{6,}'|[^\s"',;]{6,})"#,
+                &format!(r"(?im)^([ \t]*{SECRET_KEY}[ \t]*:[ \t]*[|>][+-]?)[ \t]*\n(?:[ \t]+\S[^\n]*(?:\n|\z))+"),
+                "$1 [REDACTED]\n",
+            ),
+            // Assignments such as PASSWORD=xxx, api_key: "xxx" or {'token': 'xxx'}; the key name
+            // is kept. Quoted values may hold spaces and line breaks.
+            rule(
+                &format!(r#"(?i)\b({SECRET_KEY})(["']?\s*[=:]\s*)("[^"]{{6,2000}}"|'[^']{{6,2000}}'|[^\s"',;|>\[\]{{}}()]{{6,}})"#),
                 "$1$2[REDACTED]",
             ),
         ]
@@ -103,6 +114,17 @@ mod tests {
             ),
             ("DB_PASSWORD=hunter2hunter2", "hunter2"),
             (r#"{"api_key": "abcdef123456"}"#, "abcdef123456"),
+            ("{'api_key': 'abcdef123456'}", "abcdef123456"),
+            ("config = {'password': 'hunter2 hunter2'}", "hunter2"),
+            ("API_TOKEN=\"abc\ndefghijk\"", "defghijk"),
+            (
+                "secret: |\n  abcdefghijklmnop\n  qrstuvwxyz\n",
+                "qrstuvwxyz",
+            ),
+            (
+                "https://abcdefghijklmnopqrstuvwxyz0123@gitlab.example.com/o/r.git",
+                "abcdefghijklmnopqrstuvwxyz0123",
+            ),
             ("postgres://admin:s3cretpw@db.internal:5432/app", "s3cretpw"),
             (
                 "-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----",
@@ -128,6 +150,25 @@ mod tests {
             redact("postgres://u:pw123456@h/db"),
             "postgres://u:[REDACTED]@h/db"
         );
+        // Short user names in URLs are not secrets.
+        for s in ["ssh://git@github.com/o/r", "https://alice@example.com/x"] {
+            assert_eq!(redact(s), s);
+        }
+        assert_eq!(
+            redact("secret: |\n  abcdefghijkl\nnext: 1"),
+            "secret: | [REDACTED]\nnext: 1"
+        );
+        // Brackets end an unquoted value.
+        assert_eq!(redact("{token: abcdefgh}"), "{token: [REDACTED]}");
+        // Redacting twice changes nothing, so text redacted before storage survives the gate
+        // before model calls unchanged.
+        for s in [
+            "DB_PASSWORD=hunter2hunter2",
+            "postgres://u:pw123456@h/db",
+            "{'token': 'abcdefgh'}",
+        ] {
+            assert_eq!(redact(&redact(s)), redact(s));
+        }
     }
 
     #[test]

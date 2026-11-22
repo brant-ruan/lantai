@@ -34,6 +34,10 @@ pub fn read_remote(git_root: &Path) -> Option<String> {
 /// Normalize a remote URL to `host/owner/repo`, so that the ssh and https forms are equivalent.
 pub fn normalize_remote(url: &str) -> String {
     let mut s = url.trim().to_lowercase();
+    // A query or fragment can carry a token (`?access_token=…`) and never names the repository.
+    if let Some(pos) = s.find(['?', '#']) {
+        s.truncate(pos);
+    }
     if let Some(pos) = s.find("://") {
         s = s[pos + 3..].to_string();
     }
@@ -137,6 +141,8 @@ mod tests {
             "https://someone:ghp_exampletoken1234567890@github.com/owner/repo",
             "https://ghp_exampletoken1234567890@github.com/owner/repo.git",
             "https://oauth2:token-value@github.com/owner/repo",
+            "https://github.com/owner/repo.git?access_token=ghp_exampletoken1234567890",
+            "https://github.com/owner/repo#token=abc@def",
         ] {
             let out = normalize_remote(url);
             assert_eq!(out, "github.com/owner/repo", "{url}");

@@ -81,6 +81,27 @@ impl PromptSet {
 mod tests {
     use super::*;
 
+    #[test]
+    fn redaction_leaves_built_in_prompts_alone() {
+        // Every prompt passes the redaction gate before a model call; it must not alter ours.
+        for set in SETS {
+            for text in [
+                set.digest,
+                set.digest_merge,
+                set.digest_update,
+                set.project_brief,
+                set.daily_standard,
+                set.daily_concise,
+                set.weekly_standard,
+                set.monthly_standard,
+                set.report_rules,
+            ] {
+                assert_eq!(aj_core::redact::redact(text), text, "{}", set.tag);
+            }
+        }
+        assert_eq!(aj_core::redact::redact(SYSTEM), SYSTEM);
+    }
+
     fn placeholders(text: &str) -> Vec<&str> {
         let mut out: Vec<&str> = ["{date}", "{period}", "{project}"]
             .into_iter()

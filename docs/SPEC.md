@@ -567,8 +567,10 @@ worker pool (`stage1.rs`); only the main thread touches the database.
 the last text message of each turn), and the user note (highest priority). It drops file contents
 returned by reads, long command output and images. `aj report daily --dry-run` prints the result.
 
-**Redaction** (`aj-core/src/redact.rs`) replaces common key formats, `.env`-style assignments,
-private key blocks, bearer tokens and the like, once before storage and again before sending.
+**Redaction** (`aj-core/src/redact.rs`) replaces common key formats, assignments to secret-looking
+keys (`.env` lines, JSON and Python dictionaries, quoted values over several lines, YAML block
+values), credentials in URLs (user and password, or a long token alone), private key blocks,
+bearer tokens and the like, once before storage and again before sending. It is idempotent.
 
 **Digest:**
 
@@ -1153,9 +1155,12 @@ Anything else shows the raw text as before.
 
 - All data stays on the machine, in the app data directory, readable only by the user.
 - Redaction runs twice: before storage, so recognizable secrets never reach the database, and
-  before anything is sent to a model.
-- Repository remotes are stored only as normalized `host/owner/repo`; the raw URL, which may embed
-  an access token, never leaves `aj-core/src/project/git.rs`.
+  on the whole prompt in `Engine::complete`, the one gate every model call passes (engines
+  implement `send`). Text that was never redacted on its way in, such as session notes and
+  project names and descriptions, is covered by the gate.
+- Repository remotes are stored only as normalized `host/owner/repo` (user info, query and
+  fragment dropped); the raw URL, which may embed an access token, never leaves
+  `aj-core/src/project/git.rs`.
 - Report generation runs without tools; instructions inside session content are only data.
 - Agent folders are read only, and only the session files in them (credential files next to them
   are never read; OpenCode's database is copied before opening).

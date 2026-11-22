@@ -24,6 +24,22 @@ What Lantai does today, what comes next, and what was set aside. The design of w
 
 ## Next
 
+### Custom session folders per agent (first)
+
+Some people keep an agent's sessions somewhere other than the default (a moved home, a synced
+drive, `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and the like). Today the only way to point Lantai there
+is an `AJ_*_ROOT` environment variable, which the desktop app never sees.
+
+- Settings → Agents lets the user add one or more folders per agent, replacing or adding to the
+  defaults; stored as `[agents.<key>] roots = [...]` in `config.toml` (a new optional key).
+  `aj_sources` takes them in place of the environment variable when set.
+- Validate on save with the adapter's `probe` (folder exists, data in a version Lantai reads) and
+  show the result next to each folder; a folder that does not look like that agent's sessions is
+  warned about, not silently scanned.
+- Changing folders rescans that agent; sessions already stored stay. The same session reached
+  through two folders must not be stored twice (session IDs already deduplicate).
+- Agent folders stay read only (hard constraint 1), whatever path the user picks.
+
 ### Human journal, phase 3: notes as report material
 
 The rule: **notes on a period become material for the report one level up.** Annotations and day
@@ -94,6 +110,9 @@ stale once; that is expected.
   drawer, and an option on a daily report's Update to redo that day's digests too. It bypasses the
   cache once and stores the new digest; the report then shows as stale and Update rewrites only
   the affected project's section.
+- **Replace `chrono`.** RustSec marks it unmaintained (RUSTSEC-2026-0543, informational, no known
+  vulnerability); move date handling to `jiff` or `time`. Local dates and the day boundary depend
+  on it, so the slicing tests must pass unchanged.
 - A ledger of Lantai's own model calls (stage, model, tokens, time, outcome) for the dashboard's
   "Lantai itself" panel. Needs a new table.
 - A model per stage: a cheap, fast model for digests and a stronger one for reports.

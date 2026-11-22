@@ -164,7 +164,7 @@ impl Engine for OpenAiCompatEngine {
         )
     }
 
-    fn complete(&self, prompt: &str) -> Result<String> {
+    fn send(&self, prompt: &str) -> Result<String> {
         const ATTEMPTS: u32 = 3;
         let mut last = None;
         for attempt in 1..=ATTEMPTS {

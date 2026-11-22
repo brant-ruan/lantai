@@ -11,7 +11,18 @@ use crate::{diagnose, prompts};
 pub trait Engine: Sync {
     /// Engine identifier (including the model); part of the cache hash.
     fn name(&self) -> String;
-    fn complete(&self, prompt: &str) -> Result<String>;
+
+    /// Send a prompt that [`Engine::complete`] has already redacted. Implement this; call
+    /// `complete`.
+    fn send(&self, prompt: &str) -> Result<String>;
+
+    /// Redact the whole prompt and send it. This is the one gate every model call passes, so
+    /// text that was never redacted on its way in (notes, project names and descriptions, user
+    /// prompts) cannot reach a model as it is. Redaction is idempotent, so text redacted before
+    /// storage is unchanged.
+    fn complete(&self, prompt: &str) -> Result<String> {
+        self.send(&aj_core::redact::redact(prompt))
+    }
 }
 
 /// Generates through the local `claude` CLI, reusing an existing subscription.
@@ -31,7 +42,7 @@ impl Engine for ClaudeCliEngine {
         format!("claude-cli:{}", self.model.as_deref().unwrap_or("default"))
     }
 
-    fn complete(&self, prompt: &str) -> Result<String> {
+    fn send(&self, prompt: &str) -> Result<String> {
         std::fs::create_dir_all(&self.runner_dir)
             .with_context(|| format!("failed to create {}", self.runner_dir.display()))?;
         let mut cmd = Command::new(&self.binary);
@@ -100,7 +111,7 @@ impl Engine for NoModelEngine {
         String::new()
     }
 
-    fn complete(&self, _prompt: &str) -> Result<String> {
+    fn send(&self, _prompt: &str) -> Result<String> {
         bail!("{}", diagnose::NO_MODEL)
     }
 }
@@ -136,9 +147,31 @@ pub(crate) mod testing {
             "mock".into()
         }
 
-        fn complete(&self, prompt: &str) -> Result<String> {
+        fn send(&self, prompt: &str) -> Result<String> {
             self.prompts.lock().unwrap().push(prompt.to_string());
             (self.respond)(prompt)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::testing::MockEngine;
+    use super::Engine;
+
+    #[test]
+    fn complete_redacts_the_whole_prompt() {
+        let engine = MockEngine::new(|_| Ok("ok".into()));
+        engine
+            .complete(
+                "User note: DB_PASSWORD=hunter2hunter2\n- \"app\" — key sk-abcdefghijklmnopqrstu\n",
+            )
+            .unwrap();
+        let sent = engine.prompts.lock().unwrap()[0].clone();
+        assert!(
+            !sent.contains("hunter2") && !sent.contains("sk-abcdef"),
+            "{sent}"
+        );
+        assert!(sent.contains("User note: DB_PASSWORD=[REDACTED]"), "{sent}");
     }
 }
