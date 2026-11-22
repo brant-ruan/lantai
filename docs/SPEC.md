@@ -383,7 +383,7 @@ Markdown lists. Project sections are displayed in sidebar order without changing
   tab that extracts the project's `## <project>` sections from daily, weekly or monthly reports
   (`aj-report/src/rollup.rs`) without calling a model. Active periods without a report link to
   generating one.
-- **Statistics** (`aj-core/src/stats.rs`, `aj-store/src/stats.rs`): windows of 7, 30, 90 days or
+- **Statistics** (`aj-core/src/stats/`, `aj-store/src/stats.rs`): windows of 7, 30, 90 days or
   all, optionally including ignored sessions. KPIs (active time as an interval union, active days
   and streak, sessions and turns, changed files and lines deduplicated across agents and
   worktrees); activity trend stacked by project; distribution by project, agent and five tool
@@ -804,7 +804,7 @@ changed automatically.
    the prompts ask to write such pairs as one item. They also count in the cluster cache key.
 4. **Material names the agent** in each slice heading, so the model can write "reviewed, then
    changed" as two steps of one item. Report text itself does not name agents.
-5. **Statistics deduplicate** (`aj-core/src/stats.rs`): active time as interval unions per day,
+5. **Statistics deduplicate** (`aj-core/src/stats/`): active time as interval unions per day,
    changed files by normalized relative path (with repository root) across agents and worktrees.
 6. **Weekly threads** naturally span agents.
 

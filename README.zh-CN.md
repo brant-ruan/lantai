@@ -248,6 +248,7 @@ aj days                          列出最近有活动的日期
 aj sessions [--date 2026-11-16]  列出某一天的会话切片，按项目分组
 aj show <会话 | S12>              在终端回放会话或切片
 aj digest S12                    查看送给模型的文本和已缓存的摘要
+aj search <词...> [--layer reports|sessions] [--project ...] [--agent ...]   搜索报告与会话原文
 aj note <会话> "一句话"           补充备注，生成报告时优先级最高
 aj ignore | include <会话>        在报告中忽略某个会话，或恢复
 aj project new <名称> [--path 目录] [--remote 仓库] [--regex 正则] [--auto]
@@ -332,13 +333,15 @@ stage2_chars = 60000               # 单次报告请求的素材上限
 
 ```text
 crates/
-  aj-ir                 IR 类型与版本（无 IO）
+  aj-ir                 IR 类型与版本、Agent 标识、交换格式（无 IO）
   aj-adapter            SourceAdapter 接口、流式与 zstd 读取
   aj-adapter-*          每个 Agent 一个适配器：claude、codex、antigravity、dsh、workbuddy、opencode
   aj-sources            注册表：Agent → 会话目录 → 适配器
   aj-store              SQLite 持久化与统计查询
   aj-core               扫描、按日切片、脱敏、项目规则、统计
-  aj-report             摘要、报告生成、锚点校验、版本、导出
+  aj-report             摘要、报告生成、生成引擎、锚点校验、版本、导出
+  aj-backup             备份归档
+  aj-update             检查 GitHub Releases 上的新版本
   aj-cli                命令行 aj
 app/                    Tauri v2 桌面应用（React + TypeScript）
 website/                lantai.wohin.me，纯静态页面

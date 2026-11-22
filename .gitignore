@@ -7,3 +7,4 @@ app/src-tauri/gen/
 /build/
 /tmp/
 /AGENTS.local.md
+/.claude/settings.local.json

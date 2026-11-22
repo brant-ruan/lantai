@@ -6,7 +6,10 @@ What Lantai does today, what comes next, and what was set aside. The design of w
 ## Where it stands (0.1.0)
 
 - **Sources:** Claude Code, Codex CLI, Antigravity, DeepSeek Harness, WorkBuddy and OpenCode 1.x,
-  read into one versioned IR, with a compatibility check per source.
+  read into one versioned IR, with a compatibility check per source; agents are named by open
+  identifiers, and `aj export` writes the IR exchange format.
+- **Models:** any OpenAI-compatible endpoint (with presets, local servers included) or the Claude
+  Code CLI, which is found on request; no model is built in. Common failures are explained.
 - **Evening review:** a day's sessions laid out by project, assignment rules and suggestions,
   ignoring sessions, batch operations across days, a configurable day boundary.
 - **Reports:** daily, weekly and monthly reports as multi-level outlines with checked anchors;
@@ -110,16 +113,17 @@ stale once; that is expected.
   directly; the hand-written home page stays as it is.
 - **Search:** highlight hits after jumping to a report; semantic search with embeddings; "ask
   Lantai" (answer questions from search results with a model).
-- **Engines:** Anthropic's native API (for prompt caching); Codex CLI as an engine
-  (`codex exec --ephemeral`).
+- **Engines:** Anthropic's native API (for prompt caching). Codex CLI, Antigravity (`agy`) and
+  OpenCode as engines once they can run with every tool off and without leaving a session (see
+  SPEC.md, "Agent CLIs"); check again when they release new versions.
 - **Desktop:** a menu bar item (today's stats, quick note / ignore / assign); file-system watching
   instead of scan triggers.
 - **Other platforms:** agent data folders and path normalization on Windows and WSL.
 
 ## Parked and dropped
 
-- **Git commits (parked).** An implementation exists outside `main`: collect commits, link them to
-  slices by time, add them to report material. For daily reports it added little (commits made
+- **Git commits (parked).** It was built once and set aside: collect commits, link them to slices
+  by time, add them to report material. For daily reports it added little (commits made
   by agents are already in the session) while changing the schema and lengthening the material.
   It may return for commit counts in weekly reports. Lessons: `git commit` output in sessions
   rarely contains the new hash, so linking works only by time (±10 minutes); deduplicating by

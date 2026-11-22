@@ -248,6 +248,7 @@ aj days                          List recent days that have activity
 aj sessions [--date 2026-11-16]  List the slices of a day, grouped by project
 aj show <session | S12>          Replay a session or slice in the terminal
 aj digest S12                    Show what is sent to the model and the cached digest
+aj search <terms...> [--layer reports|sessions] [--project ...] [--agent ...]   Search reports and session text
 aj note <session> "text"         Attach a one-line note (highest priority in reports)
 aj ignore | include <session>    Exclude a session from reports, or bring it back
 aj project new <name> [--path dir] [--remote repo] [--regex re] [--auto]
@@ -332,13 +333,15 @@ Lantai is a Rust workspace with a thin Tauri + React shell. Each agent's format 
 
 ```text
 crates/
-  aj-ir                 IR types and version (no I/O)
+  aj-ir                 IR types and version, agent identifiers, exchange format (no I/O)
   aj-adapter            SourceAdapter trait, streaming and zstd readers
   aj-adapter-*          one adapter per agent: claude, codex, antigravity, dsh, workbuddy, opencode
   aj-sources            registry: agent → session folders → adapter
   aj-store              SQLite persistence and stats queries
   aj-core               scanning, per-day slicing, redaction, project rules, stats
-  aj-report             digests, report generation, anchor validation, versions, export
+  aj-report             digests, reports, engines, anchor validation, versions, export
+  aj-backup             backup archives
+  aj-update             update check against GitHub Releases
   aj-cli                the `aj` command
 app/                    Tauri v2 desktop app (React + TypeScript)
 website/                lantai.wohin.me, plain static HTML
