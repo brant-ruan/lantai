@@ -76,7 +76,7 @@
         <noscript><p style="padding:24px">The interactive demo needs JavaScript.</p></noscript>
       </div>
       <p class="demo-caption">This is a live demo with made-up data. Switch views, click an anchor like <code>[#S5.T2]</code>, reassign a session and press Update, or show only what you wrote.</p>
-      <p class="meta"><span>Open source</span><span>macOS desktop app &amp; CLI</span><span>Early development</span></p>
+      <p class="meta"><span>Open source</span><span>macOS desktop app &amp; CLI</span><span>Beta</span></p>
     </div>
   </section>
 
@@ -250,31 +250,32 @@
     <div class="wrap">
       <div class="section-head reveal">
         <div class="eyebrow">Get started</div>
-        <h2>Build it from source.</h2>
-        <p>Lantai is in early development and there are no prebuilt downloads yet. Building takes a few minutes.</p>
+        <h2>Download, scan, write.</h2>
+        <p>A free macOS app for Apple silicon and Intel, with the command-line tool inside. Lantai is in beta: until 1.0, an update may change the data format, and the changelog says what to do.</p>
+        <p class="start-cta"><a class="btn btn-primary" href="https://github.com/brant-ruan/lantai/releases/latest">Download for macOS</a></p>
       </div>
       <div class="start reveal">
         <div class="start-card">
           <h3>Desktop app</h3>
-          <p>Produces <code>build/Lantai.app</code>, a regular macOS app you can drag into your Applications folder.</p>
-          <div class="code" id="code-app"><button class="copy" type="button" data-target="code-app">Copy</button><span class="cmd">git clone https://github.com/brant-ruan/lantai.git</span>
-<span class="cmd">cd lantai/app</span>
-<span class="cmd">npm install</span>
-<span class="cmd">npm run build:app</span></div>
+          <p>Open the <code>.dmg</code> and drag Lantai into Applications. It isn't signed with an Apple Developer ID yet, so the first time, click <strong>Open Anyway</strong> in System Settings → Privacy &amp; Security, or run:</p>
+          <div class="code" id="code-app"><button class="copy" type="button" data-target="code-app">Copy</button><span class="cmd">xattr -dr com.apple.quarantine \</span>
+<span class="cmd">  /Applications/Lantai.app</span></div>
+          <p>Then click <strong>Scan</strong>, sort the day's sessions into projects and press <strong>Generate</strong>. A signed-in Claude Code needs no model setup.</p>
         </div>
         <div class="start-card">
           <h3>Command line</h3>
-          <p>The same engine as a command-line tool called <code>aj</code>. The first scan backfills the last 90 days of sessions.</p>
-          <div class="code" id="code-cli"><button class="copy" type="button" data-target="code-cli">Copy</button><span class="cmd">cargo build --release</span>
-<span class="cmd">./target/release/aj scan</span>
-<span class="cmd">./target/release/aj sessions</span>
-<span class="cmd">./target/release/aj report daily</span></div>
+          <p>The same engine as a command-line tool, <code>aj</code>. Install it from Settings → System → Command-line tool. It links <code>~/.local/bin/aj</code>, so that folder needs to be on your <code>PATH</code>:</p>
+          <div class="code" id="code-cli"><button class="copy" type="button" data-target="code-cli">Copy</button><span class="cmd">export PATH="$HOME/.local/bin:$PATH"</span>
+<span class="cmd">aj scan</span>
+<span class="cmd">aj report daily</span>
+<span class="c"># add the first line to ~/.zshrc to keep it</span></div>
+          <p>The first scan reads the last 90 days of sessions. Run <code>aj --help</code> for every command.</p>
         </div>
       </div>
       <div class="requirements reveal">
-        <div><strong>Platform</strong>macOS for now. Other platforms may build but haven't been tested yet.</div>
-        <div><strong>Toolchain</strong>Rust (stable) for the engine and the CLI; Node.js as well for the desktop app.</div>
+        <div><strong>Platform</strong>macOS 11 or later, on Apple silicon or Intel.</div>
         <div><strong>A model</strong>Any OpenAI-compatible API, a local model server, or a signed-in Claude Code.</div>
+        <div><strong>From source</strong>Rust (stable) and Node.js, then <code>npm run build:app</code> in <code>app/</code>. See the <a href="https://github.com/brant-ruan/lantai#get-started">README</a>.</div>
       </div>
     </div>
   </section>
@@ -315,6 +316,7 @@
     <nav aria-label="Footer">
       <a href="https://github.com/brant-ruan/lantai">GitHub</a>
       <a href="https://github.com/brant-ruan/lantai/blob/main/docs/SPEC.md">Design spec</a>
+      <a href="https://github.com/brant-ruan/lantai/blob/main/docs/ROADMAP.md">Roadmap</a>
       <a href="https://github.com/brant-ruan/lantai/issues">Issues</a>
       <a href="https://github.com/sponsors/brant-ruan">GitHub Sponsors</a>
       <a href="https://afdian.com/a/bonan">Afdian</a>

@@ -14,7 +14,7 @@ every point linked to its conversation. Beside them, you write what no session h
 [![Built with Rust and Tauri](https://img.shields.io/badge/built%20with-Rust%20·%20Tauri-1f2d45?style=flat-square&logo=rust&logoColor=white)](#architecture)
 [![Status: beta](https://img.shields.io/badge/status-beta-f2bf6c?style=flat-square)](#versioning)
 
-[Website](https://lantai.wohin.me) · [Get started](#get-started) · [Changelog](CHANGELOG.md) · [Design spec](docs/SPEC.md) · **English** | [简体中文](README.zh-CN.md)
+[Website](https://lantai.wohin.me) · [Get started](#get-started) · [Changelog](CHANGELOG.md) · [Design spec](docs/SPEC.md) · [Roadmap](docs/ROADMAP.md) · **English** | [简体中文](README.zh-CN.md)
 
 </div>
 
@@ -188,7 +188,7 @@ Agent logs hold private code, file paths and sometimes secrets. Lantai treats th
 ### Desktop app
 
 1. Download the `.dmg` from the [latest release](https://github.com/brant-ruan/lantai/releases/latest), open it and drag **Lantai** into **Applications**.
-2. Open Lantai. It is not signed with an Apple Developer ID yet, so macOS blocks it the first time. Go to **System Settings → Privacy & Security**, find the message about Lantai and click **Open Anyway**. You only need to do this once. (Or run `xattr -dr com.apple.quarantine /Applications/Lantai.app` in a terminal.)
+2. Open Lantai. It is not signed with an Apple Developer ID yet, so macOS blocks it the first time. Go to **System Settings → Privacy & Security**, find the message about Lantai and click **Open Anyway**. (Or run `xattr -dr com.apple.quarantine /Applications/Lantai.app` in a terminal.)
 
 <details>
 <summary><b>Build it from source instead</b></summary>
@@ -205,6 +205,21 @@ npm run build:app        # produces build/Lantai.app
 For development with hot reload, run `npm run tauri dev` instead.
 
 </details>
+
+### Your first report
+
+1. **Choose agents.** Claude Code is on by default. To add others, open **Settings → Agents**; it shows which agents were found on your machine.
+2. **Scan.** Click **Scan** in the sidebar. The first scan reads sessions from the last 90 days.
+3. **Choose a model.** If Claude Code is installed and signed in, Lantai uses it and you can skip this step. Otherwise add one in **Settings → Models** (see [Configure a model](#configure-a-model)).
+4. **Sort the day.** Pick a day in the sidebar. Assign each session to a project from its row (**New project…** creates one), and **Ignore** what doesn't belong in a report. When you assign a session, Lantai offers a rule for its folder, so later sessions there are suggested or filed for you.
+5. **Generate.** Click **Generate**, then add what only you know beside the draft.
+
+### Good to know
+
+- **Updates are manual for now.** Each new version is downloaded as a `.dmg` and, being unsigned, needs **Open Anyway** once more. Lantai can tell you when one is out: turn on update checks in **Settings → System**, or use **Check for Updates…** in the app menu.
+- **Keys and the Keychain.** API keys are stored in your login Keychain under the service `lantai`, through macOS's own `security` tool. macOS does not normally ask for permission, and the keys survive updates.
+- **Folder access.** Lantai reads each session's project folder only to find its Git repository (the `.git` folder). If your projects live in Documents, Desktop, Downloads or iCloud Drive, macOS asks once whether Lantai may access that folder. Saying no is fine: those sessions just can't be matched by repository rules.
+- **Claude Code as the model.** `claude` must be installed and signed in. Lantai loads your login shell's environment, so it finds `claude` even when opened from Finder, as long as your shell's `PATH` includes it.
 
 ### Command line
 
@@ -297,6 +312,15 @@ The full reference is at the top of [`crates/aj-report/src/config.rs`](crates/aj
 
 The prompt decides a report's structure, length and tone. Built-in prompts for daily, weekly and monthly reports can be edited in **Settings → Prompts**, or kept as several variants on the command line (`aj prompt new mine --from standard`, then `aj prompt default mine`). Anchor rules and the "stick to the material" instructions are appended by the program, so editing a prompt can't break traceability. Every report version saves the prompt it was written with, and because digests are cached, trying a new prompt costs a single model call.
 
+### Your data
+
+Everything lives in `~/Library/Application Support/lantai`: the database `journal.sqlite`, the settings `config.toml` and a cache. Sessions in the database can always be rebuilt from your agents' logs; your projects, rules, prompts, reports, edits and notes exist only there.
+
+- **Back up and restore** in **Settings → System**. A backup is one zip file with the database and settings; API keys stay in the Keychain and are not included. Restoring first keeps a copy of what it replaces.
+- **Updating during the beta:** read the release's **Breaking** section first. When a new version changes the database format, Lantai keeps a copy of the old database next to it (`journal.sqlite.bak-schema-<n>`) before migrating.
+- **Uninstalling:** delete the app, the folder above and `~/.local/bin/aj` if you installed the command-line tool, and remove the `lantai` items in Keychain Access.
+- **Getting the data out:** reports export as Markdown; `aj export` writes the sessions as JSONL in Lantai's versioned intermediate representation, described in [docs/SPEC.md](docs/SPEC.md).
+
 ## Architecture
 
 Lantai is a Rust workspace with a thin Tauri + React shell. Each agent's format knowledge stays inside its adapter; everything above works on the versioned IR.
@@ -315,7 +339,14 @@ app/                    Tauri v2 desktop app (React + TypeScript)
 website/                lantai.wohin.me, plain static HTML
 ```
 
-Dependencies point one way: `aj-ir` ← adapters / `aj-store` ← `aj-core` ← `aj-report` ← `aj-cli` / `app`. See [docs/SPEC.md](docs/SPEC.md) for the full design.
+Dependencies point one way: `aj-ir` ← adapters / `aj-store` ← `aj-core` ← `aj-report` ← `aj-cli` / `app`.
+
+Documentation:
+
+- [docs/SPEC.md](docs/SPEC.md): the design, including the IR, storage, the report pipeline and privacy
+- [docs/ADAPTERS.md](docs/ADAPTERS.md): each agent's session format, and how to add an adapter
+- [docs/ROADMAP.md](docs/ROADMAP.md): what comes next, and what was set aside and why
+- [docs/RELEASING.md](docs/RELEASING.md): versioning and releases
 
 ## Versioning
 
@@ -331,11 +362,11 @@ Lantai is also an experiment in how people and agents work together, and how the
 
 ## Contributing
 
-Issues and pull requests are welcome, with one caveat: for now I'm focused on the existing roadmap, so I can't promise a timely review or that a pull request will be merged. Before you start:
+Issues and pull requests are welcome, with one caveat: for now I'm focused on the existing [roadmap](docs/ROADMAP.md), so I can't promise a timely review or that a pull request will be merged. Before you start:
 
 - **Bugs** go in [issues](https://github.com/brant-ruan/lantai/issues), **ideas and questions** in [Discussions](https://github.com/brant-ruan/lantai/discussions), and **privacy or security problems** go privately through [SECURITY.md](SECURITY.md). Please don't paste session content, reports or keys: issues are public.
 - For anything larger than a small fix, start a discussion first, so we can agree it fits before you put in the work.
-- [AGENTS.md](AGENTS.md) describes the conventions and hard constraints (read-only sources, privacy rules, layering). It is written for coding agents and works just as well for people. [docs/SPEC.md](docs/SPEC.md) is the single source of truth for the design; change it before changing behavior.
+- [AGENTS.md](AGENTS.md) describes the conventions and hard constraints (read-only sources, privacy rules, layering). It is written for coding agents and works just as well for people. [docs/SPEC.md](docs/SPEC.md) is the single source of truth for the design; change it before changing behavior. To support another agent, start with [docs/ADAPTERS.md](docs/ADAPTERS.md).
 - Run `cargo fmt --all`, `cargo clippy --workspace --all-targets` and `cargo test --workspace` before sending a change. Never commit real session content: fixtures must be redacted.
 
 ## Sponsor

@@ -14,7 +14,7 @@
 [![基于 Rust 与 Tauri](https://img.shields.io/badge/built%20with-Rust%20·%20Tauri-1f2d45?style=flat-square&logo=rust&logoColor=white)](#架构)
 [![状态：beta](https://img.shields.io/badge/status-beta-f2bf6c?style=flat-square)](#版本)
 
-[主页](https://lantai.wohin.me/zh/) · [开始使用](#开始使用) · [更新日志](CHANGELOG.md) · [设计文档](docs/SPEC.md) · [English](README.md) | **简体中文**
+[主页](https://lantai.wohin.me/zh/) · [开始使用](#开始使用) · [更新日志](CHANGELOG.md) · [设计文档](docs/SPEC.md) · [路线图](docs/ROADMAP.md) · [English](README.md) | **简体中文**
 
 </div>
 
@@ -162,7 +162,7 @@ Agent 的草稿和你的笔记在同一页上，每个项目一份大纲。紫�
 | <img src="website/assets/agents/workbuddy.svg" width="20" alt=""> | **WorkBuddy** | `~/.workbuddy/projects` |
 | <img src="website/assets/agents/opencode.svg" width="20" alt=""> | **OpenCode** | `~/.local/share/opencode/opencode.db` |
 
-每个 Agent 的日志格式由各自的适配器处理，解析成同一套有版本的中间表示，之上的一切与用的是哪个 Agent 无关。默认只启用 Claude Code。其他 Agent 在「设置 → Agents」里开启，那里也会显示本机是否检测到对应的会话目录，以及本机数据的版本兰台能否读取。OpenCode 目前读取 1.x 的存储，OpenCode 2.x 保存的会话暂不读取；兰台会先把 OpenCode 的数据库复制到自己的缓存目录再读，不会改动 OpenCode 目录里的任何文件。
+每个 Agent 的日志格式由各自的适配器处理，解析成同一套有版本的中间表示，之上的一切与用的是哪个 Agent 无关。默认只启用 Claude Code。其他 Agent 在「设置 → Agent」里开启，那里也会显示本机是否检测到对应的会话目录，以及本机数据的版本兰台能否读取。OpenCode 目前读取 1.x 的存储，OpenCode 2.x 保存的会话暂不读取；兰台会先把 OpenCode 的数据库复制到自己的缓存目录再读，不会改动 OpenCode 目录里的任何文件。
 
 ## 隐私
 
@@ -188,7 +188,7 @@ Agent 日志里有私有代码、文件路径，有时还有密钥。兰台按�
 ### 桌面应用
 
 1. 从[最新发布](https://github.com/brant-ruan/lantai/releases/latest)下载 `.dmg`，打开后把 **Lantai** 拖进「应用程序」。
-2. 打开兰台。它还没有苹果开发者签名，macOS 第一次会拦下它：打开「系统设置 → 隐私与安全性」，找到关于兰台的提示，点「仍要打开」。只需要做一次。（也可以在终端里执行 `xattr -dr com.apple.quarantine /Applications/Lantai.app`。）
+2. 打开兰台。它还没有苹果开发者签名，macOS 第一次会拦下它：打开「系统设置 → 隐私与安全性」，找到关于兰台的提示，点「仍要打开」。（也可以在终端里执行 `xattr -dr com.apple.quarantine /Applications/Lantai.app`。）
 
 <details>
 <summary><b>或者从源码构建</b></summary>
@@ -205,6 +205,21 @@ npm run build:app        # 生成 build/Lantai.app
 开发调试（热更新）用 `npm run tauri dev`。
 
 </details>
+
+### 第一份日报
+
+1. **选择 Agent。** 默认只读 Claude Code。要加入其他 Agent，打开「设置 → Agent」，这里会显示本机检测到了哪些。
+2. **扫描。** 点侧栏的「扫描」。第一次扫描读取最近 90 天的会话。
+3. **选择模型。** 如果本机装了 Claude Code 并已登录，兰台直接用它，这一步可以跳过；否则在「设置 → 模型」里添加一个（见[配置模型](#配置模型)）。
+4. **整理当天。** 在侧栏选一天，从每条会话所在的行把它归到项目里（「新建项目…」可以新建），不该进报告的点「忽略」。归属会话时，兰台会提议为它所在的文件夹建一条规则，以后这个文件夹里的会话会被建议或自动归属。
+5. **生成。** 点「生成」，然后在草稿旁边写下只有你知道的事。
+
+### 注意事项
+
+- **暂时需要手动更新。** 每个新版本都要重新下载 `.dmg`；因为没有签名，第一次打开时还要再点一次「仍要打开」。兰台可以在新版本发布时提醒你：在「设置 → 系统」里打开检查更新，或者点应用菜单里的「检查更新…」。
+- **密钥与钥匙串。** API 密钥通过 macOS 自带的 `security` 工具存进登录钥匙串，服务名为 `lantai`。系统通常不会弹窗询问，更新应用后密钥也仍然有效。
+- **文件夹访问。** 兰台读取每个会话的项目文件夹，只是为了找到它的 Git 仓库（`.git` 文件夹）。如果你的项目放在「文稿」「桌面」「下载」或 iCloud 云盘里，macOS 会询问一次是否允许兰台访问该文件夹。拒绝也没关系，只是这些会话无法按仓库规则归属。
+- **用 Claude Code 当模型。** 需要已安装并登录 `claude`。兰台会载入登录 shell 的环境，所以从访达打开也能找到 `claude`，前提是你的 shell `PATH` 里有它。
 
 ### 命令行
 
@@ -256,7 +271,7 @@ aj doctor                        查看各数据源的解析状态
 
 ### 配置模型
 
-在应用的「设置 → Models」里配置：添加提供方（地址与密钥），拉取模型列表，为常用模型建别名并选定默认。密钥保存在 macOS 钥匙串。
+在应用的「设置 → 模型」里配置：添加提供方（地址与密钥），拉取模型列表，为常用模型建别名并选定默认。密钥保存在 macOS 钥匙串。
 
 <details>
 <summary><b>也可以直接编辑 <code>config.toml</code></b></summary>
@@ -295,7 +310,16 @@ stage2_chars = 60000               # 单次报告请求的素材上限
 
 ### 打磨提示词
 
-提示词决定报告的结构、详略和语气。日报、周报、月报的内置提示词可以在「设置 → Prompts」里直接修改，也可以在命令行保存多份对照（`aj prompt new mine --from standard`，再 `aj prompt default mine`）。锚点格式、只依据素材等规则由程序固定追加，改提示词不会破坏溯源。每个报告版本都记录生成它所用的提示词；摘要有缓存，换提示词重新生成只需要一次模型调用。
+提示词决定报告的结构、详略和语气。日报、周报、月报的内置提示词可以在「设置 → 提示词」里直接修改，也可以在命令行保存多份对照（`aj prompt new mine --from standard`，再 `aj prompt default mine`）。锚点格式、只依据素材等规则由程序固定追加，改提示词不会破坏溯源。每个报告版本都记录生成它所用的提示词；摘要有缓存，换提示词重新生成只需要一次模型调用。
+
+### 你的数据
+
+所有数据都在 `~/Library/Application Support/lantai`：数据库 `journal.sqlite`、设置 `config.toml` 和缓存。数据库里的会话随时可以从各 Agent 的日志重建；你的项目、规则、提示词、报告、修改和笔记只存在这里。
+
+- **备份与恢复**在「设置 → 系统」里。备份是一个 zip 文件，包含数据库和设置；API 密钥留在钥匙串里，不在备份中。恢复之前会先保留一份被替换的数据。
+- **beta 期间的更新：**先看该版本的 **Breaking** 部分。新版本改变数据库格式时，兰台会在迁移前把旧数据库复制一份放在旁边（`journal.sqlite.bak-schema-<n>`）。
+- **卸载：**删除应用和上面的文件夹；如果装了命令行工具，再删除 `~/.local/bin/aj`；最后在「钥匙串访问」里删除 `lantai` 条目。
+- **导出数据：**报告可以导出为 Markdown；`aj export` 把会话导出为 JSONL，格式是兰台带版本号的中间表示，见 [docs/SPEC.md](docs/SPEC.md)。
 
 ## 架构
 
@@ -315,7 +339,14 @@ app/                    Tauri v2 桌面应用（React + TypeScript）
 website/                lantai.wohin.me，纯静态页面
 ```
 
-依赖方向单向：`aj-ir` ← 适配器 / `aj-store` ← `aj-core` ← `aj-report` ← `aj-cli` / `app`。完整设计见 [docs/SPEC.md](docs/SPEC.md)。
+依赖方向单向：`aj-ir` ← 适配器 / `aj-store` ← `aj-core` ← `aj-report` ← `aj-cli` / `app`。
+
+文档（英文）：
+
+- [docs/SPEC.md](docs/SPEC.md)：设计，包括中间表示、存储、报告流程与隐私
+- [docs/ADAPTERS.md](docs/ADAPTERS.md)：各 Agent 的会话格式，以及如何新增适配器
+- [docs/ROADMAP.md](docs/ROADMAP.md)：接下来做什么，搁置了什么、为什么
+- [docs/RELEASING.md](docs/RELEASING.md)：版本与发布
 
 ## 版本
 
@@ -331,11 +362,11 @@ Agent 能替我们做出很好的结果，却没法替我们度过这一天。�
 
 ## 参与贡献
 
-欢迎提交 Issue 和 Pull Request。需要说明的是：现阶段我专注于既定的路线图，不能保证及时审阅，也不能保证 PR 一定会被合并。开始之前：
+欢迎提交 Issue 和 Pull Request。需要说明的是：现阶段我专注于既定的[路线图](docs/ROADMAP.md)，不能保证及时审阅，也不能保证 PR 一定会被合并。开始之前：
 
 - **bug** 提到 [Issues](https://github.com/brant-ruan/lantai/issues)，**想法和问题**放到 [Discussions](https://github.com/brant-ruan/lantai/discussions)，**隐私或安全问题**按 [SECURITY.md](SECURITY.md) 私下报告。Issue 是公开的，请不要贴会话内容、报告或密钥。
 - 比小修小补大的改动，请先开一个讨论，确认方向合适再动手，免得白费功夫。
-- [AGENTS.md](AGENTS.md) 记录了协作约定与硬性约束（数据源只读、隐私规则、分层），写给 Coding Agent，也适合人阅读。[docs/SPEC.md](docs/SPEC.md) 是设计的唯一事实来源：改行为之前先改它。
+- [AGENTS.md](AGENTS.md) 记录了协作约定与硬性约束（数据源只读、隐私规则、分层），写给 Coding Agent，也适合人阅读。[docs/SPEC.md](docs/SPEC.md) 是设计的唯一事实来源：改行为之前先改它。想支持新的 Agent，从 [docs/ADAPTERS.md](docs/ADAPTERS.md) 开始。
 - 提交前运行 `cargo fmt --all`、`cargo clippy --workspace --all-targets` 与 `cargo test --workspace`。不要提交真实会话内容，测试样本必须先脱敏。
 
 ## 赞助

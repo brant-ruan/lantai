@@ -108,13 +108,11 @@ repository addresses before committing it.
 
 ## Deployment
 
-`website/` (with `CNAME` and `.nojekyll`) is deployed to GitHub Pages by
-`.github/workflows/pages.yml.disabled`, kept disabled until Pages is enabled for the repository
-(GitHub only runs `.yml` / `.yaml` files). To enable:
+`website/` is deployed to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`
+that touches it (or by hand). Repository settings it relies on:
 
-1. Rename the workflow to `pages.yml` and check its action versions.
-2. Repository Settings → Pages → Source: **GitHub Actions**.
-3. Custom domain `lantai.wohin.me` (with Actions deployment the `CNAME` file is not used), then
-   **Enforce HTTPS** once DNS has propagated. DNS: `lantai` CNAME `brant-ruan.github.io`.
-4. Optionally verify the domain in the account's Pages settings to prevent takeover of
+1. Settings → Pages → Source: **GitHub Actions**.
+2. Custom domain `lantai.wohin.me` (with Actions deployment the `CNAME` file is not used) and
+   **Enforce HTTPS**. DNS: `lantai` CNAME `brant-ruan.github.io`.
+3. Optionally, verify the domain in the account's Pages settings to prevent takeover of
    subdomains.

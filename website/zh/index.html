@@ -77,7 +77,7 @@
         <noscript><p style="padding:24px">交互演示需要启用 JavaScript。</p></noscript>
       </div>
       <p class="demo-caption">这是一个可以操作的演示，数据均为虚构。试试切换视图、点击 <code>[#S5.T2]</code> 这样的锚点、把会话移到别的项目再点 Update，或者只看你写的内容。</p>
-      <p class="meta"><span>开源</span><span>macOS 桌面应用与命令行</span><span>早期开发中</span></p>
+      <p class="meta"><span>开源</span><span>macOS 桌面应用与命令行</span><span>beta 阶段</span></p>
     </div>
   </section>
 
@@ -251,31 +251,32 @@
     <div class="wrap">
       <div class="section-head reveal">
         <div class="eyebrow">开始使用</div>
-        <h2>从源码构建。</h2>
-        <p>兰台还在早期开发，暂时没有预编译的安装包。构建只需要几分钟。</p>
+        <h2>下载，扫描，落笔。</h2>
+        <p>免费的 macOS 应用，支持 Apple 芯片与 Intel，内置命令行工具。兰台还在 beta 阶段：1.0 之前，更新可能改变数据格式，更新日志会写明该怎么做。</p>
+        <p class="start-cta"><a class="btn btn-primary" href="https://github.com/brant-ruan/lantai/releases/latest">下载 macOS 版</a></p>
       </div>
       <div class="start reveal">
         <div class="start-card">
           <h3>桌面应用</h3>
-          <p>生成 <code>build/Lantai.app</code>，拖进「应用程序」即可。</p>
-          <div class="code" id="code-app"><button class="copy" type="button" data-target="code-app">复制</button><span class="cmd">git clone https://github.com/brant-ruan/lantai.git</span>
-<span class="cmd">cd lantai/app</span>
-<span class="cmd">npm install</span>
-<span class="cmd">npm run build:app</span></div>
+          <p>打开 <code>.dmg</code>，把兰台拖进「应用程序」。它还没有苹果开发者签名，第一次打开时，在「系统设置 → 隐私与安全性」里点<strong>仍要打开</strong>，或者在终端执行：</p>
+          <div class="code" id="code-app"><button class="copy" type="button" data-target="code-app">复制</button><span class="cmd">xattr -dr com.apple.quarantine \</span>
+<span class="cmd">  /Applications/Lantai.app</span></div>
+          <p>然后点<strong>扫描</strong>，把当天的会话归到项目里，再点<strong>生成</strong>。已登录的 Claude Code 无需配置就能当模型用。</p>
         </div>
         <div class="start-card">
           <h3>命令行</h3>
-          <p>同一套引擎的命令行版本 <code>aj</code>，首次扫描回填最近 90 天。</p>
-          <div class="code" id="code-cli"><button class="copy" type="button" data-target="code-cli">复制</button><span class="cmd">cargo build --release</span>
-<span class="cmd">./target/release/aj scan</span>
-<span class="cmd">./target/release/aj sessions</span>
-<span class="cmd">./target/release/aj report daily</span></div>
+          <p>同一套引擎的命令行版本 <code>aj</code>，在「设置 → 系统 → 命令行工具」里安装。它会链接到 <code>~/.local/bin/aj</code>，所以这个文件夹要在 <code>PATH</code> 里：</p>
+          <div class="code" id="code-cli"><button class="copy" type="button" data-target="code-cli">复制</button><span class="cmd">export PATH="$HOME/.local/bin:$PATH"</span>
+<span class="cmd">aj scan</span>
+<span class="cmd">aj report daily</span>
+<span class="c"># 把第一行加进 ~/.zshrc 即可长期生效</span></div>
+          <p>首次扫描读取最近 90 天的会话。执行 <code>aj --help</code> 查看全部命令。</p>
         </div>
       </div>
       <div class="requirements reveal">
-        <div><strong>平台</strong>macOS。其他平台也许能构建，但尚未测试。</div>
-        <div><strong>工具链</strong>Rust（stable）；桌面应用另需 Node.js。</div>
-        <div><strong>模型</strong>OpenAI 兼容接口、本地模型或 Claude Code。</div>
+        <div><strong>平台</strong>macOS 11 或更高版本，Apple 芯片或 Intel。</div>
+        <div><strong>模型</strong>OpenAI 兼容接口、本地模型，或已登录的 Claude Code。</div>
+        <div><strong>从源码构建</strong>需要 Rust（stable）与 Node.js，在 <code>app/</code> 里执行 <code>npm run build:app</code>。详见 <a href="https://github.com/brant-ruan/lantai/blob/main/README.zh-CN.md#开始使用">README</a>。</div>
       </div>
     </div>
   </section>
@@ -316,6 +317,7 @@
     <nav aria-label="页脚">
       <a href="https://github.com/brant-ruan/lantai">GitHub</a>
       <a href="https://github.com/brant-ruan/lantai/blob/main/docs/SPEC.md">设计文档</a>
+      <a href="https://github.com/brant-ruan/lantai/blob/main/docs/ROADMAP.md">路线图</a>
       <a href="https://github.com/brant-ruan/lantai/issues">问题反馈</a>
       <a href="https://afdian.com/a/bonan">爱发电</a>
       <a href="https://github.com/sponsors/brant-ruan">GitHub Sponsors</a>

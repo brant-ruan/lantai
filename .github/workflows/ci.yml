@@ -1,14 +1,11 @@
 # Checks formatting, lints, tests and the frontend type check and build. Runs on macOS, the
 # only platform Lantai supports.
-#
-# Manual only while the repository is private (macOS minutes are billed at 10x there).
-# Once it is public, add these triggers back above workflow_dispatch:
-#   push:
-#     branches: [main]
-#   pull_request:
 name: CI
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:

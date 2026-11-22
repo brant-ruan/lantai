@@ -1,6 +1,5 @@
-# Deploys the static project website in website/ to GitHub Pages.
-# Disabled until Pages is enabled for the repository: rename back to pages.yml to turn it on.
-# The custom domain (lantai.wohin.me) must also be set in Settings -> Pages;
+# Deploys the static project website in website/ to GitHub Pages (Settings -> Pages -> Source:
+# GitHub Actions). The custom domain (lantai.wohin.me) is set in Settings -> Pages;
 # website/CNAME only documents it, since artifact-based deploys ignore that file.
 name: Deploy website
 
