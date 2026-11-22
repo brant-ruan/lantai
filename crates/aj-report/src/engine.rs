@@ -91,6 +91,20 @@ impl Engine for ClaudeCliEngine {
     }
 }
 
+/// Stands in when no model is configured, for work that only needs an engine's name (cache
+/// estimates, dry runs). Its empty name matches no cached digest; it cannot complete.
+pub struct NoModelEngine;
+
+impl Engine for NoModelEngine {
+    fn name(&self) -> String {
+        String::new()
+    }
+
+    fn complete(&self, _prompt: &str) -> Result<String> {
+        bail!("{}", diagnose::NO_MODEL)
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod testing {
     use super::*;

@@ -171,7 +171,7 @@ pub fn get_lantai_stats(
     );
     // Without a usable default model nothing counts as reusable, which is also what generating would find.
     let engine = cfg
-        .build_engine(None, &state.data_dir.join("runner"))
+        .estimate_engine(None, &state.data_dir.join("runner"))
         .map(|e| e.name())
         .unwrap_or_default();
     let budgets = cfg.budgets();

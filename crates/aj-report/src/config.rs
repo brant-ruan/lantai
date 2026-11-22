@@ -59,7 +59,7 @@ use serde::{Deserialize, Serialize};
 use aj_ir::AgentId;
 
 use crate::diagnose;
-use crate::engine::{ClaudeCliEngine, Engine};
+use crate::engine::{ClaudeCliEngine, Engine, NoModelEngine};
 use crate::keystore::KeyStore;
 use crate::lang::{self, Language};
 use crate::local_tools::{ToolDescriptor, ToolEngine};
@@ -696,6 +696,20 @@ impl AppConfig {
         Ok(alias)
     }
 
+    /// The engine for estimates and dry runs: [`Self::build_engine`], except that with no model
+    /// configured and none picked it is [`NoModelEngine`], so a period's state still loads and
+    /// nothing counts as cached (which is what generating would find).
+    pub fn estimate_engine(
+        &self,
+        alias: Option<&str>,
+        runner_dir: &Path,
+    ) -> Result<Box<dyn Engine>> {
+        if alias.is_none() && self.default_model_name().is_none() {
+            return Ok(Box::new(NoModelEngine));
+        }
+        self.build_engine(alias, runner_dir)
+    }
+
     /// Build the engine for a model alias (the default alias when `None`).
     pub fn build_engine(&self, alias: Option<&str>, runner_dir: &Path) -> Result<Box<dyn Engine>> {
         let Some(alias) = alias.or_else(|| self.default_model_name()) else {
@@ -826,6 +840,11 @@ batch_concurrency = 4
             crate::diagnose::diagnose(&err),
             Some(crate::diagnose::Failure::NoModel)
         );
+        // Estimates and dry runs still get an engine; it matches no cache and cannot complete.
+        let est = empty.estimate_engine(None, &dir).unwrap();
+        assert_eq!(est.name(), "");
+        assert!(est.complete("x").is_err());
+        assert!(empty.estimate_engine(Some("nope"), &dir).is_err());
         assert_eq!(empty.budgets().batch_concurrency, 2);
         std::fs::write(
             &path,

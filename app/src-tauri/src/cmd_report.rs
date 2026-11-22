@@ -401,10 +401,10 @@ pub fn get_daily_report_state(
 ) -> Result<DailyReportStateDto, String> {
     let store = state.open_store().map_err(cmd_err)?;
     let cfg = state.load_config().map_err(cmd_err)?;
-    let built_engine = cfg
-        .build_engine(engine.as_deref(), &state.data_dir.join("runner"))
-        .map_err(cmd_err)?;
-    let engine_name = built_engine.name();
+    let engine_name = cfg
+        .estimate_engine(engine.as_deref(), &state.data_dir.join("runner"))
+        .map_err(cmd_err)?
+        .name();
     let budgets = cfg.budgets();
     let language = state.report_language(&[]).map_err(cmd_err)?;
     let est = estimate_daily(
@@ -441,10 +441,10 @@ pub fn get_weekly_report_state(
     let store = state.open_store().map_err(cmd_err)?;
     let cfg = state.load_config().map_err(cmd_err)?;
     let week = Week::parse(&week).map_err(cmd_err)?;
-    let built_engine = cfg
-        .build_engine(engine.as_deref(), &state.data_dir.join("runner"))
-        .map_err(cmd_err)?;
-    let engine_name = built_engine.name();
+    let engine_name = cfg
+        .estimate_engine(engine.as_deref(), &state.data_dir.join("runner"))
+        .map_err(cmd_err)?
+        .name();
     let budgets = cfg.budgets();
     let language = state.report_language(&[]).map_err(cmd_err)?;
     let est = estimate_weekly(
@@ -490,10 +490,10 @@ pub fn get_monthly_report_state(
     let store = state.open_store().map_err(cmd_err)?;
     let cfg = state.load_config().map_err(cmd_err)?;
     let month = Month::parse(&month).map_err(cmd_err)?;
-    let built_engine = cfg
-        .build_engine(engine.as_deref(), &state.data_dir.join("runner"))
-        .map_err(cmd_err)?;
-    let engine_name = built_engine.name();
+    let engine_name = cfg
+        .estimate_engine(engine.as_deref(), &state.data_dir.join("runner"))
+        .map_err(cmd_err)?
+        .name();
     let budgets = cfg.budgets();
     let language = state.report_language(&[]).map_err(cmd_err)?;
     let est = estimate_monthly(

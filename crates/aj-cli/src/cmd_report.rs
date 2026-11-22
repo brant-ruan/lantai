@@ -367,7 +367,7 @@ fn cmd_report_monthly(
     out: Option<PathBuf>,
 ) -> Result<()> {
     let config = app.load_config()?;
-    let engine = config.build_engine(model.as_deref(), &app.data_dir.join("runner"))?;
+    let engine = report_engine(&config, model.as_deref(), args.dry_run, app)?;
     let opts = MonthlyOptions {
         language: app.report_language(args.lang.as_deref())?,
         month: args.month,
@@ -446,7 +446,7 @@ fn cmd_report_weekly(
     out: Option<PathBuf>,
 ) -> Result<()> {
     let config = app.load_config()?;
-    let engine = config.build_engine(model.as_deref(), &app.data_dir.join("runner"))?;
+    let engine = report_engine(&config, model.as_deref(), args.dry_run, app)?;
     let opts = WeeklyOptions {
         language: app.report_language(args.lang.as_deref())?,
         week: args.week,
@@ -529,7 +529,7 @@ fn cmd_report_daily(
     out: Option<PathBuf>,
 ) -> Result<()> {
     let config = app.load_config()?;
-    let engine = config.build_engine(model.as_deref(), &app.data_dir.join("runner"))?;
+    let engine = report_engine(&config, model.as_deref(), args.dry_run, app)?;
     let opts = DailyOptions {
         language: app.report_language(args.lang.as_deref())?,
         date: args.date,
@@ -608,6 +608,21 @@ fn cmd_report_daily(
         eprintln!("Written to {}", path.display());
     }
     Ok(())
+}
+
+/// The engine a report command runs with. A dry run never calls a model, so it works without one.
+fn report_engine(
+    config: &aj_report::AppConfig,
+    model: Option<&str>,
+    dry_run: bool,
+    app: &App,
+) -> Result<Box<dyn aj_report::Engine>> {
+    let runner = app.data_dir.join("runner");
+    if dry_run {
+        config.estimate_engine(model, &runner)
+    } else {
+        config.build_engine(model, &runner)
+    }
 }
 
 pub(crate) fn cmd_models(app: &App, test: bool, only: Option<&str>) -> Result<()> {
