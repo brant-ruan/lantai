@@ -618,11 +618,11 @@ body {
   min-height: 100px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   gap: 6px;
 }
 
 .days-list {
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -673,7 +673,6 @@ body {
   color: var(--text);
 }
 .day-row:hover { background: var(--surface-alt); }
-.day-row.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .day-row-date {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -727,7 +726,7 @@ body {
   color: var(--muted);
 }
 
-.day-batch-bar {
+.report-batch-bar {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -737,32 +736,32 @@ body {
   border-radius: 7px;
   flex-shrink: 0;
 }
-.day-batch-row {
+.report-batch-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 5px;
 }
-.day-batch-close {
+.report-batch-close {
   padding: 0 5px;
   font-size: 14px;
   line-height: 1.2;
 }
-.day-batch-split {
+.report-batch-split {
   position: relative;
   display: inline-flex;
   align-items: stretch;
   flex: 1;
   min-width: 0;
 }
-.day-batch-split .dropdown {
+.report-batch-split .dropdown {
   position: static;
   display: flex;
 }
-.day-batch-split .dropdown-menu {
+.report-batch-split .dropdown-menu {
   min-width: 176px;
 }
-.day-batch-main-btn {
+.report-batch-main-btn {
   flex: 1;
   min-width: 0;
   border-top-right-radius: 0;
@@ -773,22 +772,22 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.day-batch-caret {
+.report-batch-caret {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   border-left: 1px solid var(--border);
   padding: 2px 5px;
   font-size: 11px;
 }
-.day-batch-status-btns {
+.report-batch-status-btns {
   display: inline-flex;
   gap: 3px;
   flex-shrink: 0;
 }
-.day-batch-status-btns .btn-xs {
+.report-batch-status-btns .btn-xs {
   padding: 2px 5px;
 }
-.day-batch-confirm {
+.report-batch-confirm {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -799,12 +798,12 @@ body {
   border: 1px solid var(--border);
   font-size: 11px;
 }
-.day-batch-confirm-actions {
+.report-batch-confirm-actions {
   display: inline-flex;
   gap: 4px;
   flex-shrink: 0;
 }
-.day-batch-check {
+.report-batch-check {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -813,7 +812,17 @@ body {
   color: var(--text);
   cursor: pointer;
 }
-.day-batch-summary {
+.report-batch-coverage {
+  max-height: 76px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.report-batch-coverage li + li { margin-top: 4px; }
+.report-batch-summary {
   font-size: 11px;
   color: var(--muted);
   line-height: 1.35;

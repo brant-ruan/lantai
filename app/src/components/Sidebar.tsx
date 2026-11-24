@@ -3,14 +3,13 @@
 // this component owns the calendar cursor so lists and calendar stay in step.
 
 import { useEffect, useState } from "react";
+import type { ReportBatch } from "../hooks/useReportBatch";
 import { useT } from "../i18n";
 import type {
-  BatchPlan,
-  DayBatchMode,
-  DayBatchRun,
   DayOverview,
   GenStage,
   MonthOverview,
+  PeriodMode,
   ProjectSummary,
   ViewMode,
   WeekOverview,
@@ -39,26 +38,11 @@ interface SidebarProps {
   days: DayOverview[];
   today: string;
   selectedDate: string;
-  /** Dates whose daily report is being generated right now, with the stage. */
-  generatingDates: Record<string, GenStage>;
+  generating: Record<string, GenStage>;
   onSelectDate: (date: string) => void;
   showIgnoredDays: boolean;
   onToggleShowIgnoredDays: () => void;
-  daySelectMode: boolean;
-  selectedDates: string[];
-  onChangeDaySelectMode: (on: boolean) => void;
-  onChangeSelectedDates: (dates: string[]) => void;
-  onQuickSelectStale: () => Promise<void>;
-  dayBatchPlan: BatchPlan | null;
-  dayBatchPlanning: boolean;
-  dayBatchIncludeFinal: boolean;
-  onChangeDayBatchIncludeFinal: (include: boolean) => void;
-  dayBatchRun: DayBatchRun | null;
-  dayBatchSummary: string | null;
-  onRunDayBatch: (mode: DayBatchMode) => Promise<void>;
-  onCancelDayBatch: () => void;
-  onSetDayBatchStatus: (status: "draft" | "final") => Promise<void>;
-  onCloseDayBatch: () => void;
+  batches: Record<PeriodMode, ReportBatch>;
   weeks: WeekOverview[];
   currentWeek: string;
   selectedWeek: string;
@@ -201,7 +185,7 @@ export function Sidebar(props: SidebarProps) {
           today={today}
           currentWeek={currentWeek}
           selectedDate={selectedDate}
-          generating={props.generatingDates}
+          generating={props.generating}
           onOpenDate={(date) => {
             setMonth(date.slice(0, 7));
             props.onSelectDate(date);
@@ -209,43 +193,33 @@ export function Sidebar(props: SidebarProps) {
           showIgnoredDays={props.showIgnoredDays}
           onToggleShowIgnoredDays={props.onToggleShowIgnoredDays}
           escapeCloses={viewMode === "daily"}
-          selectMode={props.daySelectMode}
-          selectedDates={props.selectedDates}
-          onChangeSelectMode={props.onChangeDaySelectMode}
-          onChangeSelectedDates={props.onChangeSelectedDates}
-          onQuickSelectStale={props.onQuickSelectStale}
-          batchPlan={props.dayBatchPlan}
-          batchPlanning={props.dayBatchPlanning}
-          batchIncludeFinal={props.dayBatchIncludeFinal}
-          onChangeBatchIncludeFinal={props.onChangeDayBatchIncludeFinal}
-          batchRun={props.dayBatchRun}
-          batchSummary={props.dayBatchSummary}
-          onRunBatch={props.onRunDayBatch}
-          onCancelBatch={props.onCancelDayBatch}
-          onSetBatchStatus={props.onSetDayBatchStatus}
-          onCloseBatch={props.onCloseDayBatch}
+          batch={props.batches.daily}
         />
       ) : browseMode === "weekly" ? (
         <WeekList
           weeks={props.weeks}
-          currentWeek={currentWeek}
-          selectedWeek={selectedWeek}
-          generating={props.generatingDates}
-          onOpenWeek={(week) => {
+          current={currentWeek}
+          selected={selectedWeek}
+          generating={props.generating}
+          onOpen={(week) => {
             setMonth(weekMonth(week) ?? activeMonth);
             props.onSelectWeek(week);
           }}
+          batch={props.batches.weekly}
+          escapeCloses={viewMode === "weekly"}
         />
       ) : browseMode === "monthly" ? (
         <MonthList
           months={props.months}
-          currentMonth={currentMonth}
-          selectedMonth={selectedMonth}
-          generating={props.generatingDates}
-          onOpenMonth={(m) => {
+          current={currentMonth}
+          selected={selectedMonth}
+          generating={props.generating}
+          onOpen={(m) => {
             setYear(m.slice(0, 4));
             props.onSelectMonth(m);
           }}
+          batch={props.batches.monthly}
+          escapeCloses={viewMode === "monthly"}
         />
       ) : (
         <ProjectsSection

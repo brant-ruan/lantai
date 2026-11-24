@@ -1,7 +1,7 @@
 // Application shell: wires the sidebar, the active workspace view, the slice drawer and the
 // settings modal together. View state and refresh logic live in hooks under `hooks/`.
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { ProjectRollupPanel } from "./components/ProjectRollupPanel";
 import { ProjectTimeline } from "./components/ProjectTimeline";
@@ -10,6 +10,7 @@ import { useResizableValue } from "./components/Resizable";
 import { resetReportWidth } from "./hooks/useReportWidth";
 import { SettingsModal } from "./components/SettingsModal";
 import { Sidebar } from "./components/Sidebar";
+import { weekMonth } from "./components/sidebar/dates";
 import { SliceDrawer } from "./components/SliceDrawer";
 import { SliceList } from "./components/SliceList";
 import { StatsView } from "./components/StatsView";
@@ -17,7 +18,7 @@ import { SearchView } from "./components/SearchView";
 import { WorkspaceTabs } from "./components/WorkspaceTabs";
 import { useAppearance } from "./hooks/useAppearance";
 import { useDateRollover } from "./hooks/useDateRollover";
-import { useDayBatch } from "./hooks/useDayBatch";
+import { useReportBatch } from "./hooks/useReportBatch";
 import { useMenuActions } from "./hooks/useMenuActions";
 import { useSearchView } from "./hooks/useSearchView";
 import { usePeriodView, type PeriodLoaders, type PeriodView } from "./hooks/usePeriodView";
@@ -35,6 +36,7 @@ import type {
   DayWorkbench,
   Diagnostics,
   MonthOverview,
+  PeriodMode,
   ProjectsOverview,
   PromptItem,
   SettingsTab,
@@ -47,8 +49,6 @@ import { DeleteProjectDialog, type DeleteTarget } from "./components/DeleteProje
 
 /** Fixed sidebar width: wide enough for the full calendar, not resizable. */
 const SIDEBAR_WIDTH = 240;
-
-type PeriodMode = "daily" | "weekly" | "monthly";
 
 const DAILY_LOADERS: PeriodLoaders = {
   workbench: api.dayWorkbench,
@@ -168,7 +168,10 @@ export function App() {
   const { setSelected: setSelectedWeek } = weekly;
   const { setSelected: setSelectedMonth } = monthly;
   const { setSelectedId: setSelectedProjectId } = project;
+  const [batchRevision, setBatchRevision] = useState(0);
+  const metadataRequest = useRef(0);
   const refreshMetadata = useCallback(async () => {
+    const request = ++metadataRequest.current;
     const [daysRes, weeksRes, monthsRes, p, po, h] = await Promise.all([
       api.listDays(showIgnoredDaysRef.current),
       api.listWeeks(),
@@ -177,6 +180,8 @@ export function App() {
       api.listProjectsAndRules(),
       api.diagnostics(),
     ]);
+    if (request !== metadataRequest.current) return;
+    setBatchRevision((revision) => revision + 1);
     setToday(daysRes.today);
     setDays(daysRes.days);
     setSelectedDate((prev) => {
@@ -208,33 +213,23 @@ export function App() {
       .catch((e) => setErrorMsg(String(e)));
   }, []);
 
-  /** Refresh after a daily report finished: the day list, and the report if still on screen. */
-  const refreshAfterDay = async (date: string) => {
+  const refreshAfterReport = async (type: PeriodMode, key: string) => {
     await refreshMetadata();
-    if (viewModeRef.current === "daily" && daily.selectedRef.current === date) {
-      await daily.refresh(date);
+    const shown = viewModeRef.current;
+    if (shown === "daily" && type === shown && daily.selectedRef.current === key) {
+      await daily.refresh(key);
+    } else if (shown === "weekly" && type === shown && weekly.selectedRef.current === key) {
+      await weekly.refresh(key);
+    } else if (shown === "monthly") {
+      const month = monthly.selectedRef.current;
+      if ((type === "monthly" && key === month) || (type === "weekly" && weekMonth(key) === month)) {
+        await monthly.refresh(month);
+      }
     }
   };
 
-  // The batch needs `refreshCurrent`, which needs the batch's plan revision: break the cycle with a ref.
-  const refreshCurrentRef = useRef<() => Promise<void>>(async () => {});
-  const dayBatch = useDayBatch({
-    days,
-    showIgnoredDays,
-    prompt: daily.prompt,
-    engine: selectedEngine,
-    runAction,
-    setErrorMsg,
-    startJob: jobs.startJob,
-    finishJob: jobs.finishJob,
-    refreshAfterDay,
-    refreshCurrent: () => refreshCurrentRef.current(),
-  });
-  const { bumpPlanRevision } = dayBatch;
-
   const refreshCurrent = useCallback(async () => {
     await refreshMetadata();
-    bumpPlanRevision();
     if (viewMode === "daily") {
       await daily.refresh(daily.selected);
     } else if (viewMode === "weekly") {
@@ -250,7 +245,6 @@ export function App() {
     }
   }, [
     refreshMetadata,
-    bumpPlanRevision,
     viewMode,
     daily.refresh,
     daily.selected,
@@ -265,7 +259,35 @@ export function App() {
     stats.range,
     stats.includeIgnored,
   ]);
-  refreshCurrentRef.current = refreshCurrent;
+
+  const dayPeriods = useMemo(() => days.map((d) => ({
+    key: d.localDate, slices: d.slices, reportStatus: d.reportStatus,
+  })), [days]);
+  const weekPeriods = useMemo(() => weeks.map((w) => ({
+    key: w.week, slices: w.slices, reportStatus: w.reportStatus,
+  })), [weeks]);
+  const monthPeriods = useMemo(() => months.map((m) => ({
+    key: m.month, slices: m.slices, reportStatus: m.reportStatus,
+  })), [months]);
+  const batchInputs = {
+    revision: batchRevision,
+    engine: selectedEngine,
+    generating: jobs.jobs,
+    setErrorMsg,
+    startJob: jobs.startJob,
+    finishJob: jobs.finishJob,
+    refreshAfterReport,
+    refreshCurrent,
+  };
+  const dayBatch = useReportBatch({
+    ...batchInputs, reportType: "daily", periods: dayPeriods, prompt: daily.prompt,
+  });
+  const weekBatch = useReportBatch({
+    ...batchInputs, reportType: "weekly", periods: weekPeriods, prompt: weekly.prompt,
+  });
+  const monthBatch = useReportBatch({
+    ...batchInputs, reportType: "monthly", periods: monthPeriods, prompt: monthly.prompt,
+  });
 
   // Prompts, defaults, digests and estimates depend on the report language: reload them
   // when it changes (not on the first render, which loads them anyway).
@@ -363,12 +385,7 @@ export function App() {
     jobs.startJob(period, mode === "monthly" ? "stage2" : "stage1");
     const common = { prompt: view.prompt || null, engine: selectedEngine || null, update };
     try {
-      const r =
-        mode === "daily"
-          ? await api.generateDailyReport({ date: period, project: null, ...common })
-          : mode === "weekly"
-            ? await api.generateWeeklyReport({ week: period, ...common })
-            : await api.generateMonthlyReport({ month: period, ...common });
+      const r = await api.generatePeriodReport(mode, period, common);
       console.debug(`[report ${period}] completed`, r);
     } catch (err) {
       const msg = errorText(err);
@@ -377,14 +394,7 @@ export function App() {
     } finally {
       jobs.finishJob(period);
     }
-    // Refresh the lists either way; reload the report only if it is still on screen.
-    await runAction(async () => {
-      await refreshMetadata();
-      if (mode === "daily") bumpPlanRevision();
-      if (viewModeRef.current === mode && view.selectedRef.current === period) {
-        await view.refresh(period);
-      }
-    });
+    await runAction(() => refreshAfterReport(mode, period));
   };
 
   const handleScan = async () => {
@@ -725,25 +735,11 @@ export function App() {
         days={days}
         today={today}
         selectedDate={daily.selected}
-        generatingDates={jobs.jobs}
+        generating={jobs.jobs}
         onSelectDate={(d) => openDay(d)}
         showIgnoredDays={showIgnoredDays}
         onToggleShowIgnoredDays={handleToggleShowIgnoredDays}
-        daySelectMode={dayBatch.selectMode}
-        selectedDates={dayBatch.selectedDates}
-        onChangeDaySelectMode={dayBatch.changeSelectMode}
-        onChangeSelectedDates={dayBatch.changeSelectedDates}
-        onQuickSelectStale={dayBatch.quickSelectStale}
-        dayBatchPlan={dayBatch.plan}
-        dayBatchPlanning={dayBatch.planning}
-        dayBatchIncludeFinal={dayBatch.includeFinal}
-        onChangeDayBatchIncludeFinal={dayBatch.setIncludeFinal}
-        dayBatchRun={dayBatch.run}
-        dayBatchSummary={dayBatch.summary}
-        onRunDayBatch={dayBatch.runBatch}
-        onCancelDayBatch={dayBatch.cancel}
-        onSetDayBatchStatus={dayBatch.setStatus}
-        onCloseDayBatch={dayBatch.close}
+        batches={{ daily: dayBatch, weekly: weekBatch, monthly: monthBatch }}
         weeks={weeks}
         currentWeek={currentWeek}
         selectedWeek={weekly.selected}

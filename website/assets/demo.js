@@ -249,7 +249,7 @@
   }
   function manifestOf(list) {
     var m = {};
-    byProject(list).forEach(function (g) { m[g.project.name] = g.slices.map(function (s) { return s.id; }).join(","); });
+    byProject(list).forEach(function (g) { m[g.project.name] = g.slices.map(function (s) { return s.id; }); });
     return m;
   }
   function itemLines(s) {
@@ -322,6 +322,20 @@
     return { title: title, sections: sections };
   }
 
+  function reportManifest(kind, key, list) {
+    if (kind !== "monthly") return manifestOf(list);
+    var manifest = {};
+    monthWeeks(key).forEach(function (week) {
+      var rep = reports.weekly[week];
+      if (!rep) return;
+      splitMarkdown(rep.md).sections.forEach(function (sec) {
+        var lines = sec.lines.filter(function (line) { return line.charAt(0) !== ">"; });
+        if (lines.length) (manifest[sec.name] = manifest[sec.name] || []).push(week + "\n" + lines.join("\n"));
+      });
+    });
+    return manifest;
+  }
+
   var reports = { daily: {}, weekly: {}, monthly: {} };
   function makeReport(kind, key, opts) {
     opts = opts || {};
@@ -331,7 +345,7 @@
       md: serialize(titleOf(kind, key), buildSections(kind, key, used)),
       v: 1,
       status: opts.status || "final",
-      manifest: kind === "monthly" ? null : manifestOf(used),
+      manifest: reportManifest(kind, key, used),
     };
   }
   (function seedReports() {
@@ -356,14 +370,14 @@
   function staleness(kind, key) {
     var rep = reports[kind][key];
     if (!rep || !rep.manifest) return null;
-    var now = manifestOf(periodSlices(kind, key));
+    var now = reportManifest(kind, key, periodSlices(kind, key));
     var names = {};
     Object.keys(now).concat(Object.keys(rep.manifest)).forEach(function (n) { names[n] = true; });
     var changed = [];
     var count = 0;
     Object.keys(names).forEach(function (n) {
-      var a = (now[n] || "").split(",").filter(Boolean);
-      var b = (rep.manifest[n] || "").split(",").filter(Boolean);
+      var a = now[n] || [];
+      var b = rep.manifest[n] || [];
       var diff = a.filter(function (x) { return b.indexOf(x) < 0; }).length + b.filter(function (x) { return a.indexOf(x) < 0; }).length;
       if (diff) { changed.push(n); count += diff; }
     });
@@ -391,6 +405,7 @@
     granularity: "daily",
     drawer: null,
     jobs: {},
+    batches: { daily: null, weekly: null, monthly: null },
     expanded: {},
     foldedNotes: {},
     menu: null,
@@ -631,6 +646,7 @@
     else if (mode === "weekly") html += renderWeekList();
     else if (mode === "monthly") html += renderMonthList();
     else html += renderProjectList();
+    if (mode !== "projects" && state.batches[mode]) html += renderBatchBar(mode);
     html += '<div class="dm-side-foot">';
     if (state.scanNote) html += '<div class="dm-note">' + esc(state.scanNote) + "</div>";
     html += '<div class="dm-foot-actions">';
@@ -719,39 +735,112 @@
     return c;
   }
 
+  function batchListHeader(kind, label) {
+    var open = state.menu === "batch-list";
+    var html = '<div class="dm-label-row"><span class="dm-label">' + label + '</span><div class="dm-menu-wrap">';
+    html += '<button type="button" class="dm-btn dm-btn-ghost dm-btn-xs" data-act="menu" data-menu="batch-list" aria-label="' + label + ' list options" aria-expanded="' + open + '">⋯</button>';
+    if (open) {
+      var options = [
+        [state.batches[kind] ? "Exit multi-select" : "Select " + label.toLowerCase() + "…", "select"],
+        ["All drafts", "drafts"], ["All out of date", "stale"], ["All without a report", "missing"],
+      ];
+      if (kind === "daily") options.splice(1, 0, ["This week", "week"], ["This month", "month"]);
+      html += '<div class="dm-menu">';
+      options.forEach(function (opt) {
+        html += '<button type="button" data-act="batch-select" data-pick="' + opt[1] + '">' + opt[0] + '</button>';
+      });
+      html += '</div>';
+    }
+    return html + '</div></div>';
+  }
+
+  function batchRow(kind, key, active, dateHtml, metaHtml, act, attrs) {
+    var batch = state.batches[kind];
+    var row = rowShell(active, dateHtml, metaHtml, act, attrs + ' data-list-key="' + key + '"');
+    if (!batch || batch.running) return row;
+    var checked = batch.keys.indexOf(key) >= 0;
+    return '<div class="dm-batch-row' + (checked ? ' selected' : '') + '"><input type="checkbox" aria-label="Select ' + key +
+      '" data-act="batch-toggle" data-key="' + key + '"' + (checked ? ' checked' : '') + '>' + row + '</div>';
+  }
+
+  function batchItem(kind, key, includeFinal) {
+    var rep = reports[kind][key];
+    var month = kind === "monthly" && monthOverview(key);
+    var available = month ? month.reportedWeeks > 0 : reportable(periodSlices(kind, key)).length > 0;
+    var eligible = available && (!rep || rep.status !== "final" || includeFinal);
+    return {
+      key: key, eligible: eligible, missing: eligible && !rep, stale: eligible && !!staleness(kind, key),
+      missingWeeks: month ? month.weeks.filter(function (w) { return !w.status; }).map(function (w) { return w.week; }) : [],
+      available: available,
+    };
+  }
+
+  function renderBatchBar(kind) {
+    var batch = state.batches[kind];
+    var plan = batch.keys.map(function (key) { return batchItem(kind, key, batch.includeFinal); });
+    function button(label, action, value, disabled, style) {
+      return '<button type="button" class="dm-btn dm-btn-xs dm-btn-' + (style || "secondary") + '" data-act="' +
+        action + '" data-value="' + value + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button>';
+    }
+    var html = '<div class="dm-batch-bar">';
+    if (batch.running) return html + '<div>Running ' + batch.running.done + '/' + batch.running.total +
+      button("Cancel all", "batch-cancel", "", false, "danger") + '</div></div>';
+    var missing = plan.filter(function (p) { return p.missing; }).length;
+    var stale = plan.filter(function (p) { return p.stale; }).length;
+    var eligible = plan.filter(function (p) { return p.eligible; }).length;
+    html += '<div>' + batch.keys.length + ' selected' + button("×", "batch-close", "", false, "ghost") + '</div>';
+    html += '<div>' + button("Generate / Update", "batch-run", "smart", !missing && !stale, "primary") +
+      button("▾", "menu", "batch-actions", !plan.length) + button("Final", "batch-status", "final", !plan.length) +
+      button("Draft", "batch-status", "draft", !plan.length) + '</div>';
+    if (state.menu === "batch-actions") {
+      html += '<div class="dm-batch-options">' + button("Update out of date (" + stale + ")", "batch-run", "stale", !stale) +
+        button("Generate missing (" + missing + ")", "batch-run", "missing", !missing) +
+        button("Regenerate all (" + eligible + ")", "batch-run", "regenerate", !eligible) +
+        button((batch.includeFinal ? "✓ " : "") + "Include final", "batch-final", "", false, "ghost") + '</div>';
+    }
+    if (batch.confirm) html += '<div>Regenerate ' + eligible + ' reports?' +
+      button("Confirm", "batch-run", "confirmed", !eligible) + button("Cancel", "batch-dismiss", "", false) + '</div>';
+    if (kind === "monthly") plan.forEach(function (p) {
+      if (p.missingWeeks.length) html += '<p>' + p.key + (p.available ? ' is missing ' : ' will be skipped. Missing ') +
+        p.missingWeeks.join(", ") + '</p>';
+    });
+    if (batch.summary) html += '<p role="status">' + esc(batch.summary) + '</p>';
+    return html + '</div>';
+  }
+
   function renderDayList() {
     var days = [];
     for (var d = TODAY; d >= GRID_START; d = addDays(d, -1)) { var o = dayOverview(d); if (o) days.push(o); }
-    var html = '<div class="dm-section dm-list-wrap"><div class="dm-label">Days</div><div class="dm-list" data-scroll="days">';
+    var html = '<div class="dm-section dm-list-wrap">' + batchListHeader("daily", "Days") + '<div class="dm-list" data-scroll="days">';
     days.forEach(function (o) {
       // As in the app: how many notes the person wrote, then time. (The narrow demo sidebar
       // leaves unassigned sessions to the Sessions tab.)
       var nn = noteCount(o.date);
       var meta = (nn ? '<span class="dm-row-notes" title="' + nn + (nn === 1 ? " note" : " notes") + '">' + nn + "</span>" : "") + '<span class="dm-stats" title="' + o.slices + (o.slices === 1 ? " session" : " sessions") + '">' + fmtMinutes(o.minutes) + "</span>" + statusDot(o.status, state.jobs["daily|" + o.date]);
-      html += rowShell(o.date === state.date, o.date.slice(5) + '<span class="dm-row-wd">' + (o.date === TODAY ? "Today" : WD_SHORT[weekday(o.date)]) + "</span>", meta, "day", 'data-date="' + o.date + '"');
+      html += batchRow("daily", o.date, o.date === state.date, o.date.slice(5) + '<span class="dm-row-wd">' + (o.date === TODAY ? "Today" : WD_SHORT[weekday(o.date)]) + "</span>", meta, "day", 'data-date="' + o.date + '"');
     });
     return html + "</div></div>";
   }
   function renderWeekList() {
-    var html = '<div class="dm-section dm-list-wrap"><div class="dm-list" data-scroll="weeks">';
+    var html = '<div class="dm-section dm-list-wrap">' + batchListHeader("weekly", "Weeks") + '<div class="dm-list" data-scroll="weeks">';
     Object.keys(weekMondays).sort().reverse().forEach(function (wk) {
       if (weekMondays[wk] < GRID_START) return;
       var o = weekOverview(wk);
       if (!o) return;
       var sub = wk === CUR_WEEK ? "This week" : o.monday.slice(5) + " ~ " + addDays(o.monday, 6).slice(5);
       var meta = (o.unassigned ? '<span class="dm-badge warn">' + o.unassigned + "</span>" : "") + '<span class="dm-stats">' + o.days + "d · " + fmtMinutes(o.minutes) + "</span>" + statusDot(o.status, state.jobs["weekly|" + wk]);
-      html += rowShell(wk === state.week, wk.slice(5) + '<span class="dm-row-wd">' + sub + "</span>", meta, "week", 'data-week="' + wk + '"');
+      html += batchRow("weekly", wk, wk === state.week, wk.slice(5) + '<span class="dm-row-wd">' + sub + "</span>", meta, "week", 'data-week="' + wk + '"');
     });
     return html + "</div></div>";
   }
   function renderMonthList() {
-    var html = '<div class="dm-section dm-list-wrap"><div class="dm-list" data-scroll="months">';
+    var html = '<div class="dm-section dm-list-wrap">' + batchListHeader("monthly", "Months") + '<div class="dm-list" data-scroll="months">';
     Object.keys(DATA.monthly).sort().reverse().forEach(function (m) {
       var o = monthOverview(m);
       if (!o) return;
       var sub = m === CUR_MONTH ? "This month" : monthTitle(m).split(" · ")[1];
       var meta = (o.unassigned ? '<span class="dm-badge warn">' + o.unassigned + "</span>" : "") + '<span class="dm-stats">' + o.reportedWeeks + "/" + o.activeWeeks + "w · " + fmtMinutes(o.minutes) + "</span>" + statusDot(o.status, state.jobs["monthly|" + m]);
-      html += rowShell(m === state.month, m + '<span class="dm-row-wd">' + sub + "</span>", meta, "month", 'data-month="' + m + '"');
+      html += batchRow("monthly", m, m === state.month, m + '<span class="dm-row-wd">' + sub + "</span>", meta, "month", 'data-month="' + m + '"');
     });
     return html + "</div></div>";
   }
@@ -1103,18 +1192,18 @@
 
   /* ------------------------------------------------------------- actions */
 
-  function generate(kind, key, update) {
+  function generate(kind, key, update, finished) {
     var jobKey = kind + "|" + key;
     if (state.jobs[jobKey]) return;
     state.editing = false;
     state.jobs[jobKey] = "stage1";
     render();
     setTimeout(function () {
-      if (!state.jobs[jobKey]) return;
+      if (!state.jobs[jobKey]) { if (finished) finished(false); return; }
       state.jobs[jobKey] = "stage2";
       render();
       setTimeout(function () {
-        if (!state.jobs[jobKey]) return;
+        if (!state.jobs[jobKey]) { if (finished) finished(false); return; }
         delete state.jobs[jobKey];
         var old = reports[kind][key];
         var list = periodSlices(kind, key);
@@ -1131,10 +1220,77 @@
         } else {
           md = serialize(titleOf(kind, key), fresh);
         }
-        reports[kind][key] = { md: md, v: old ? old.v + 1 : 1, status: "draft", manifest: kind === "monthly" ? null : manifestOf(list) };
+        reports[kind][key] = { md: md, v: old ? old.v + 1 : 1, status: "draft", manifest: reportManifest(kind, key, list) };
+        if (finished) finished(true);
         render();
       }, 1500);
     }, 1100);
+  }
+
+  function batchSelection(kind) {
+    return state.batches[kind] || (state.batches[kind] = { keys: [], includeFinal: false });
+  }
+
+  function listKeys() {
+    return Array.from(root.querySelectorAll("[data-list-key]"), function (el) {
+      return el.getAttribute("data-list-key");
+    });
+  }
+
+  function selectBatchRow(kind, key, range) {
+    var batch = batchSelection(kind);
+    if (batch.running) return;
+    batch.open = true;
+    var keys = listKeys();
+    var start = keys.indexOf(batch.anchor || periodKey(kind));
+    var end = keys.indexOf(key);
+    if (range && start >= 0) {
+      batch.keys = Array.from(new Set(batch.keys.concat(keys.slice(Math.min(start, end), Math.max(start, end) + 1))));
+    } else {
+      batch.keys = batch.keys.indexOf(key) < 0 ? batch.keys.concat(key) : batch.keys.filter(function (k) { return k !== key; });
+      batch.anchor = key;
+    }
+    batch.summary = null;
+    batch.confirm = false;
+  }
+
+  function runBatch(kind, mode) {
+    var batch = state.batches[kind];
+    if (mode === "regenerate") { batch.confirm = true; return; }
+    batch.confirm = false;
+    var plan = batch.keys.map(function (key) { return batchItem(kind, key, batch.includeFinal); });
+    var queue = plan.filter(function (p) {
+      if (state.jobs[kind + "|" + p.key]) return false;
+      if (mode === "confirmed") return p.eligible;
+      return (mode !== "missing" && p.stale) || (mode !== "stale" && p.missing);
+    });
+    var skipped = plan.length - queue.length;
+    var job = batch.running = { done: 0, total: queue.length, active: [] };
+    var completed = 0;
+    function next() {
+      var p = queue.shift();
+      if (!p || job.cancelled) return;
+      job.active.push(p.key);
+      generate(kind, p.key, p.stale && mode !== "confirmed", function (ok) {
+        job.active = job.active.filter(function (key) { return key !== p.key; });
+        job.done += 1;
+        if (ok) completed += 1;
+        if (!job.cancelled && queue.length) next();
+        if (job.active.length === 0) finish();
+      });
+    }
+    function finish() {
+      var parts = [completed + " completed"];
+      if (skipped) parts.push(skipped + " skipped");
+      if (job.cancelled) parts.push(job.total - completed + " cancelled");
+      batch.running = null;
+      batch.keys = kind === "monthly" ? plan.filter(function (p) { return !p.available; })
+        .map(function (p) { return p.key; }) : [];
+      batch.summary = parts.join(" · ");
+      render();
+    }
+    if (!queue.length) finish();
+    else { next(); next(); }
   }
 
   function openPeriod(kind, key) {
@@ -1153,8 +1309,54 @@
     if (!el || !root.contains(el) || el.tagName === "SELECT") return;
     var act = el.getAttribute("data-act");
     var kind, key, s;
+    var listKey = el.getAttribute("data-list-key");
+    if (listKey && (ev.metaKey || ev.ctrlKey || ev.shiftKey)) {
+      selectBatchRow(state.mode, listKey, ev.shiftKey && !(ev.metaKey || ev.ctrlKey));
+      render();
+      return;
+    }
     if (act !== "menu" && state.menu) state.menu = null;
     switch (act) {
+      case "batch-select":
+        var pick = el.getAttribute("data-pick");
+        var selection = batchSelection(state.mode);
+        if (selection.running) break;
+        if (pick === "select") {
+          if (selection.open) state.batches[state.mode] = null;
+          else selection.open = true;
+          break;
+        }
+        selection.open = true;
+        selection.summary = null;
+        selection.confirm = false;
+        selection.keys = listKeys().filter(function (period) {
+          var rep = reports[state.mode][period];
+          if (pick === "drafts") return rep && rep.status === "draft";
+          if (pick === "stale") return batchItem(state.mode, period, true).stale;
+          if (pick === "week") return weekKey(period) === CUR_WEEK;
+          if (pick === "month") return period.slice(0, 7) === CUR_MONTH;
+          return !rep;
+        });
+        break;
+      case "batch-toggle": selectBatchRow(state.mode, el.getAttribute("data-key"), false); break;
+      case "batch-close": state.batches[state.mode] = null; break;
+      case "batch-final": state.batches[state.mode].includeFinal = !state.batches[state.mode].includeFinal; break;
+      case "batch-dismiss": state.batches[state.mode].confirm = false; break;
+      case "batch-run": runBatch(state.mode, el.getAttribute("data-value")); break;
+      case "batch-cancel":
+        var running = state.batches[state.mode].running;
+        running.cancelled = true;
+        running.active.forEach(function (key) { delete state.jobs[state.mode + "|" + key]; });
+        break;
+      case "batch-status":
+        var batch = state.batches[state.mode];
+        var marked = batch.keys.filter(function (key) {
+          var rep = reports[state.mode][key];
+          if (rep) rep.status = el.getAttribute("data-value");
+          return !!rep;
+        }).length;
+        batch.summary = marked + " marked " + el.getAttribute("data-value");
+        break;
       case "mode":
         state.mode = el.getAttribute("data-mode");
         state.stats = false;
@@ -1228,7 +1430,10 @@
         if (r && ta) { r.md = ta.value; r.v += 1; }
         state.editing = false;
         break;
-      case "menu": state.menu = state.menu ? null : "options"; break;
+      case "menu":
+        var menu = el.getAttribute("data-menu") || el.getAttribute("data-value") || "options";
+        state.menu = state.menu === menu ? null : menu;
+        break;
       case "copy":
         kind = state.mode;
         var cr = reports[kind][periodKey(kind)];
@@ -1299,7 +1504,13 @@
   });
 
   root.addEventListener("keydown", function (ev) {
-    if (ev.key === "Escape" && (state.drawer || state.menu)) { state.drawer = null; state.menu = null; render(); }
+    if (ev.key !== "Escape") return;
+    if (state.drawer || state.menu) { state.drawer = null; state.menu = null; render(); }
+    else if (state.batches[state.mode] && !state.batches[state.mode].running &&
+             !ev.target.matches("input[type=text], textarea")) {
+      state.batches[state.mode] = null;
+      render();
+    }
   });
 
   render();

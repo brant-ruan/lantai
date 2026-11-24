@@ -73,7 +73,8 @@ export interface WeeklyResult {
 }
 
 /** Report kinds the report commands accept. */
-export type ReportType = "daily" | "weekly" | "monthly" | "project";
+export type PeriodMode = "daily" | "weekly" | "monthly";
+export type ReportType = PeriodMode | "project";
 
 export interface SliceCard {
   id: number;
@@ -144,7 +145,7 @@ export interface ProjectWorkbench {
 }
 
 /** Which period reports a project rollup is made of. */
-export type RollupGranularity = "daily" | "weekly" | "monthly";
+export type RollupGranularity = PeriodMode;
 
 export interface ProjectRollupEntry {
   /** Period key: a date, or a week key such as "2026-W47". */
@@ -504,20 +505,20 @@ export type DensityId = "compact" | "default" | "comfortable";
 /** Phase of a running report job: digesting slices, then writing the report. */
 export type GenStage = "stage1" | "stage2";
 
-export type DayBatchMode = "smart" | "stale" | "missing" | "regenerate";
+export type ReportBatchMode = "smart" | "stale" | "missing" | "regenerate";
 
-export interface BatchDayPlan {
-  date: string;
-  slicesUsed: number;
+export interface BatchItem {
+  periodKey: string;
+  hasInputs: boolean;
+  missingWeeks: string[];
   status: "none" | "draft" | "final";
   stale: boolean;
-  staleProjects: string[];
   action: "generate" | "update" | "skip";
   canRegenerate: boolean;
 }
 
 export interface BatchPlan {
-  days: BatchDayPlan[];
+  items: BatchItem[];
   missingCount: number;
   staleCount: number;
   regenerateCount: number;
@@ -529,7 +530,7 @@ export interface BatchStatusResult {
   skipped: string[];
 }
 
-export interface DayBatchRun {
+export interface ReportBatchRun {
   done: number;
   total: number;
 }

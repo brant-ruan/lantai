@@ -201,6 +201,10 @@ What the code does not make obvious. The design behind each is in the spec.
 - **Parallel generation:** `AppState.report_jobs` has one job per key (date, `date|project`, week
   key, month key), each with its own cancel flag; `report-progress` events carry the key.
   `Store::open` sets a 15-second `busy_timeout` so concurrent writers wait.
+- **Sidebar report batches:** `useReportBatch` owns each view's selection and queue, and
+  `aj_report::batch` plans from the same inputs as single reports. Monthly generation requires
+  usable weekly sections, and editing or generating a weekly report can invalidate a monthly
+  plan. The app refreshes batch previews after report metadata changes.
 - **Models and keys:** `config.toml` has providers `[providers.*]`, model aliases `[models.*]` and
   `default_model`. Keys are stored in the macOS keychain by `keystore.rs` (through
   `/usr/bin/security`); keys are never read from environment variables. Nothing is built in: with

@@ -2,7 +2,7 @@
 // checked against `Messages` and fall back to these texts for keys they leave out.
 // Texts that depend on a number are functions, written per language.
 
-import type { ReportProgress } from "../types";
+import type { PeriodMode, ReportProgress } from "../types";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 /** "day" / "week" / "month" for a granularity ("daily", "weekly", "monthly"). */
@@ -138,9 +138,11 @@ export const en = {
 
   dayList: {
     days: "Days",
-    options: "Daily list options",
+    options: { daily: "Daily list options", weekly: "Weekly list options", monthly: "Monthly list options" },
+    weeks: "Weeks",
+    months: "Months",
     showIgnoredDays: "Show ignored days",
-    selectDays: "Select days...",
+    selectPeriods: { daily: "Select days…", weekly: "Select weeks…", monthly: "Select months…" },
     exitMultiSelect: "Exit multi-select",
     quickSelect: "Quick select",
     thisWeek: "This week",
@@ -148,7 +150,7 @@ export const en = {
     allDraft: "All drafts",
     allOutOfDate: "All out of date",
     allWithoutReport: "All without a report",
-    selectDay: (date: string) => `Select ${date}`,
+    selectPeriod: (key: string) => `Select ${key}`,
     today: "Today",
     unassignedBadge: (n: number) => `${n} unassigned`,
     ignoredTitle: (n: number) => plural(n, "ignored slice", "ignored slices"),
@@ -357,16 +359,22 @@ export const en = {
     exitTitle: "Exit selection (Esc)",
   },
 
-  dayBatch: {
+  reportBatch: {
     running: (done: number, total: number) => `Running ${done}/${total}`,
     cancelAll: "Cancel all",
-    selected: (n: number) => `${plural(n, "day", "days")} selected`,
+    selected: (n: number, kind: PeriodMode) => {
+      const unit = { daily: "day", weekly: "week", monthly: "month" }[kind];
+      return `${plural(n, unit, `${unit}s`)} selected`;
+    },
+    partialMonth: (month: string, weeks: string) => `${month} is missing weekly reports for ${weeks}`,
+    unavailableMonth: (month: string, weeks: string) =>
+      `${month} will be skipped. No usable weekly reports${weeks ? ` for ${weeks}` : ""}.`,
     exit: "Exit multi-select",
     exitTitle: "Exit multi-select (Esc)",
     confirmRegenerate: (n: number) => `Regenerate ${plural(n, "report", "reports")}?`,
     confirm: "Confirm",
     smartTitle: (missing: number, stale: number) => `${missing} to generate, ${stale} to update`,
-    nothingToDo: "No missing or out-of-date reports in the selection",
+    nothingToDo: "No selected reports can be generated or updated",
     generateUpdate: "Generate / Update",
     options: "Batch generation options",
     updateStale: (n: number) => `Update out of date (${n})`,
@@ -379,9 +387,11 @@ export const en = {
     draftTitle: "Reopen the selected reports as drafts",
   },
 
-  dayBatchSummary: {
+  reportBatchSummary: {
     noReports: "No existing reports to check.",
-    allUpToDate: "All reports are up to date.",
+    allUpToDate: "No out-of-date reports with usable inputs.",
+    alreadyRunning: "A report is already being generated.",
+    coverageChanged: "Weekly coverage changed. Review the selection before running again.",
     skippedNothing: (n: number) => `${n} skipped (nothing to run)`,
     nothingToRun: "Nothing to run.",
     generated: (n: number) => `${n} generated`,

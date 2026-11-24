@@ -6,6 +6,7 @@ mod app_icon;
 mod cmd_agents;
 mod cmd_appearance;
 mod cmd_backup;
+mod cmd_batch;
 mod cmd_browse;
 mod cmd_cli;
 mod cmd_engine;
@@ -146,9 +147,9 @@ pub fn run() {
             cmd_report::cancel_report_generation,
             cmd_report::running_report_jobs,
             cmd_report::save_report_edit,
-            cmd_report::plan_batch,
+            cmd_batch::plan_batch,
             cmd_report::set_report_status,
-            cmd_report::set_reports_status,
+            cmd_batch::set_reports_status,
             cmd_report::restore_report_version,
             cmd_report::export_daily_report,
             cmd_report::pick_export_directory,

@@ -1,8 +1,4 @@
-//! On-demand planning for batch daily report operations in the sidebar.
-//!
-//! Computes for a selected set of dates whether each day has no report, an up-to-date
-//! report, or a stale report relative to its current slices, and chooses the smart
-//! batch action (`generate`, `update`, or `skip`) without running any model calls.
+//! On-demand planning for daily, weekly and monthly report batches, without model calls.
 
 use std::collections::HashSet;
 
@@ -12,18 +8,21 @@ use chrono::{TimeZone, Utc};
 
 use crate::lang::Language;
 use crate::material::{self, MaterialContext};
-use crate::prompt_library::KIND_DAILY;
+use crate::monthly::estimate_monthly;
+use crate::period::{Month, Week};
 use crate::report_io;
+use crate::rollup::Granularity;
 use crate::summarize::Budgets;
+use crate::weekly::estimate_weekly;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DayReportStatus {
+pub enum ReportStatus {
     None,
     Draft,
     Final,
 }
 
-impl DayReportStatus {
+impl ReportStatus {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
@@ -51,45 +50,45 @@ impl BatchAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BatchDayPlan {
-    pub date: String,
-    pub slices_used: usize,
-    pub status: DayReportStatus,
+pub struct BatchItem {
+    pub period_key: String,
+    pub has_inputs: bool,
+    pub missing_weeks: Vec<String>,
+    pub status: ReportStatus,
     pub stale: bool,
-    pub stale_projects: Vec<String>,
     pub action: BatchAction,
     pub can_regenerate: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchPlan {
-    pub days: Vec<BatchDayPlan>,
+    pub items: Vec<BatchItem>,
     pub missing_count: usize,
     pub stale_count: usize,
     pub regenerate_count: usize,
     pub batch_concurrency: usize,
 }
 
-/// Decide the smart batch action for one day from its slice count, report status and staleness.
-pub fn decide_action(
-    slices_used: usize,
-    status: DayReportStatus,
+/// Decide the smart action from the period’s available input, report status and staleness.
+fn decide_action(
+    has_inputs: bool,
+    status: ReportStatus,
     stale: bool,
     include_final: bool,
 ) -> BatchAction {
-    if slices_used == 0 {
+    if !has_inputs {
         return BatchAction::Skip;
     }
     match status {
-        DayReportStatus::None => BatchAction::Generate,
-        DayReportStatus::Draft => {
+        ReportStatus::None => BatchAction::Generate,
+        ReportStatus::Draft => {
             if stale {
                 BatchAction::Update
             } else {
                 BatchAction::Skip
             }
         }
-        DayReportStatus::Final => {
+        ReportStatus::Final => {
             if include_final && stale {
                 BatchAction::Update
             } else {
@@ -99,30 +98,25 @@ pub fn decide_action(
     }
 }
 
-/// Whether `Regenerate all` applies to this day under the current `include_final` policy.
-pub fn can_regenerate(slices_used: usize, status: DayReportStatus, include_final: bool) -> bool {
-    slices_used > 0 && (status != DayReportStatus::Final || include_final)
-}
-
-fn count_active_slices(store: &Store, date: &str) -> Result<usize> {
-    let mut count = 0usize;
+fn has_active_slices(store: &Store, date: &str) -> Result<bool> {
     for slice in store.slices_for_date(date)? {
         let Some(session) = store.session(slice.session_id)? else {
             continue;
         };
         if !slice.is_ignored(&session) {
-            count += 1;
+            return Ok(true);
         }
     }
-    Ok(count)
+    Ok(false)
 }
 
-/// Compute the per-day status, staleness and smart batch action for `dates` (deduplicated
-/// in input order). Does not invoke any model.
+/// Plan distinct periods in input order. Monthly availability is determined by usable
+/// weekly sections, and its staleness is measured against those sections.
 pub fn plan_batch<Tz: TimeZone>(
     store: &Store,
     tz: &Tz,
-    dates: &[String],
+    granularity: Granularity,
+    period_keys: &[String],
     include_final: bool,
     budgets: &Budgets,
     language: &'static Language,
@@ -130,12 +124,15 @@ pub fn plan_batch<Tz: TimeZone>(
 where
     Tz::Offset: std::fmt::Display,
 {
-    let mut seen = HashSet::with_capacity(dates.len());
-    let mut days = Vec::with_capacity(dates.len());
-    let mut missing_count = 0usize;
-    let mut stale_count = 0usize;
-    let mut regenerate_count = 0usize;
-
+    let kind = granularity.report_kind();
+    let mut seen = HashSet::with_capacity(period_keys.len());
+    let mut plan = BatchPlan {
+        items: Vec::with_capacity(period_keys.len()),
+        missing_count: 0,
+        stale_count: 0,
+        regenerate_count: 0,
+        batch_concurrency: budgets.batch_concurrency.max(1),
+    };
     let ctx = MaterialContext {
         engine_name: "",
         budgets,
@@ -143,79 +140,77 @@ where
         language,
     };
 
-    for date in dates {
-        if !seen.insert(date.as_str()) {
+    for key in period_keys {
+        let period = match granularity {
+            Granularity::Daily => key.clone(),
+            Granularity::Weekly => Week::parse(key)?.key(),
+            Granularity::Monthly => Month::parse(key)?.key(),
+        };
+        if !seen.insert(period.clone()) {
             continue;
         }
-        let meta = store.report_meta(KIND_DAILY, date, None)?;
-        let version = match meta {
-            Some(ref m) if m.current_version_id.is_some() => {
-                store.current_report_version(KIND_DAILY, date, None)?
-            }
-            _ => None,
-        };
-        let status = match (version.as_ref(), meta.as_ref().map(|m| m.status.as_str())) {
-            (Some(_), Some("final")) => DayReportStatus::Final,
-            (Some(_), _) => DayReportStatus::Draft,
-            (None, _) => DayReportStatus::None,
+        let meta = store.report_meta(kind, &period, None)?;
+        let status = match meta.filter(|m| m.current_version_id.is_some()) {
+            Some(m) if m.status == "final" => ReportStatus::Final,
+            Some(_) => ReportStatus::Draft,
+            None => ReportStatus::None,
         };
 
-        let has_manifest = version
-            .as_ref()
-            .and_then(|v| v.input_manifest.as_deref())
-            .is_some();
-
-        let (slices_used, stale, stale_projects) =
-            if status != DayReportStatus::None && has_manifest {
-                let collected = material::collect(store, tz, date, None, &ctx)?;
-                let staleness =
-                    report_io::staleness(store, KIND_DAILY, date, None, &collected.materials)?;
-                let used = collected.materials.len();
-                match staleness {
-                    Some(s) => (used, true, s.projects),
-                    None => (used, false, Vec::new()),
+        let (has_inputs, stale, missing_weeks) = match granularity {
+            Granularity::Daily => {
+                let version = store.current_report_version(kind, &period, None)?;
+                if version.is_some_and(|v| v.input_manifest.is_some()) {
+                    let collected = material::collect(store, tz, &period, None, &ctx)?;
+                    let stale =
+                        report_io::staleness(store, kind, &period, None, &collected.materials)?;
+                    (!collected.materials.is_empty(), stale.is_some(), Vec::new())
+                } else {
+                    (has_active_slices(store, &period)?, false, Vec::new())
                 }
-            } else {
-                (count_active_slices(store, date)?, false, Vec::new())
-            };
-
-        let action = decide_action(slices_used, status, stale, include_final);
-        let can_reg = can_regenerate(slices_used, status, include_final);
-
-        match action {
-            BatchAction::Generate => missing_count += 1,
-            BatchAction::Update => stale_count += 1,
-            BatchAction::Skip => {}
-        }
-        if can_reg {
-            regenerate_count += 1;
-        }
-
-        days.push(BatchDayPlan {
-            date: date.clone(),
-            slices_used,
+            }
+            Granularity::Weekly => {
+                let estimate = estimate_weekly(store, tz, Week::parse(&period)?, None, &ctx)?;
+                (
+                    estimate.slices_used > 0,
+                    estimate.staleness.is_some(),
+                    Vec::new(),
+                )
+            }
+            Granularity::Monthly => {
+                let estimate = estimate_monthly(store, tz, Month::parse(&period)?, None, &ctx)?;
+                (
+                    estimate.weeks_reported > 0,
+                    estimate.staleness.is_some(),
+                    estimate.unreported_weeks,
+                )
+            }
+        };
+        let action = decide_action(has_inputs, status, stale, include_final);
+        let can_regenerate = has_inputs && (status != ReportStatus::Final || include_final);
+        plan.missing_count += usize::from(action == BatchAction::Generate);
+        plan.stale_count += usize::from(action == BatchAction::Update);
+        plan.regenerate_count += usize::from(can_regenerate);
+        plan.items.push(BatchItem {
+            period_key: period,
+            has_inputs,
+            missing_weeks,
             status,
             stale,
-            stale_projects,
             action,
-            can_regenerate: can_reg,
+            can_regenerate,
         });
     }
 
-    Ok(BatchPlan {
-        days,
-        missing_count,
-        stale_count,
-        regenerate_count,
-        batch_concurrency: budgets.batch_concurrency.max(1),
-    })
+    Ok(plan)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::engine::testing::MockEngine;
-    use crate::prompt_library;
+    use crate::monthly::{generate_monthly, MonthlyOptions};
+    use crate::prompt_library::{self, KIND_DAILY};
+    use crate::weekly::{generate_weekly, WeeklyOptions};
     use crate::{generate_daily, DailyOptions, ReportMode};
     use aj_core::{slice::reslice_session, Config};
     use aj_ir::{AgentId, IrEvent};
@@ -259,49 +254,43 @@ mod tests {
     }
 
     #[test]
-    fn decide_action_and_can_regenerate_cover_all_combinations() {
+    fn decide_action_respects_availability_staleness_and_final_status() {
         assert_eq!(
-            decide_action(0, DayReportStatus::None, false, false),
+            decide_action(false, ReportStatus::None, false, false),
             BatchAction::Skip
         );
         assert_eq!(
-            decide_action(0, DayReportStatus::Draft, true, true),
+            decide_action(false, ReportStatus::Draft, true, true),
             BatchAction::Skip
         );
         assert_eq!(
-            decide_action(2, DayReportStatus::None, false, false),
+            decide_action(true, ReportStatus::None, false, false),
             BatchAction::Generate
         );
         assert_eq!(
-            decide_action(2, DayReportStatus::Draft, false, false),
+            decide_action(true, ReportStatus::Draft, false, false),
             BatchAction::Skip
         );
         assert_eq!(
-            decide_action(2, DayReportStatus::Draft, true, false),
+            decide_action(true, ReportStatus::Draft, true, false),
             BatchAction::Update
         );
         assert_eq!(
-            decide_action(2, DayReportStatus::Final, false, false),
+            decide_action(true, ReportStatus::Final, false, false),
             BatchAction::Skip
         );
         assert_eq!(
-            decide_action(2, DayReportStatus::Final, true, false),
+            decide_action(true, ReportStatus::Final, true, false),
             BatchAction::Skip
         );
         assert_eq!(
-            decide_action(2, DayReportStatus::Final, false, true),
+            decide_action(true, ReportStatus::Final, false, true),
             BatchAction::Skip
         );
         assert_eq!(
-            decide_action(2, DayReportStatus::Final, true, true),
+            decide_action(true, ReportStatus::Final, true, true),
             BatchAction::Update
         );
-
-        assert!(!can_regenerate(0, DayReportStatus::None, true));
-        assert!(can_regenerate(1, DayReportStatus::None, false));
-        assert!(can_regenerate(1, DayReportStatus::Draft, false));
-        assert!(!can_regenerate(1, DayReportStatus::Final, false));
-        assert!(can_regenerate(1, DayReportStatus::Final, true));
     }
 
     #[test]
@@ -373,28 +362,179 @@ mod tests {
             ..Budgets::default()
         };
 
-        let p_default = plan_batch(&store, &tz, &dates, false, &budgets, &crate::lang::EN).unwrap();
-        assert_eq!(p_default.days.len(), 5);
+        let p_default = plan_batch(
+            &store,
+            &tz,
+            Granularity::Daily,
+            &dates,
+            false,
+            &budgets,
+            &crate::lang::EN,
+        )
+        .unwrap();
+        assert_eq!(p_default.items.len(), 5);
         assert_eq!(p_default.batch_concurrency, 3);
         assert_eq!(p_default.missing_count, 1);
         assert_eq!(p_default.stale_count, 1);
         assert_eq!(p_default.regenerate_count, 3); // 16, 17, 18 (15 has 0 slices, 19 is final)
-        assert_eq!(p_default.days[0].action, BatchAction::Skip);
-        assert_eq!(p_default.days[1].action, BatchAction::Generate);
-        assert_eq!(p_default.days[2].action, BatchAction::Skip);
-        assert!(!p_default.days[2].stale);
-        assert_eq!(p_default.days[3].action, BatchAction::Update);
-        assert_eq!(p_default.days[3].stale_projects, vec!["app".to_string()]);
-        assert_eq!(p_default.days[4].status, DayReportStatus::Final);
-        assert!(p_default.days[4].stale);
-        assert_eq!(p_default.days[4].action, BatchAction::Skip);
-        assert!(!p_default.days[4].can_regenerate);
+        assert_eq!(p_default.items[0].action, BatchAction::Skip);
+        assert_eq!(p_default.items[1].action, BatchAction::Generate);
+        assert_eq!(p_default.items[2].action, BatchAction::Skip);
+        assert!(!p_default.items[2].stale);
+        assert_eq!(p_default.items[3].action, BatchAction::Update);
+        assert!(p_default.items[3].stale);
+        assert_eq!(p_default.items[4].status, ReportStatus::Final);
+        assert!(p_default.items[4].stale);
+        assert_eq!(p_default.items[4].action, BatchAction::Skip);
+        assert!(!p_default.items[4].can_regenerate);
 
-        let p_final = plan_batch(&store, &tz, &dates, true, &budgets, &crate::lang::EN).unwrap();
+        let p_final = plan_batch(
+            &store,
+            &tz,
+            Granularity::Daily,
+            &dates,
+            true,
+            &budgets,
+            &crate::lang::EN,
+        )
+        .unwrap();
         assert_eq!(p_final.missing_count, 1);
         assert_eq!(p_final.stale_count, 2);
         assert_eq!(p_final.regenerate_count, 4);
-        assert_eq!(p_final.days[4].action, BatchAction::Update);
-        assert!(p_final.days[4].can_regenerate);
+        assert_eq!(p_final.items[4].action, BatchAction::Update);
+        assert!(p_final.items[4].can_regenerate);
+    }
+
+    #[test]
+    fn weekly_batch_plans_from_sessions_without_daily_reports() {
+        let tz = FixedOffset::east_opt(0).unwrap();
+        let mut store = Store::open_in_memory().unwrap();
+        prompt_library::sync_builtins(&mut store).unwrap();
+        let project = store.create_project("app", None).unwrap();
+        let ignored = add_session(&mut store, &tz, "ignored", project, "2026-11-10T10:00:00Z");
+        store.set_session_ignored(ignored, true).unwrap();
+        add_session(&mut store, &tz, "active", project, "2026-11-18T10:00:00Z");
+        let keys = ["2026-W46".into(), "2026-W47".into(), "2026w47".into()];
+        let budgets = Budgets::default();
+        let plan = |store: &Store| {
+            plan_batch(
+                store,
+                &tz,
+                Granularity::Weekly,
+                &keys,
+                false,
+                &budgets,
+                &crate::lang::EN,
+            )
+            .unwrap()
+        };
+        let initial = plan(&store);
+        assert_eq!(initial.items.len(), 2);
+        assert_eq!(initial.items[0].action, BatchAction::Skip);
+        assert_eq!(initial.items[1].action, BatchAction::Generate);
+
+        let engine = MockEngine::new(|_| Ok("## app\n- did work [#S2]".into()));
+        let opts = WeeklyOptions {
+            week: Week::parse("2026-W47").unwrap(),
+            project: None,
+            prompt: None,
+            concurrency: 1,
+            dry_run: false,
+            budgets: Budgets::default(),
+            cancel: None,
+            mode: ReportMode::Regenerate,
+            now: t("2026-11-22T00:00:00Z"),
+            language: &crate::lang::EN,
+        };
+        generate_weekly(&mut store, &engine, &tz, &opts, &mut |_| {}).unwrap();
+        assert_eq!(plan(&store).items[1].action, BatchAction::Skip);
+        add_session(&mut store, &tz, "later", project, "2026-11-19T10:00:00Z");
+        assert_eq!(plan(&store).items[1].action, BatchAction::Update);
+    }
+
+    #[test]
+    fn monthly_batch_requires_usable_weekly_sections_and_updates_when_coverage_grows() {
+        let tz = FixedOffset::east_opt(0).unwrap();
+        let mut store = Store::open_in_memory().unwrap();
+        prompt_library::sync_builtins(&mut store).unwrap();
+        let project = store.create_project("app", None).unwrap();
+        add_session(&mut store, &tz, "early", project, "2026-11-10T10:00:00Z");
+        add_session(&mut store, &tz, "late", project, "2026-11-18T10:00:00Z");
+        add_session(&mut store, &tz, "dec", project, "2026-12-02T10:00:00Z");
+        let keys = ["2026-11".into(), "2026-12".into()];
+        let budgets = Budgets::default();
+        let plan = |store: &Store| {
+            plan_batch(
+                store,
+                &tz,
+                Granularity::Monthly,
+                &keys,
+                false,
+                &budgets,
+                &crate::lang::EN,
+            )
+            .unwrap()
+        };
+        let save_week = |store: &mut Store, period_key: &str, markdown: &str| {
+            store
+                .save_report_version(&aj_store::NewReportVersion {
+                    report_type: Granularity::Weekly.report_kind(),
+                    period_key,
+                    project_id: None,
+                    origin: "generated",
+                    markdown,
+                    engine: None,
+                    input_hash: None,
+                    prompt_id: None,
+                    prompt_name: None,
+                    prompt_snapshot: None,
+                    input_manifest: None,
+                    language: "en",
+                })
+                .unwrap();
+        };
+        save_week(
+            &mut store,
+            "2026-W49",
+            "# Weekly report\n\n## app\n> Stats only",
+        );
+        let blocked = plan(&store);
+        assert_eq!(blocked.regenerate_count, 0);
+        assert_eq!(blocked.items[0].missing_weeks, ["2026-W46", "2026-W47"]);
+        assert_eq!(blocked.items[1].missing_weeks, ["2026-W49"]);
+        assert_eq!(blocked.items[1].action, BatchAction::Skip);
+
+        save_week(&mut store, "2026-W46", "## app\n- early work [#S1]");
+        let partial = plan(&store);
+        assert_eq!(partial.items[0].action, BatchAction::Generate);
+        assert_eq!(partial.items[0].missing_weeks, ["2026-W47"]);
+        assert_eq!(partial.missing_count, 1);
+
+        let engine = MockEngine::new(|_| Ok("## app\n- early work [#S1]".into()));
+        let opts = MonthlyOptions {
+            month: Month::parse("2026-11").unwrap(),
+            project: None,
+            prompt: None,
+            concurrency: 1,
+            dry_run: false,
+            budgets: Budgets::default(),
+            cancel: None,
+            mode: ReportMode::Regenerate,
+            now: t("2026-11-30T00:00:00Z"),
+            language: &crate::lang::EN,
+        };
+        generate_monthly(&mut store, &engine, &tz, &opts, &mut |_| {}).unwrap();
+        assert_eq!(plan(&store).items[0].action, BatchAction::Skip);
+        save_week(&mut store, "2026-W47", "## app\n- late work [#S2]");
+        let stale = plan(&store);
+        assert!(stale.items[0].missing_weeks.is_empty());
+        assert_eq!(stale.items[0].action, BatchAction::Update);
+
+        let marked = store
+            .set_reports_status("monthly", &keys, None, "final")
+            .unwrap();
+        assert_eq!(marked.updated, ["2026-11"]);
+        assert_eq!(marked.skipped, ["2026-12"]);
+        assert_eq!(plan(&store).items[0].action, BatchAction::Skip);
     }
 }

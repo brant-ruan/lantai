@@ -1,6 +1,6 @@
 // 简体中文界面文字。键与 `en.ts` 一一对应；`satisfies Messages` 保证不缺键。
 
-import type { ReportProgress } from "../types";
+import type { PeriodMode, ReportProgress } from "../types";
 import type { Messages } from "./en";
 
 const zhUnit = (g: string) => (g === "monthly" ? "月份" : g === "weekly" ? "周" : "日期");
@@ -128,9 +128,11 @@ export const zhHans = {
 
   dayList: {
     days: "日期",
-    options: "日期列表选项",
+    options: { daily: "日期列表选项", weekly: "周列表选项", monthly: "月列表选项" },
+    weeks: "周",
+    months: "月",
     showIgnoredDays: "显示已忽略的日期",
-    selectDays: "选择日期…",
+    selectPeriods: { daily: "选择日期…", weekly: "选择周…", monthly: "选择月份…" },
     exitMultiSelect: "退出多选",
     quickSelect: "快速选择",
     thisWeek: "本周",
@@ -138,7 +140,7 @@ export const zhHans = {
     allDraft: "全部草稿",
     allOutOfDate: "全部已过期",
     allWithoutReport: "全部没有报告的",
-    selectDay: (date: string) => `选择 ${date}`,
+    selectPeriod: (key: string) => `选择 ${key}`,
     today: "今天",
     unassignedBadge: (n: number) => `${n} 未归属`,
     ignoredTitle: (n: number) => `${n} 个已忽略的切片`,
@@ -342,16 +344,20 @@ export const zhHans = {
     exitTitle: "退出选择（Esc）",
   },
 
-  dayBatch: {
+  reportBatch: {
     running: (done: number, total: number) => `进行中 ${done}/${total}`,
     cancelAll: "全部取消",
-    selected: (n: number) => `已选 ${n} 天`,
+    selected: (n: number, kind: PeriodMode) =>
+      `已选 ${n} ${{ daily: "天", weekly: "周", monthly: "个月" }[kind]}`,
+    partialMonth: (month: string, weeks: string) => `${month} 缺少周报（${weeks}）`,
+    unavailableMonth: (month: string, weeks: string) =>
+      `${month} 将跳过，缺少可用周报${weeks ? `（${weeks}）` : ""}。`,
     exit: "退出多选",
     exitTitle: "退出多选（Esc）",
     confirmRegenerate: (n: number) => `重新生成 ${n} 份报告？`,
     confirm: "确认",
     smartTitle: (missing: number, stale: number) => `${missing} 份待生成，${stale} 份待更新`,
-    nothingToDo: "所选日期没有缺失或过期的报告",
+    nothingToDo: "所选周期没有可生成或更新的报告",
     generateUpdate: "生成 / 更新",
     options: "批量生成选项",
     updateStale: (n: number) => `更新已过期的（${n}）`,
@@ -364,9 +370,11 @@ export const zhHans = {
     draftTitle: "把选中的报告重新打开为草稿",
   },
 
-  dayBatchSummary: {
+  reportBatchSummary: {
     noReports: "没有已有的报告可检查。",
-    allUpToDate: "所有报告都是最新的。",
+    allUpToDate: "没有具备可用材料的过期报告。",
+    alreadyRunning: "这份报告正在生成。",
+    coverageChanged: "周报覆盖情况已变化。请查看当前选择后再次运行。",
     skippedNothing: (n: number) => `跳过 ${n} 个（无需处理）`,
     nothingToRun: "没有需要处理的。",
     generated: (n: number) => `生成 ${n} 份`,

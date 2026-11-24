@@ -37,6 +37,7 @@ import type {
   ProjectDeleteImpact,
   ProjectRollup,
   ReportType,
+  PeriodMode,
   RollupGranularity,
   WeeklyResult,
   WeeksResponse,
@@ -233,30 +234,24 @@ export const api = {
   }) => invoke<ProjectRollup>("get_project_rollup", params),
   digestSliceNow: (sliceId: number, engine: string | null) =>
     invoke<StoredDigest>("digest_slice_now", { sliceId, engine }),
-  generateDailyReport: (params: {
-    date: string;
-    project: string | null;
-    prompt: string | null;
-    engine: string | null;
-    /** Rewrite only the projects whose material changed since the current version. */
-    update?: boolean;
-  }) => invoke<DailyResult>("generate_daily_report", params),
   getWeeklyReportState: (week: string, engine: string | null) =>
     invoke<DailyReportState>("get_weekly_report_state", { week, engine }),
-  generateWeeklyReport: (params: {
-    week: string;
-    prompt: string | null;
-    engine: string | null;
-    update?: boolean;
-  }) => invoke<WeeklyResult>("generate_weekly_report", params),
   getMonthlyReportState: (month: string, engine: string | null) =>
     invoke<DailyReportState>("get_monthly_report_state", { month, engine }),
-  generateMonthlyReport: (params: {
-    month: string;
-    prompt: string | null;
-    engine: string | null;
-    update?: boolean;
-  }) => invoke<WeeklyResult>("generate_monthly_report", params),
+  generatePeriodReport: (
+    mode: PeriodMode,
+    key: string,
+    options: { prompt: string | null; engine: string | null; update: boolean },
+  ) => {
+    switch (mode) {
+      case "daily":
+        return invoke<DailyResult>("generate_daily_report", { date: key, project: null, ...options });
+      case "weekly":
+        return invoke<WeeklyResult>("generate_weekly_report", { week: key, ...options });
+      case "monthly":
+        return invoke<WeeklyResult>("generate_monthly_report", { month: key, ...options });
+    }
+  },
   /** Cancel the job of a period: a date or a week key. */
   cancelReportGeneration: (period: string, project: string | null = null) =>
     invoke<void>("cancel_report_generation", { period, project }),
@@ -288,13 +283,10 @@ export const api = {
       project: null,
       status: params.status,
     }),
-  planBatch: (dates: string[], includeFinal?: boolean) =>
-    invoke<BatchPlan>("plan_batch", {
-      dates,
-      includeFinal: includeFinal ?? null,
-    }),
-  setReportsStatus: (dates: string[], status: "draft" | "final") =>
-    invoke<BatchStatusResult>("set_reports_status", { dates, status }),
+  planBatch: (reportType: PeriodMode, periodKeys: string[], includeFinal: boolean) =>
+    invoke<BatchPlan>("plan_batch", { reportType, periodKeys, includeFinal }),
+  setReportsStatus: (reportType: PeriodMode, periodKeys: string[], status: "draft" | "final") =>
+    invoke<BatchStatusResult>("set_reports_status", { reportType, periodKeys, status }),
   restoreReportVersion: (params: {
     reportType: ReportType;
     periodKey: string;

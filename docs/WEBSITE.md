@@ -84,7 +84,8 @@ The hero demo imitates the desktop app's layout with made-up data and can be cli
   notes are in `notes`. The calendar is fixed to one month.
 - It supports the views, tabs, toolbar and source filter, folding, anchors opening the drawer,
   reassigning and ignoring followed by Update, generation progress, draft / final, editing, the
-  project page and statistics. Version history, export and settings do nothing.
+  project page, statistics, and sidebar report batches in all three period lists. Version
+  history, export and settings do nothing.
 - Interface text is English on both pages, as in the app; report and session content is Chinese
   on the Chinese page.
 - **It does not share code with `app/`.** When the desktop interface changes noticeably, update

@@ -374,10 +374,17 @@ Markdown lists. Project sections are displayed in sidebar order without changing
 - **Weekly:** a calendar with one row per week, week numbers shaded by activity, and a list of
   active weeks. **Monthly:** a 4 × 3 year heat map and a month list. Both have Report and Sessions
   tabs.
-- **Batch operations on dates:** multi-select (or quick picks: this week, this month, all drafts,
-  all stale, all without a report); the action bar generates or updates each day as needed, skips
-  up-to-date and (by default) final days, or sets draft / final. The logic is in
-  `aj-report/src/batch.rs`; concurrency is `[budgets] batch_concurrency` (default 2).
+- **Batch report operations:** select dates, weeks or months in their sidebar lists with
+  checkboxes, Cmd-click or Shift-click. Each list offers quick picks for drafts, stale reports and
+  periods without a report. The date list also offers this week and this month. Generate / Update
+  creates missing reports and updates stale ones, skipping up-to-date and, by default, final
+  reports. The menu also offers only missing, only stale, and regenerate all with confirmation.
+  Draft and final actions apply to selected periods with an existing report. Progress and cancel
+  apply to the batch, and failed periods stay selected for retry. Monthly planning lists each
+  selected month's missing active weeks before running. A month with some usable weekly sections
+  can run with partial coverage; a month without usable weekly sections is skipped. Weekly
+  reports are generated explicitly in the week view. The planner lives in `aj-report/src/batch.rs`;
+  each batch uses `[budgets] batch_concurrency` (default 2).
 - **Projects** can be reordered by dragging and renamed in place.
 - **Project page:** a timeline of the project's slices, pending suggestions, rules, and a Report
   tab that extracts the project's `## <project>` sections from daily, weekly or monthly reports
