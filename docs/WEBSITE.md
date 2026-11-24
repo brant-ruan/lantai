@@ -110,7 +110,12 @@ repository addresses before committing it.
 ## Deployment
 
 `website/` is deployed to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`
-that touches it (or by hand). Repository settings it relies on:
+that touches it (or by hand). The `build` job packages and uploads the static files, then
+`deploy` waits for `build` before publishing. Keeping them in separate jobs avoids an
+[intermittent artifact lookup failure](https://github.com/actions/deploy-pages/issues/451)
+when deployment starts immediately after upload in the same job.
+
+Repository settings it relies on:
 
 1. Settings → Pages → Source: **GitHub Actions**.
 2. Custom domain `lantai.wohin.me` (with Actions deployment the `CNAME` file is not used) and

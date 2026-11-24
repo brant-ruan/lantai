@@ -274,6 +274,9 @@ What the code does not make obvious. The design behind each is in the spec.
   check whether the website's interactive demo (`website/assets/demo*.js`, `demo.css`, both
   pages) still matches, and update it by hand if not; it shares no code with `app/` (see
   [docs/WEBSITE.md](docs/WEBSITE.md), "The interactive demo").
+- **Website deployment:** keep the Pages upload and publish steps in separate jobs. The publish
+  job waits for the upload job to avoid querying artifact metadata before it becomes visible
+  (see [docs/WEBSITE.md](docs/WEBSITE.md), "Deployment").
 - **Design first:** change [docs/SPEC.md](docs/SPEC.md) before the code. Reference spec sections
   by title (`docs/SPEC.md, "Distribution"`), not by number.
 - **Adapters** need fixtures and golden tests for their parsing behaviour.
