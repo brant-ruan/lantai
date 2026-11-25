@@ -14,6 +14,10 @@ stored data or exported IR is affected:
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-25
+
+IR 0.3.0 · Schema 11 (unchanged; no action needed when upgrading).
+
 ### Added
 
 - Batch generation, updating and draft / final actions in the weekly and monthly sidebar lists.
@@ -83,5 +87,6 @@ The first public release. IR 0.3.0 · Schema 11.
   off by default; when on, Lantai only reads GitHub's public release list and never downloads or
   installs anything.
 
-[Unreleased]: https://github.com/brant-ruan/lantai/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/brant-ruan/lantai/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/brant-ruan/lantai/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/brant-ruan/lantai/releases/tag/v0.1.0
