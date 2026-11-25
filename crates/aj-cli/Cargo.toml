@@ -5,12 +5,12 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-aj-adapter = { version = "0.1.0", path = "../aj-adapter" }
-aj-core = { version = "0.1.0", path = "../aj-core" }
-aj-ir = { version = "0.1.0", path = "../aj-ir" }
-aj-sources = { version = "0.1.0", path = "../aj-sources" }
-aj-report = { version = "0.1.0", path = "../aj-report" }
-aj-store = { version = "0.1.0", path = "../aj-store" }
+aj-adapter = { path = "../aj-adapter" }
+aj-core = { path = "../aj-core" }
+aj-ir = { path = "../aj-ir" }
+aj-sources = { path = "../aj-sources" }
+aj-report = { path = "../aj-report" }
+aj-store = { path = "../aj-store" }
 anyhow = "1.0.104"
 chrono = "0.4.45"
 clap = { version = "4.6.7", features = ["derive", "env"] }

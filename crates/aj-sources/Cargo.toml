@@ -5,13 +5,13 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-aj-adapter = { version = "0.1.0", path = "../aj-adapter" }
-aj-adapter-antigravity = { version = "0.1.0", path = "../aj-adapter-antigravity" }
-aj-adapter-claude = { version = "0.1.0", path = "../aj-adapter-claude" }
-aj-adapter-codex = { version = "0.1.0", path = "../aj-adapter-codex" }
-aj-adapter-dsh = { version = "0.1.0", path = "../aj-adapter-dsh" }
-aj-adapter-opencode = { version = "0.1.0", path = "../aj-adapter-opencode" }
-aj-adapter-workbuddy = { version = "0.1.0", path = "../aj-adapter-workbuddy" }
-aj-ir = { version = "0.1.0", path = "../aj-ir" }
+aj-adapter = { path = "../aj-adapter" }
+aj-adapter-antigravity = { path = "../aj-adapter-antigravity" }
+aj-adapter-claude = { path = "../aj-adapter-claude" }
+aj-adapter-codex = { path = "../aj-adapter-codex" }
+aj-adapter-dsh = { path = "../aj-adapter-dsh" }
+aj-adapter-opencode = { path = "../aj-adapter-opencode" }
+aj-adapter-workbuddy = { path = "../aj-adapter-workbuddy" }
+aj-ir = { path = "../aj-ir" }
 anyhow = "1.0.104"
 dirs = "7.0.0"

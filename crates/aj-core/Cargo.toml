@@ -5,9 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-aj-adapter = { version = "0.1.0", path = "../aj-adapter" }
-aj-ir = { version = "0.1.0", path = "../aj-ir" }
-aj-store = { version = "0.1.0", path = "../aj-store" }
+aj-adapter = { path = "../aj-adapter" }
+aj-ir = { path = "../aj-ir" }
+aj-store = { path = "../aj-store" }
 anyhow = "1.0.104"
 chrono = "0.4.45"
 regex = "1.13.1"
