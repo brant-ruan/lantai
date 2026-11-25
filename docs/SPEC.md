@@ -785,8 +785,14 @@ generated during the week, a weekly report costs one writing request per project
 2. Material: each week's current weekly section for the project, without the stats line. Weeks
    with activity but no weekly report are listed as `unreported_weeks`, and the UI suggests
    generating them first.
-3. One request per project merges the same work across weeks into threads, in time order, with
-   small items combined into one "N smaller pieces of work".
+3. One request per project merges the same work across weeks into threads, with milestones in
+   time order. Keep minor work within a related thread wherever it belongs. If one standalone
+   outcome is worth revisiting, name it directly in a final top-level point. If several are worth
+   revisiting, group them in a final point titled for their shared theme, or "Other progress"
+   when they have no shared theme. Use one indented point per outcome with its week or date
+   range and the source anchors available in the weekly material. The existing outline folds
+   those points under the group. Omit minor work without a distinct outcome worth revisiting
+   and never add a count-only point.
 4. Title `# 2026-11 · W45 ~ W48`; the stats line is computed from the month's slices.
 5. The manifest records the weekly sections' hashes; staleness and Update work as for daily
    reports.

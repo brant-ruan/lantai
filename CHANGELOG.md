@@ -22,6 +22,8 @@ stored data or exported IR is affected:
 ### Fixed
 
 - Generated daily report sections reject anchors to sessions from another project.
+- The built-in monthly prompts name minor outcomes worth revisiting and group multiple outcomes
+  under an expandable point with source links, replacing count-only summaries.
 
 ## [0.1.0] - 2026-11-22
 
