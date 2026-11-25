@@ -203,9 +203,10 @@ where
     else {
         bail!("the report for {} is already up to date", opts.date);
     };
-    let (mut targets, others): (Vec<Material>, Vec<Material>) = materials
+    let mut targets: Vec<Material> = materials
         .into_iter()
-        .partition(|m| write_keys.contains(&project_key(m.project_id)));
+        .filter(|m| write_keys.contains(&project_key(m.project_id)))
+        .collect();
 
     // ---- Stage 1: digests for the projects being written ----------------------
     stage1::run(
@@ -253,7 +254,7 @@ where
         result.markdown = prompt;
         return Ok(result);
     }
-    let written: Vec<ProjectSection> = if expected.is_empty() {
+    let mut written: Vec<ProjectSection> = if expected.is_empty() {
         Vec::new()
     } else {
         if is_cancelled(&opts.cancel) {
@@ -274,7 +275,14 @@ where
         )?
     };
 
-    // ---- Assemble, verify and save -----------------------------------------
+    // ---- Verify, assemble and save -----------------------------------------
+    for section in &mut written {
+        let sources = targets.iter().filter(|m| m.project_name == section.project);
+        let (body, check) = anchors::verify(&section.body, &material::valid_anchors(sources));
+        section.body = body;
+        result.anchors.total += check.total;
+        result.anchors.invalid += check.invalid;
+    }
     let all_sections = match &base {
         None => written,
         Some(b) => {
@@ -298,13 +306,7 @@ where
             structure::splice_sections(&b.sections, &written, &removed_names)
         }
     };
-    let all_materials: Vec<Material> = targets.into_iter().chain(others).collect();
-    let (markdown, check) = anchors::verify(
-        &structure::compose_report(&lang.daily_title(&opts.date), &all_sections),
-        &material::valid_anchors(&all_materials),
-    );
-    result.anchors = check;
-    result.markdown = markdown;
+    result.markdown = structure::compose_report(&lang.daily_title(&opts.date), &all_sections);
     result.projects_written = expected;
 
     let new_manifest = report_io::new_manifest(
@@ -531,7 +533,7 @@ mod tests {
 
         // The stage 2 material contains the digest, not the long original text.
         let stage2 = engine.prompts.lock().unwrap().last().unwrap().clone();
-        assert!(stage2.contains("Key changes:\n- added a mutex [T0]"));
+        assert!(stage2.contains("Key changes:\n- added a mutex [#S1.T0]"));
         assert!(stage2.contains("what does this error mean"));
         assert!(!stage2.contains("Detailed explanation. Detailed explanation."));
 
@@ -1024,6 +1026,36 @@ mod tests {
         );
     }
 
+    #[test]
+    fn removes_cross_project_anchors_even_when_both_slices_have_the_turn() {
+        let (mut store, tz) = fixture();
+        add_web(&mut store, &tz, "web1", "2026-11-16T04:00:00Z");
+        let engine = MockEngine::new(|prompt| {
+            if prompt.contains("Session record:") {
+                return Ok(DIGEST_REPLY.into());
+            }
+            Ok("# Report\n\n## app\n- Added a mutex [#S1.T0]\n\n## web\n- Tweaked the landing page [#S1.T0] [#S3.T0]".into())
+        });
+
+        let result = run(&mut store, &engine, &tz, &opts());
+        assert_eq!(
+            result.anchors,
+            AnchorCheck {
+                total: 3,
+                invalid: 1
+            }
+        );
+        let saved = store
+            .current_report_version(KIND_DAILY, "2026-11-16", None)
+            .unwrap()
+            .unwrap();
+        assert!(saved.markdown.contains("## app\n- Added a mutex [#S1.T0]"));
+        assert_eq!(
+            structure::extract_project_section(&saved.markdown, "web").as_deref(),
+            Some("- Tweaked the landing page [#S3.T0]")
+        );
+    }
+
     fn update_opts() -> DailyOptions {
         DailyOptions {
             mode: ReportMode::Update,
@@ -1073,7 +1105,7 @@ mod tests {
         );
         assert_eq!(staleness_now(&store, &tz), None);
 
-        edit_current(&mut store, "- web v1", "- web v1, edited by me");
+        edit_current(&mut store, "- web v1", "- web v1, edited by me [#S1.T0]");
         // An edit alone does not make the report stale.
         assert_eq!(staleness_now(&store, &tz), None);
         store
@@ -1098,7 +1130,9 @@ mod tests {
         assert_eq!(r2.projects_written, vec!["app"]);
         assert_eq!(r2.sections_kept, 1);
         assert!(r2.markdown.contains("## app\n- app v2"));
-        assert!(r2.markdown.contains("## web\n- web v1, edited by me"));
+        assert!(r2
+            .markdown
+            .contains("## web\n- web v1, edited by me [#S1.T0]"));
         let stage2 = engine.prompts.lock().unwrap().last().unwrap().clone();
         assert!(stage2.contains("Write only the sections for these projects: app."));
         assert!(!stage2.contains("## Project: web"));

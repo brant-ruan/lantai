@@ -19,7 +19,7 @@ use crate::lang::Language;
 use crate::material::ProjectMaterial;
 
 /// Bump when the project brief prompt or the cluster structure changes, to invalidate cached briefs.
-pub const BRIEF_PROMPT_VERSION: &str = "5";
+pub const BRIEF_PROMPT_VERSION: &str = "6";
 
 /// Condense a project into task clusters before stage 2 once it has at least this many slices.
 pub const SLICE_CLUSTER_THRESHOLD: usize = 5;

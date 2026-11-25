@@ -19,6 +19,10 @@ stored data or exported IR is affected:
 - Batch generation, updating and draft / final actions in the weekly and monthly sidebar lists.
   The monthly batch shows which weekly reports are missing before generation.
 
+### Fixed
+
+- Generated daily report sections reject anchors to sessions from another project.
+
 ## [0.1.0] - 2026-11-22
 
 The first public release. IR 0.3.0 · Schema 11.

@@ -231,9 +231,11 @@ where
 }
 
 /// Slice ID to the turn indexes it contains: the set of anchors a report may use.
-pub fn valid_anchors(materials: &[Material]) -> HashMap<i64, BTreeSet<i64>> {
+pub fn valid_anchors<'a>(
+    materials: impl IntoIterator<Item = &'a Material>,
+) -> HashMap<i64, BTreeSet<i64>> {
     materials
-        .iter()
+        .into_iter()
         .map(|m| (m.slice.id, m.turns.iter().map(|t| t.index).collect()))
         .collect()
 }
@@ -382,7 +384,7 @@ where
         let _ = writeln!(p, "User note: {}", note.trim());
     }
     match m.digest.as_ref() {
-        Some(StoredDigest::Summary(d)) => render_digest(p, d),
+        Some(StoredDigest::Summary(d)) => render_digest(p, m.slice.id, d),
         Some(StoredDigest::Raw { text }) => {
             let _ = writeln!(p, "Raw record (T<n> are turn numbers):\n{text}");
         }
@@ -390,19 +392,13 @@ where
     }
 }
 
-fn render_digest(p: &mut String, d: &Digest) {
-    let turns = |t: &[i64]| {
-        if t.is_empty() {
-            String::new()
-        } else {
-            format!(
-                " [{}]",
-                t.iter()
-                    .map(|n| format!("T{n}"))
-                    .collect::<Vec<_>>()
-                    .join(",")
-            )
+fn render_digest(p: &mut String, slice_id: i64, d: &Digest) {
+    let render_point = |p: &mut String, point: &crate::digest::Point| {
+        let _ = write!(p, "- {}", point.text);
+        for turn in &point.turns {
+            let _ = write!(p, " [#S{slice_id}.T{turn}]");
         }
+        p.push('\n');
     };
     if !d.goal.is_empty() {
         let _ = writeln!(p, "Goal: {}", d.goal);
@@ -410,13 +406,13 @@ fn render_digest(p: &mut String, d: &Digest) {
     if !d.key_changes.is_empty() {
         p.push_str("Key changes:\n");
         for c in &d.key_changes {
-            let _ = writeln!(p, "- {}{}", c.text, turns(&c.turns));
+            render_point(p, c);
         }
     }
     if !d.decisions_and_pitfalls.is_empty() {
         p.push_str("Decisions and pitfalls:\n");
         for c in &d.decisions_and_pitfalls {
-            let _ = writeln!(p, "- {}{}", c.text, turns(&c.turns));
+            render_point(p, c);
         }
     }
     // `outcome` and `open_items` stay in the digest for incremental merging, but are

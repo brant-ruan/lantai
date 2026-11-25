@@ -695,8 +695,8 @@ under Options. Nothing regenerates by itself. CLI: `aj report daily --update`.
    changed section was edited by the user, the edited version goes along as "the previous version;
    keep the user's changes".
 4. Gone projects lose their section.
-5. Sections are joined in project order, the title rewritten, anchors checked against all
-   material, and the result saved as a new version.
+5. The program checks anchors in newly written daily sections against each project's own
+   material. It joins sections in project order, rewrites the title, and saves a new version.
 
 Daily, weekly and monthly reports share versions, manifests, staleness and Update in
 `report_io.rs`; `daily.rs`, `weekly/` and `monthly/` only orchestrate. Updating a final report
@@ -708,8 +708,11 @@ creates a new draft version.
 - Models write variants: `[#S12.T3,T5]`, `[#S12.T3, S12.T5]`, `[S12.T3]` without `#`.
   `anchors.rs` splits and checks each, rewrites them to the canonical form, and drops anything
   else.
-- **Valid set:** the slices and turns sent (daily), the week's slices and turns (weekly), the union
-  of the month's weeks (monthly). Invalid anchors are dropped and counted.
+- **Valid set:** the slices and turns of the project whose section is being written (daily), the
+  week's slices and turns (weekly), the union of the month's weeks (monthly). Invalid anchors are
+  dropped and counted. Daily updates leave links in carried-over sections as saved.
+- Slice digest points are rendered with full slice-and-turn anchors so the report writer can copy
+  the source reference directly.
 
 ### Versions and export
 

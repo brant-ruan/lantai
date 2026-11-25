@@ -122,7 +122,8 @@ What the code does not make obvious. The design behind each is in the spec.
   `monthly/` only orchestrate. Stage 1's worker pool is `stage1.rs`; only the main thread touches
   the database. Titles come from `structure::report_title` (rewritten on validation and on read;
   the model's title is dropped); weekly and monthly stats lines (`> `) come from
-  `report_io::stats_line`.
+  `report_io::stats_line`. Daily generation checks each new section's anchors against that
+  project's slices before splicing in sections kept by Update.
 - **Prompts:** built-in prompts are synced into the database at startup; once a user edits one it
   becomes theirs and is no longer overwritten. Changing the digest or cluster prompts or their
   structure bumps `DIGEST_PROMPT_VERSION` or `BRIEF_PROMPT_VERSION`.
