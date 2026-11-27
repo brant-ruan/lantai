@@ -14,6 +14,25 @@ stored data or exported IR is affected:
 
 ## [Unreleased]
 
+### Added
+
+- Codex CLI can write reports. **Find tools** (or `aj models --add codex`) adds it; it runs
+  `codex exec` without saving a session, with every feature that adds a tool turned off, a
+  read-only sandbox and nothing approved. The README lists the few declarations Codex still sends.
+- Agent CLI providers list their models in **Settings → Models**: Claude Code's shorthands, and
+  the models in Codex's picker with the reasoning efforts each accepts.
+- Reasoning effort for Claude Code and Codex aliases, and a temperature (0 to 2) for
+  OpenAI-compatible aliases. Both are optional; left blank, nothing is sent and caches stay valid.
+
+### Changed
+
+- The rule for using an agent CLI is now "the fewest tools it allows, and nothing left that can
+  run commands, change files or go online" instead of "every tool off". The README has a table of
+  what each CLI still declares.
+- `aj models` shows the reasoning effort of agent CLI aliases and the temperature of
+  OpenAI-compatible ones.
+- Claude Code's model list adds `fable`.
+
 ## [0.2.0] - 2026-11-25
 
 IR 0.3.0 · Schema 11 (unchanged; no action needed when upgrading).

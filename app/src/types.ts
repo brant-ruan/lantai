@@ -391,7 +391,20 @@ export interface AppIcon {
   current: boolean;
 }
 
-export type ProviderKind = "openai_compat" | "claude_cli";
+export type ProviderKind = "openai_compat" | "claude_cli" | "codex_cli";
+
+/** Whether a provider kind is an agent CLI on this Mac (no key, a command instead of a URL). */
+export const isCliKind = (kind: ProviderKind | undefined): boolean =>
+  kind === "claude_cli" || kind === "codex_cli";
+
+/** A model a provider offers (`aj_report::ModelInfo`). */
+export interface ModelInfo {
+  id: string;
+  /** Reasoning effort values it accepts; empty when unknown. */
+  efforts: string[];
+  /** The effort used when none is set, when known. */
+  defaultEffort: string | null;
+}
 
 /** A well-known service that fills the provider form (`aj_report::presets`). */
 export interface ProviderPreset {
@@ -422,6 +435,7 @@ export interface ModelSetting {
   provider: string;
   model: string | null;
   reasoningEffort: string | null;
+  temperature: number | null;
   isDefault: boolean;
 }
 
@@ -445,6 +459,8 @@ export interface ModelInput {
   provider: string;
   model: string | null;
   reasoningEffort: string | null;
+  /** Only for OpenAI-compatible providers. */
+  temperature: number | null;
 }
 
 export type KeyUpdate =

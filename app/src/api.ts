@@ -29,6 +29,7 @@ import type {
   ExportResult,
   Diagnostics,
   KeyUpdate,
+  ModelInfo,
   ModelInput,
   ModelSettings,
   ProviderPreset,
@@ -131,7 +132,7 @@ export const api = {
     provider: ProviderInput,
     apiKey: string | null,
   ) =>
-    invoke<string[]>("list_provider_models", { savedName, provider, apiKey }),
+    invoke<ModelInfo[]>("list_provider_models", { savedName, provider, apiKey }),
   testModel: (alias: string) =>
     invoke<EngineTestResult>("test_model", { alias }),
   /** Looks for known agent CLIs on PATH; runs only their version commands. */

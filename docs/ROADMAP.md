@@ -147,9 +147,12 @@ stale once; that is expected.
   as report prompts get their anchor rules appended. It enters the cache key but applies to new
   digests only; redoing old ones is the user's choice of a date range, after seeing roughly how
   many model calls it takes.
-- **Engines:** Anthropic's native API (for prompt caching). Codex CLI, Antigravity (`agy`) and
-  OpenCode as engines once they can run with every tool off and without leaving a session (see
-  SPEC.md, "Agent CLIs"); check again when they release new versions.
+- **Engines:** Anthropic's native API (for prompt caching). Antigravity (`agy`) and OpenCode as
+  engines once they pass the bar in SPEC.md, "Agent CLIs" (no session left behind, and nothing
+  left that can act); check again when they release new versions. For Codex CLI, drop the
+  remaining declarations once it offers a switch that turns every tool off
+  ([openai/codex#60069](https://github.com/openai/codex/issues/60069)); reading reasoning effort
+  values from `GET /models` where a service returns them.
 - **Desktop:** a menu bar item (today's stats, quick note / ignore / assign); file-system watching
   instead of scan triggers.
 - **Other platforms:** agent data folders and path normalization on Windows and WSL.

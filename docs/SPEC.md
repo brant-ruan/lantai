@@ -1062,24 +1062,26 @@ base_url = "https://example.com/v1"
 timeout_secs = 300            # optional
 
 [providers.claude]            # added by "Find tools on this Mac"
-type = "claude_cli"
+type = "claude_cli"           # or "codex_cli"
 binary = "/Users/me/.local/bin/claude"
 
 [models.fast]
 provider = "gateway"
 model = "model-a"
 reasoning_effort = "high"     # optional, values depend on the service
+temperature = 0.3             # optional, OpenAI-compatible providers only
 
 [models."Claude Code"]        # the CLI's own default model
 provider = "claude"
+reasoning_effort = "high"     # optional; the CLI's default when unset
 ```
 
 Nothing is built in: a fresh installation has no provider and no model. `default_model` is the
 alias set as default, else the first alias by name; with no alias at all, generation stops with
 "no model is configured" and the app points to the Models settings page. The first alias added
 becomes the default. The Models settings page edits providers and aliases, finds local tools (see
-below), lists a provider's models (`GET /models`; `sonnet` / `opus` / `haiku` for Claude Code),
-tests connectivity and sets the default; the report toolbar can pick another alias for one run.
+below), lists a provider's models (see [Model lists and options](#model-lists-and-options)), tests
+connectivity and sets the default; the report toolbar can pick another alias for one run.
 Comments in the file are not preserved on write.
 
 **Provider presets** (`crates/aj-report/presets/providers.toml`, embedded at build time) cover
@@ -1102,48 +1104,108 @@ always fetched, never preset.
 ### OpenAI-compatible APIs
 
 `/chat/completions`, covering compatible services (including Anthropic's and Gemini's
-compatibility layers) and local servers such as Ollama and LM Studio. `reasoning_effort` is passed
-through. Network errors, 429 and 5xx are retried; other errors report the server's message.
+compatibility layers) and local servers such as Ollama and LM Studio. `reasoning_effort` and
+`temperature` are passed through when set. Network errors, 429 and 5xx are retried; other errors report the server's message.
 
 ### Agent CLIs
+
+An agent CLI reuses a subscription the user already has. Each one runs with the fewest tools it
+allows; what is left differs between CLIs and versions, and the README lists it per CLI.
+
+**The bar for an agent CLI.** A CLI becomes an engine only when all of these hold:
+
+1. One invocation is non-interactive and takes the prompt on **stdin** (no length limits, nothing
+   in the process list).
+2. It leaves **no** session behind, so Lantai's own calls stay out of its scans and out of the
+   user's history in that agent.
+3. With everything it lets us turn off turned off, **nothing left can run commands, change files
+   or go online** for the model. What may remain is a declaration that fails when called, or a
+   tool that only waits or asks a question that never reaches anyone. Session content is data: a
+   prompt built from someone's sessions must not be able to act.
+
+Every CLI also runs in a dedicated empty folder, ignores user and project configuration where it
+can, uses a read-only sandbox where it has one, and never approves anything. Switches that turn
+features off are passed so that an unknown name stops the call (fail closed): when an update
+renames a feature, generation fails with the CLI's message instead of quietly getting a tool back.
+After updating a CLI, rerun the tool audit (`cargo test -p aj-report -- --ignored tool_audit`),
+which runs the real command against a local stand-in server and prints the tools it declares; the
+README table comes from it. Prompts also start with the fingerprint described under
+[Scanning and adapters](#scanning-and-adapters), as a second line of defence.
 
 **Claude Code:**
 
 ```text
 claude -p --tools "" --no-session-persistence --output-format text --system-prompt …
+       [--model M] [--effort E]
 ```
 
-- The prompt goes through **stdin** (no length limits, nothing in the process list).
 - `--tools ""` disables all tools (`--allowedTools ""` does not).
-- `--no-session-persistence` keeps the call from leaving a session that a scan would pick up.
-- Runs in a dedicated empty folder.
+- `--no-session-persistence` keeps the call from leaving a session.
 - Each call has a fixed cost of about 8 seconds and about 4,500 input tokens.
 
-Prompts also start with the fingerprint described under [Scanning and adapters](#scanning-and-adapters),
-as a second line of defence.
+**Codex CLI:**
 
-**The bar for an agent CLI.** A CLI becomes an engine only when one invocation is
-non-interactive, can switch off **every** tool, and leaves **no** session behind. The second keeps
-session content data (a prompt built from someone's sessions must not be able to run commands or
-read files); the third keeps Lantai's own calls out of its scans. A list of individual features to
-turn off does not count: it changes between versions and cannot be checked without running it.
+```text
+codex exec --ephemeral --skip-git-repo-check --ignore-user-config --ignore-rules --strict-config
+           --color never --sandbox read-only --cd <runner folder>
+           --disable <feature> …   -c approval_policy="never" -c web_search="disabled" …
+           -c model_instructions_file="<runner folder>/codex-instructions.md"
+           [-c model_reasoning_effort="E"] [--model M] -
+```
+
+- `--ephemeral` keeps the call from leaving a session.
+- `--disable` fails on an unknown feature and `--strict-config` on an unknown `-c` key, which is
+  what makes the call fail closed.
+- The features turned off are those that add tools (shell, unified exec, image viewing,
+  sub-agents, goals, sleep, apps, plugins, browser and computer use, image generation, tool
+  suggestions, skill search, the code-mode host, hooks, memories and others); the lists are
+  `DISABLED_FEATURES` and `CONFIG_OVERRIDES` in `aj-report/src/engine/codex_cli.rs`.
+- `model_instructions_file` replaces Codex's built-in instructions (about 21,000 characters
+  describing its tools) with Lantai's system prompt, written next to the call.
+- `--ignore-user-config` skips `~/.codex/config.toml`, so MCP servers, profiles and providers
+  configured there are not used; sign-in (`codex login`) still is. Codex still adds the user's
+  global `AGENTS.md`, its list of skills and a short environment note to the request.
+- stdout carries only the final message.
+- What remains depends on the model. Models that use Codex's code mode (its default models in
+  November 2026) still declare `exec`, which fails because its host is off, `wait` and
+  `request_user_input_async`; other models still declare `apply_patch`, which the read-only
+  sandbox and "never approve" stop from writing.
+
 Checked against the versions current in November 2026:
 
-| Tool | Command | Engine | Why not |
+| Tool | Command | Engine | Tools left | Session | Why not |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Claude Code | `claude` | yes | none | none | |
+| Codex CLI | `codex` (0.160) | yes | see above; none can act | none | |
+| Antigravity | `agy` | no | cannot be turned off | kept | tools stay on and conversations are kept |
+| OpenCode | `opencode` | no | not checked | kept | `run` always stores the session in its database |
+
+### Model lists and options
+
+Listing a provider's models returns, per model, its ID and, when known, the reasoning effort
+values it accepts and its default. Effort and temperature are optional; unset means the
+provider's or CLI's own default, and nothing is sent for them.
+
+| Provider | Models listed by | Reasoning effort | Temperature |
 | :--- | :--- | :--- | :--- |
-| Claude Code | `claude` | yes | |
-| Codex CLI | `codex` | no | `exec --ephemeral` keeps no session, but tools can only be turned off one feature at a time |
-| Antigravity | `agy` | no | `--print` runs once, but tools cannot be turned off and conversations are kept |
-| OpenCode | `opencode` | no | `run` always stores the session in its database |
+| OpenAI-compatible | `GET /models` | `reasoning_effort`; hints from the preset, else a generic list | `temperature`, 0 to 2 |
+| Claude Code | a fixed list of shorthands (`fable`, `opus`, `sonnet`, `haiku`); a full model name also works | `--effort`: `low`, `medium`, `high`, `xhigh`, `max` | not offered |
+| Codex CLI | `codex debug models` (models whose visibility is `list`), 20-second limit | `model_reasoning_effort`; the values each model lists, and its default | not offered |
+
+No agent CLI has a temperature option, so the field only exists for OpenAI-compatible providers.
+`codex debug models` is a debugging command and may change; when it fails, the model ID can still
+be typed. An engine's name, which is part of cache keys, includes effort and temperature only when
+they are set, so an alias without them keeps its cached digests.
 
 ### Finding local tools
 
 `aj_report::local_tools` holds a table of known agent CLIs (agent identifier, command name,
 version arguments, whether it passes the bar above and, if not, which parts it misses). Adding a
-tool is one row; making one an engine also needs an `Engine` implementation.
+tool is one row; making one an engine also needs an `Engine` implementation and a row in the tool
+audit.
 
 - Finding runs only when the user asks (the "Find tools on this Mac" button on the Models page, or
-  `aj models --find`; `aj models --add claude` adds one). It looks for each command on `PATH` (the app imports the login shell's
+  `aj models --find`; `aj models --add claude` or `--add codex` adds one). It looks for each command on `PATH` (the app imports the login shell's
   environment) and runs `<command> --version` with a five-second limit; it never runs a prompt,
   so it checks neither sign-in nor quota. That is what Test is for.
 - Results list every tool found with its path and version. Tools that pass the bar can be added;
@@ -1177,7 +1239,9 @@ Anything else shows the raw text as before.
 - Repository remotes are stored only as normalized `host/owner/repo` (user info, query and
   fragment dropped); the raw URL, which may embed an access token, never leaves
   `aj-core/src/project/git.rs`.
-- Report generation runs without tools; instructions inside session content are only data.
+- Report generation runs with the fewest tools each engine allows, and nothing left can run
+  commands, change files or go online (see [Agent CLIs](#agent-clis)); instructions inside
+  session content are only data.
 - Agent folders are read only, and only the session files in them (credential files next to them
   are never read; OpenCode's database is copied before opening).
 - Lantai goes online only to call the model provider the user configured when generating, and to

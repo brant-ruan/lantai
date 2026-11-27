@@ -173,8 +173,8 @@ Agent 日志里有私有代码、文件路径，有时还有密钥。兰台按�
 | 🔒 **始终只读** | 兰台从不写入、移动或删除 Agent 数据目录里的任何文件。这些目录里如果还有凭据，它只读会话部分。 |
 | 🧹 **两次脱敏** | 密钥、令牌、私钥块和 `.env` 一类的值，在写入本地数据库前清除一次，发给模型前再清除一次。 |
 | 🔑 **密钥存在钥匙串** | API 密钥存在 macOS 钥匙串里，不进配置文件、数据库或日志。Git 远程地址只记 `host/owner/repo`，内嵌的令牌不保留。 |
-| 🧪 **封闭生成** | 模型写报告时禁用所有工具，也不落盘。会话里夹带的指令只被当作文字，不会被执行。 |
-| 🖥️ **模型由你选** | 可用任何 OpenAI 兼容接口，包括 Ollama 或 LM Studio 运行的本地模型，数据不出电脑；也可以沿用已登录的 Claude Code。 |
+| 🧪 **封闭生成** | 模型写报告时，所有能执行命令、修改文件或联网的工具都已关闭，也不保存会话。会话里夹带的指令只被当作文字，不会被执行。[各 Agent 命令行还剩哪些工具声明](#用-agent-命令行当模型)。 |
+| 🖥️ **模型由你选** | 可用任何 OpenAI 兼容接口，包括 Ollama 或 LM Studio 运行的本地模型，数据不出电脑；也可以沿用已登录的 Claude Code 或 Codex。 |
 | 🚫 **无账号，无遥测** | 不用注册，没有云同步，也不做统计上报。所有内容都在本地 SQLite 数据库里，其中的会话数据随时可以从 Agent 日志重建。 |
 | 🌐 **只在你要求时联网** | 除了你配置的模型，兰台不连接任何地方。检查更新默认关闭，开启后（或点菜单「检查更新…」时）只向 GitHub 查询发布列表，只发送自己的版本号，从不下载任何东西。 |
 
@@ -210,7 +210,7 @@ npm run build:app        # 生成 build/Lantai.app
 
 1. **选择 Agent。** 默认只读 Claude Code。要加入其他 Agent，打开「设置 → Agent」，这里会显示本机检测到了哪些。
 2. **扫描。** 点侧栏的「扫描」。第一次扫描读取最近 90 天的会话。
-3. **选择模型。** 打开「设置 → 模型」。如果你在用 Claude Code，点「查找本机工具」把它添加进来；否则添加一个提供方（见[配置模型](#配置模型)）。
+3. **选择模型。** 打开「设置 → 模型」。如果你在用 Claude Code 或 Codex CLI，点「查找本机工具」把它添加进来；否则添加一个提供方（见[配置模型](#配置模型)）。
 4. **整理当天。** 在侧栏选一天，从每条会话所在的行把它归到项目里（「新建项目…」可以新建），不该进报告的点「忽略」。归属会话时，兰台会提议为它所在的文件夹建一条规则，以后这个文件夹里的会话会被建议或自动归属。
 5. **生成。** 点「生成」，然后在草稿旁边写下只有你知道的事。
 
@@ -219,7 +219,7 @@ npm run build:app        # 生成 build/Lantai.app
 - **暂时需要手动更新。** 每个新版本都要重新下载 `.dmg`；因为没有签名，第一次打开时还要再点一次「仍要打开」。兰台可以在新版本发布时提醒你：在「设置 → 系统」里打开检查更新，或者点应用菜单里的「检查更新…」。
 - **密钥与钥匙串。** API 密钥通过 macOS 自带的 `security` 工具存进登录钥匙串，服务名为 `lantai`。系统通常不会弹窗询问，更新应用后密钥也仍然有效。
 - **文件夹访问。** 兰台读取每个会话的项目文件夹，只是为了找到它的 Git 仓库（`.git` 文件夹）。如果你的项目放在「文稿」「桌面」「下载」或 iCloud 云盘里，macOS 会询问一次是否允许兰台访问该文件夹。拒绝也没关系，只是这些会话无法按仓库规则归属。
-- **用 Claude Code 当模型。** 需要已安装并登录 `claude`。「查找本机工具」会搜索登录 shell 的 `PATH`，所以从访达打开也能找到 `claude`。查找只运行 `claude --version`，是否已登录请用「测试」确认。Codex CLI、Antigravity 和 OpenCode 也能被找到，但暂时不能用来写报告：兰台只使用能关闭全部工具、且不留下会话的命令行。
+- **用 Agent 命令行当模型。** 需要已安装并登录 `claude` 或 `codex`。「查找本机工具」会搜索登录 shell 的 `PATH`，所以从访达打开也能找到它们。查找只运行 `--version`，是否已登录请用「测试」确认。Antigravity 和 OpenCode 也能被找到，但暂时不能用来写报告（见[用 Agent 命令行当模型](#用-agent-命令行当模型)）。
 
 ### 命令行
 
@@ -234,7 +234,7 @@ export PATH="$HOME/.local/bin:$PATH"
 ```bash
 aj scan              # 增量扫描并入库
 aj sessions          # 当天的会话，按项目分组
-aj models --find     # 本机的 Agent 命令行；`--add claude` 把 Claude Code 设为模型
+aj models --find     # 本机的 Agent 命令行；`--add claude` 或 `--add codex` 添加一个
 aj report daily      # 生成当天的日报
 ```
 
@@ -263,7 +263,7 @@ aj report monthly [--month 2026-11 | --date ...] [--update]
 aj report history | show         查看报告的各个版本
 aj prompt list | show | new | edit | rename | delete | default
 aj export [--session <前缀>]      以 IR 交换格式导出会话
-aj models [--test] [--find]      列出模型别名、测试连通性，或查找本机 Agent 命令行（--add claude）
+aj models [--test] [--find]      列出模型别名、测试连通性，或查找本机 Agent 命令行（--add claude|codex）
 aj doctor                        查看各数据源的解析状态
 ```
 
@@ -273,7 +273,9 @@ aj doctor                        查看各数据源的解析状态
 
 ### 配置模型
 
-在应用的「设置 → 模型」里配置：点「查找本机工具」添加 Claude Code，或者添加提供方（地址与密钥），拉取模型列表，为常用模型建别名并选定默认。密钥保存在 macOS 钥匙串。第一个添加的模型会成为默认模型。
+在应用的「设置 → 模型」里配置：点「查找本机工具」添加 Claude Code 或 Codex CLI，或者添加提供方（地址与密钥），拉取模型列表，为常用模型建别名并选定默认。密钥保存在 macOS 钥匙串。第一个添加的模型会成为默认模型。
+
+每个别名都可以设置推理强度，OpenAI 兼容接口的别名还可以设置温度（0～2）；留空则不发送，使用提供方的默认值。Agent 命令行也能拉取模型列表：Claude Code 给出简写（`fable`、`opus`、`sonnet`、`haiku`）和各档推理强度，Codex 列出它的模型选择器里的模型以及每个模型支持的推理强度。Agent 命令行都没有温度设置。
 
 <details>
 <summary><b>也可以直接编辑 <code>config.toml</code></b></summary>
@@ -291,13 +293,15 @@ base_url = "http://localhost:11434/v1"
 provider = "ollama"
 model = "qwen3:32b"
 # reasoning_effort = "high"        # 可选，取值由服务端决定
+# temperature = 0.3                # 可选，0～2；只用于 OpenAI 兼容接口
 
 [providers.claude]                 # Claude Code 命令行（「查找本机工具」添加的）
-type = "claude_cli"
+type = "claude_cli"                # Codex CLI 写 "codex_cli"
 binary = "/Users/you/.local/bin/claude"
 
 [models."Claude Code"]             # 不写模型 id：用命令行自己的默认模型
 provider = "claude"
+# reasoning_effort = "high"        # 可选：low、medium、high、xhigh 或 max
 
 [agents.codex]                     # 扫描哪些 Agent（默认只有 Claude Code）
 enabled = true
@@ -313,6 +317,19 @@ stage2_chars = 60000               # 单次报告请求的素材上限
 完整说明见 [`crates/aj-report/src/config.rs`](crates/aj-report/src/config.rs) 顶部的注释。
 
 </details>
+
+### 用 Agent 命令行当模型
+
+兰台可以借用你已经付费的 Agent 命令行来写报告。并不是每个命令行都能关掉全部工具，所以兰台对每个命令行都用它允许的最少工具来运行，并且只在调用不留下会话、剩下的东西都不能执行命令、修改文件或联网时才使用它。以下是 2026 年 11 月的检查结果：
+
+| 命令行 | 版本 | 兰台的运行方式 | 仍然声明的工具 | 会话 |
+| :--- | :--- | :--- | :--- | :--- |
+| Claude Code | 2.1 | `claude -p --tools ""` | 无 | 不保存 |
+| Codex CLI | 0.160 | `codex exec --ephemeral`，关闭 22 项功能，只读沙箱，从不批准 | Codex 的默认模型：`exec`（调用会失败，它的宿主已关闭）、`wait`、`request_user_input_async`。其他模型：`apply_patch`（被只读沙箱拦住）。 | 不保存 |
+| Antigravity | 1.4 | 不使用：工具关不掉 | | 保留 |
+| OpenCode | 1.18 | 不使用：每次运行都会保存 | | 保留 |
+
+使用 Codex 时，请求里仍会带上你的全局 `~/.codex/AGENTS.md` 和 Codex 的技能列表，而 `~/.codex/config.toml` 会被忽略（其中的 MCP 服务器、配置档和自定义提供方都不生效）。如果 Codex 更新后改了兰台要关闭的某项功能的名字，生成会带着 Codex 的报错停下，而不是在那个工具重新打开的情况下继续运行；这时请更新兰台。具体命令见 [docs/SPEC.md](docs/SPEC.md#agent-clis)。
 
 ### 打磨提示词
 

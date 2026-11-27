@@ -21,6 +21,7 @@ pub mod monthly;
 pub mod openai;
 pub mod period;
 pub mod presets;
+mod process;
 pub mod progress;
 pub mod prompt_library;
 pub mod prompts;
@@ -39,7 +40,7 @@ pub use config::{
 };
 pub use daily::{generate_daily, DailyOptions, DailyResult};
 pub use digest::{Digest, Point, StoredDigest};
-pub use engine::{ClaudeCliEngine, Engine};
+pub use engine::{Engine, ModelInfo};
 pub use keystore::KeyStore;
 pub use report_io::ReportMode;
 pub use summarize::Budgets;

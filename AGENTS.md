@@ -88,9 +88,11 @@ decided by the owner.**
      redacted first.
    - Looking at real data while debugging is fine; keep only structure and counts in output, not
      content.
-7. **Report generation runs without tools and leaves nothing behind** (`claude -p --tools ""
-   --no-session-persistence`, prompt on stdin), so Lantai's own calls never show up in scans.
-   `--allowedTools ""` does not disable tools; `--tools ""` does.
+7. **Report generation runs with the fewest tools each engine allows and leaves nothing behind**
+   (prompt on stdin, no session saved), so session content cannot act and Lantai's own calls never
+   show up in scans. Nothing left may run commands, change files or go online; the bar and each
+   CLI's invocation are in `docs/SPEC.md`, "Agent CLIs". For Claude Code, `--allowedTools ""` does
+   not disable tools; `--tools ""` does.
 
 ## Layout
 
@@ -210,10 +212,15 @@ What the code does not make obvious. The design behind each is in the spec.
   `default_model`. Keys are stored in the macOS keychain by `keystore.rs` (through
   `/usr/bin/security`); keys are never read from environment variables. Nothing is built in: with
   no alias, `build_engine` fails with `diagnose::NO_MODEL`. Agent CLIs are found only on request
-  (`aj_report::local_tools`, which runs only `--version`); a CLI becomes an engine only if it can
-  run with every tool off and leave no session (`docs/SPEC.md`, "Agent CLIs"), so do not add one
-  just because it has a print mode. Engine error text is sorted by `aj_report::diagnose`; when
-  changing an engine's error messages, keep its markers (`COMMAND_NOT_FOUND`) and its tests.
+  (`aj_report::local_tools`, which runs only `--version`); a CLI becomes an engine only if it
+  leaves no session and nothing left can act (`docs/SPEC.md`, "Agent CLIs"), so do not add one
+  just because it has a print mode. Engines live in `aj_report::engine` (one module per CLI,
+  sharing `aj-report/src/process.rs` with finding local tools). Codex's switches go through
+  `--disable` and `--strict-config`, which fail on an unknown name: keep it that way (fail
+  closed), and after a CLI update run `cargo test -p aj-report -- --ignored tool_audit` and
+  refresh the README table from its output. Codex echoes the prompt on stderr, so its errors keep
+  only error lines. Engine error text is sorted by `aj_report::diagnose`; when changing an
+  engine's error messages, keep its markers (`COMMAND_NOT_FOUND`) and its tests.
 - **Packaging:** `npm run build:app` (in `app/`) builds only the `.app` and copies it to `build/`
   (ignored). Tauri's `beforeBuildCommand` runs `scripts/bundle-cli.sh`, which builds `aj` and
   places it at `Contents/MacOS/aj` through `bundle.macOS.files`. The whole app is ad-hoc signed

@@ -173,8 +173,8 @@ Agent logs hold private code, file paths and sometimes secrets. Lantai treats th
 | 🔒 **Read-only, always** | Lantai never writes, moves or deletes anything in your agents' data folders. Where those folders also hold credentials, it reads only the session files. |
 | 🧹 **Redacted twice** | Keys, tokens, private-key blocks and `.env`-style values are scrubbed before anything reaches the local database, and again before any text is sent to a model. |
 | 🔑 **Keys in the Keychain** | API keys live in the macOS Keychain, never in config files, the database or logs. Git remotes are stored as `host/owner/repo`, so tokens embedded in URLs are never kept. |
-| 🧪 **Sealed generation** | The model writes reports with all tools disabled and nothing saved to disk. Instructions hidden inside a session are treated as plain text, never as commands. |
-| 🖥️ **Your model, your choice** | Use any OpenAI-compatible endpoint, including local models through Ollama or LM Studio, so nothing has to leave your computer. Or reuse your Claude Code login. |
+| 🧪 **Sealed generation** | The model writes reports with every tool that could run commands, change files or go online turned off, and no session is saved. Instructions hidden inside a session are treated as plain text, never as commands. [What each agent CLI still declares](#agent-clis-as-the-model). |
+| 🖥️ **Your model, your choice** | Use any OpenAI-compatible endpoint, including local models through Ollama or LM Studio, so nothing has to leave your computer. Or reuse your Claude Code or Codex login. |
 | 🚫 **No account, no telemetry** | No sign-up, no cloud sync, no analytics. Everything lives in a local SQLite database, and the session data in it can be rebuilt from your agents' logs at any time. |
 | 🌐 **Online only when asked** | Besides your model, Lantai connects to nothing. Checking for updates is off unless you turn it on (or pick **Check for Updates…**); it then asks GitHub for the release list, sends only its version number, and never downloads anything. |
 
@@ -210,7 +210,7 @@ For development with hot reload, run `npm run tauri dev` instead.
 
 1. **Choose agents.** Claude Code is on by default. To add others, open **Settings → Agents**; it shows which agents were found on your machine.
 2. **Scan.** Click **Scan** in the sidebar. The first scan reads sessions from the last 90 days.
-3. **Choose a model.** Open **Settings → Models**. If you use Claude Code, click **Find tools** and add it. Otherwise add a provider (see [Configure a model](#configure-a-model)).
+3. **Choose a model.** Open **Settings → Models**. If you use Claude Code or Codex CLI, click **Find tools** and add it. Otherwise add a provider (see [Configure a model](#configure-a-model)).
 4. **Sort the day.** Pick a day in the sidebar. Assign each session to a project from its row (**New project…** creates one), and **Ignore** what doesn't belong in a report. When you assign a session, Lantai offers a rule for its folder, so later sessions there are suggested or filed for you.
 5. **Generate.** Click **Generate**, then add what only you know beside the draft.
 
@@ -219,7 +219,7 @@ For development with hot reload, run `npm run tauri dev` instead.
 - **Updates are manual for now.** Each new version is downloaded as a `.dmg` and, being unsigned, needs **Open Anyway** once more. Lantai can tell you when one is out: turn on update checks in **Settings → System**, or use **Check for Updates…** in the app menu.
 - **Keys and the Keychain.** API keys are stored in your login Keychain under the service `lantai`, through macOS's own `security` tool. macOS does not normally ask for permission, and the keys survive updates.
 - **Folder access.** Lantai reads each session's project folder only to find its Git repository (the `.git` folder). If your projects live in Documents, Desktop, Downloads or iCloud Drive, macOS asks once whether Lantai may access that folder. Saying no is fine: those sessions just can't be matched by repository rules.
-- **Claude Code as the model.** `claude` must be installed and signed in. **Find tools** searches your login shell's `PATH`, so Lantai finds `claude` even when opened from Finder. It only runs `claude --version`; use **Test** to check sign-in. Codex CLI, Antigravity and OpenCode are found too, but cannot write reports yet: Lantai only uses a CLI that can run with every tool off and without leaving a session behind.
+- **An agent CLI as the model.** `claude` or `codex` must be installed and signed in. **Find tools** searches your login shell's `PATH`, so Lantai finds them even when opened from Finder. It only runs `--version`; use **Test** to check sign-in. Antigravity and OpenCode are found too, but cannot write reports yet (see [Agent CLIs as the model](#agent-clis-as-the-model)).
 
 ### Command line
 
@@ -234,7 +234,7 @@ The first scan backfills the last 90 days.
 ```bash
 aj scan              # ingest new sessions
 aj sessions          # today's sessions, grouped by project
-aj models --find     # agent CLIs on this Mac; `--add claude` makes Claude Code the model
+aj models --find     # agent CLIs on this Mac; `--add claude` or `--add codex` adds one
 aj report daily      # write today's report
 ```
 
@@ -263,7 +263,7 @@ aj report monthly [--month 2026-11 | --date ...] [--update]
 aj report history | show         List and print saved report versions
 aj prompt list | show | new | edit | rename | delete | default
 aj export [--session <prefix>]   Export sessions in the IR exchange format
-aj models [--test] [--find]      List model aliases, test them, or find agent CLIs (--add claude)
+aj models [--test] [--find]      List model aliases, test them, or find agent CLIs (--add claude|codex)
 aj doctor                        Show the parsing health of each source
 ```
 
@@ -273,7 +273,9 @@ Run `aj <command> --help` for every option.
 
 ### Configure a model
 
-Open **Settings → Models** in the app: click **Find tools** to add Claude Code, or add a provider (base URL and key), fetch its model list, give the models you use an alias and pick a default. Keys go to the macOS Keychain. The first model you add becomes the default.
+Open **Settings → Models** in the app: click **Find tools** to add Claude Code or Codex CLI, or add a provider (base URL and key), fetch its model list, give the models you use an alias and pick a default. Keys go to the macOS Keychain. The first model you add becomes the default.
+
+Each alias can set a reasoning effort, and an OpenAI-compatible one a temperature (0 to 2); left blank, nothing is sent and the provider's default applies. Agent CLIs list their models too: Claude Code offers its shorthands (`fable`, `opus`, `sonnet`, `haiku`) and effort levels, and Codex lists the models in its picker with the efforts each one accepts. No agent CLI has a temperature setting.
 
 <details>
 <summary><b>Or edit <code>config.toml</code> by hand</b></summary>
@@ -291,13 +293,15 @@ base_url = "http://localhost:11434/v1"
 provider = "ollama"
 model = "qwen3:32b"
 # reasoning_effort = "high"        # optional; values depend on the server
+# temperature = 0.3                # optional, 0–2; OpenAI-compatible providers only
 
 [providers.claude]                 # the Claude Code CLI (what Find tools adds)
-type = "claude_cli"
+type = "claude_cli"                # "codex_cli" for Codex CLI
 binary = "/Users/you/.local/bin/claude"
 
 [models."Claude Code"]             # no model id: the CLI's own default
 provider = "claude"
+# reasoning_effort = "high"        # optional: low, medium, high, xhigh or max
 
 [agents.codex]                     # which agents to scan (default: Claude Code only)
 enabled = true
@@ -313,6 +317,19 @@ stage2_chars = 60000               # most material in one report request
 The full reference is at the top of [`crates/aj-report/src/config.rs`](crates/aj-report/src/config.rs).
 
 </details>
+
+### Agent CLIs as the model
+
+Lantai can write with an agent CLI you already pay for. Not every CLI can switch all of its tools off, so each runs with the fewest tools it allows. Lantai uses a CLI only when the call leaves no session behind and nothing left can run commands, change files or go online. Checked in November 2026:
+
+| CLI | Version | How Lantai runs it | Tools still declared | Session |
+| :--- | :--- | :--- | :--- | :--- |
+| Claude Code | 2.1 | `claude -p --tools ""` | none | not saved |
+| Codex CLI | 0.160 | `codex exec --ephemeral`, 22 features off, read-only sandbox, never approves | Codex's default models: `exec` (fails, its host is off), `wait`, `request_user_input_async`. Other models: `apply_patch` (the read-only sandbox stops it). | not saved |
+| Antigravity | 1.4 | not used: its tools cannot be turned off | | kept |
+| OpenCode | 1.18 | not used: every run is stored | | kept |
+
+With Codex, the request still carries your global `~/.codex/AGENTS.md` and Codex's list of skills, and `~/.codex/config.toml` is ignored (MCP servers, profiles, custom providers). If a Codex update renames a feature Lantai turns off, generation stops with Codex's error rather than running with that tool back on; update Lantai then. The exact commands are in [docs/SPEC.md](docs/SPEC.md#agent-clis).
 
 ### Shape the prompts
 

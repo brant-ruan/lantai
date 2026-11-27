@@ -6,10 +6,9 @@
 //! "Agent CLIs".
 
 use std::ffi::OsStr;
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::process::Command;
+use std::time::Duration;
 
 use aj_ir::AgentId;
 use serde::Serialize;
@@ -19,13 +18,14 @@ use serde::Serialize;
 #[serde(rename_all = "snake_case")]
 pub enum ToolEngine {
     ClaudeCli,
+    CodexCli,
 }
 
 /// A part of the bar a tool misses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Gap {
-    /// Tools can only be turned off one by one, or not at all.
+    /// Tools that can act stay on.
     Tools,
     /// Every run leaves a session behind.
     Sessions,
@@ -57,8 +57,8 @@ pub const TOOLS: [ToolDescriptor; 4] = [
         agent: AgentId::CODEX,
         command: "codex",
         version_args: &["--version"],
-        engine: None,
-        gaps: &[Gap::Tools],
+        engine: Some(ToolEngine::CodexCli),
+        gaps: &[],
     },
     ToolDescriptor {
         agent: AgentId::ANTIGRAVITY,
@@ -144,31 +144,10 @@ const VERSION_TIMEOUT: Duration = Duration::from_secs(5);
 /// Run `path args…` with no input and return the first line it prints, giving up after
 /// [`VERSION_TIMEOUT`]. Runs in a temporary directory so no project configuration applies.
 fn run_version(path: &Path, args: &[&str]) -> Option<String> {
-    let mut child = Command::new(path)
-        .args(args)
-        .current_dir(std::env::temp_dir())
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let started = Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) if started.elapsed() < VERSION_TIMEOUT => {
-                std::thread::sleep(Duration::from_millis(20))
-            }
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-        }
-    }
-    let mut out = Vec::new();
-    child.stdout.take()?.read_to_end(&mut out).ok()?;
-    version_line(&out)
+    let mut cmd = Command::new(path);
+    cmd.args(args).current_dir(std::env::temp_dir());
+    let done = crate::process::run(&mut cmd, None, Some(VERSION_TIMEOUT), "the tool").ok()??;
+    version_line(&done.stdout)
 }
 
 #[cfg(test)]

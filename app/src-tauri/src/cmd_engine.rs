@@ -11,7 +11,7 @@ use std::time::Instant;
 use aj_report::diagnose::{self, Failure};
 use aj_report::local_tools::{self, Gap, ToolEngine};
 use aj_report::presets::{self, PresetGroup, PresetRegion};
-use aj_report::{AppConfig, KeyUpdate, ModelConfig, ProviderConfig};
+use aj_report::{AppConfig, KeyUpdate, ModelConfig, ModelInfo, ProviderConfig};
 use serde::{Deserialize, Serialize};
 
 use crate::state::{cmd_err, AppState};
@@ -20,12 +20,12 @@ use crate::state::{cmd_err, AppState};
 #[serde(rename_all = "camelCase")]
 pub struct ProviderDto {
     pub name: String,
-    /// `openai_compat` or `claude_cli`.
+    /// `openai_compat`, `claude_cli` or `codex_cli`.
     pub kind: String,
     pub base_url: Option<String>,
     pub timeout_secs: Option<u64>,
     pub binary: Option<String>,
-    /// Whether a key is in the key store (always false for the CLI provider).
+    /// Whether a key is in the key store (always false for agent CLIs).
     pub has_key: bool,
     pub used_by: Vec<String>,
 }
@@ -37,6 +37,7 @@ pub struct ModelDto {
     pub provider: String,
     pub model: Option<String>,
     pub reasoning_effort: Option<String>,
+    pub temperature: Option<f64>,
     pub is_default: bool,
 }
 
@@ -66,6 +67,7 @@ pub struct ModelInput {
     pub provider: String,
     pub model: Option<String>,
     pub reasoning_effort: Option<String>,
+    pub temperature: Option<f64>,
 }
 
 /// `keep` leaves the stored key alone, `set` replaces it with `value`, `clear` removes it.
@@ -89,16 +91,8 @@ pub struct EngineTestResultDto {
 
 impl ProviderInput {
     fn into_config(self) -> Result<ProviderConfig, String> {
-        Ok(match self.kind.as_str() {
-            "claude_cli" => ProviderConfig::ClaudeCli {
-                binary: self.binary,
-            },
-            "openai_compat" => ProviderConfig::OpenaiCompat {
-                base_url: self.base_url.unwrap_or_default(),
-                timeout_secs: self.timeout_secs,
-            },
-            other => return Err(format!("unknown provider type: {other}")),
-        })
+        ProviderConfig::from_parts(&self.kind, self.base_url, self.timeout_secs, self.binary)
+            .map_err(cmd_err)
     }
 }
 
@@ -109,30 +103,21 @@ fn provider_dto(cfg: &AppConfig, name: &str, p: &ProviderConfig) -> ProviderDto 
         .filter(|(_, m)| m.provider == name)
         .map(|(alias, _)| alias.clone())
         .collect();
-    let base = ProviderDto {
-        name: name.to_string(),
-        kind: String::new(),
-        base_url: None,
-        timeout_secs: None,
-        binary: None,
-        has_key: cfg.has_key(name),
-        used_by,
-    };
-    match p {
-        ProviderConfig::ClaudeCli { binary } => ProviderDto {
-            kind: "claude_cli".into(),
-            binary: binary.clone(),
-            ..base
-        },
+    let (base_url, timeout_secs) = match p {
         ProviderConfig::OpenaiCompat {
             base_url,
             timeout_secs,
-        } => ProviderDto {
-            kind: "openai_compat".into(),
-            base_url: Some(base_url.clone()),
-            timeout_secs: *timeout_secs,
-            ..base
-        },
+        } => (Some(base_url.clone()), *timeout_secs),
+        _ => (None, None),
+    };
+    ProviderDto {
+        name: name.to_string(),
+        kind: p.kind().to_string(),
+        base_url,
+        timeout_secs,
+        binary: p.cli_binary().map(str::to_string),
+        has_key: cfg.has_key(name),
+        used_by,
     }
 }
 
@@ -154,6 +139,7 @@ fn settings_dto(state: &AppState, cfg: &AppConfig) -> ModelSettingsDto {
                 provider: m.provider.clone(),
                 model: m.model.clone(),
                 reasoning_effort: m.reasoning_effort.clone(),
+                temperature: m.temperature,
                 is_default: Some(alias.as_str()) == cfg.default_model_name(),
             })
             .collect(),
@@ -240,6 +226,7 @@ pub fn save_model(
         provider: model.provider,
         model: model.model,
         reasoning_effort: model.reasoning_effort,
+        temperature: model.temperature,
     };
     modify(&state, |cfg| {
         cfg.upsert_model(original_alias.as_deref(), &alias, model)
@@ -262,7 +249,7 @@ pub fn set_default_model(
     modify(&state, |cfg| cfg.set_default_model(&alias))
 }
 
-/// List the model ids a provider offers. `provider` is the form's current
+/// List the models a provider offers. `provider` is the form's current
 /// (possibly unsaved) state; `api_key` is a key typed but not yet saved.
 #[tauri::command]
 pub async fn list_provider_models(
@@ -270,7 +257,7 @@ pub async fn list_provider_models(
     saved_name: Option<String>,
     provider: ProviderInput,
     api_key: Option<String>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<ModelInfo>, String> {
     let cfg = state.load_config().map_err(cmd_err)?;
     let draft = provider.into_config()?;
     tauri::async_runtime::spawn_blocking(move || {
@@ -347,9 +334,7 @@ pub async fn find_local_tools(
             let configured_as = cfg
                 .providers
                 .iter()
-                .find(|(_, p)| {
-                    matches!(p, ProviderConfig::ClaudeCli { binary: Some(b) } if *b == path)
-                })
+                .find(|(_, p)| p.cli_binary() == Some(path.as_str()))
                 .and_then(|(name, _)| {
                     cfg.models
                         .iter()

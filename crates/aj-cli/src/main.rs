@@ -140,7 +140,7 @@ enum Cmd {
         /// Look for known agent CLIs on PATH and say which can generate reports (runs only `--version`)
         #[arg(long, conflicts_with_all = ["test", "model"])]
         find: bool,
-        /// Add a local agent CLI found on PATH as a provider and model (e.g. `claude`)
+        /// Add a local agent CLI found on PATH as a provider and model (`claude` or `codex`)
         #[arg(long, value_name = "TOOL", conflicts_with_all = ["test", "model", "find"])]
         add: Option<String>,
     },

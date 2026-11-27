@@ -3,8 +3,10 @@ import { api } from "../api";
 import { InfoTip } from "./InfoTip";
 import { FailureNote } from "./FailureNote";
 import { LocalToolsCard } from "./LocalToolsCard";
+import { isCliKind } from "../types";
 import type {
   EngineTestResult,
+  ModelInfo,
   ModelSettings,
   ProviderInput,
   ProviderKind,
@@ -48,15 +50,38 @@ interface ModelForm {
   provider: string;
   model: string;
   effort: string;
+  temperature: string;
 }
 
 interface FetchState {
   loading: boolean;
-  ids: string[] | null;
+  models: ModelInfo[] | null;
   error: string | null;
 }
 
-const IDLE_FETCH: FetchState = { loading: false, ids: null, error: null };
+const IDLE_FETCH: FetchState = { loading: false, models: null, error: null };
+const LOADING_FETCH: FetchState = { loading: true, models: null, error: null };
+
+/** Command run when a CLI provider has none set. */
+function defaultCommand(kind: ProviderKind): string {
+  return kind === "codex_cli" ? "codex" : "claude";
+}
+
+/** Reasoning effort values to suggest: the chosen model's, else every value a listed model takes. */
+function listedEfforts(models: ModelInfo[] | null, id: string): string[] {
+  if (!models) return [];
+  const chosen = models.find((m) => m.id === id);
+  if (chosen) return chosen.efforts;
+  return [...new Set(models.flatMap((m) => m.efforts))];
+}
+
+/** A temperature typed in the form: a number, null when blank, undefined when invalid. */
+function parseTemperature(text: string): number | null | undefined {
+  const t = text.trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -69,7 +94,7 @@ function providerInput(f: ProviderForm): ProviderInput {
     baseUrl: f.kind === "openai_compat" ? f.baseUrl.trim() || null : null,
     timeoutSecs:
       f.kind === "openai_compat" && Number.isFinite(timeout) ? timeout : null,
-    binary: f.kind === "claude_cli" ? f.binary.trim() || null : null,
+    binary: isCliKind(f.kind) ? f.binary.trim() || null : null,
   };
 }
 
@@ -251,21 +276,35 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
 
   const fetchForProviderForm = async () => {
     if (!providerForm) return;
-    setProviderFetch({ loading: true, ids: null, error: null });
+    setProviderFetch(LOADING_FETCH);
     try {
-      const ids = await api.listProviderModels(
+      const models = await api.listProviderModels(
         providerForm.originalName,
         providerInput(providerForm),
         providerForm.keyInput.trim() || null,
       );
-      setProviderFetch({ loading: false, ids, error: null });
+      setProviderFetch({ loading: false, models, error: null });
     } catch (e) {
-      setProviderFetch({ loading: false, ids: null, error: errText(e) });
+      setProviderFetch({ loading: false, models: null, error: errText(e) });
     }
   };
 
   // ---- model form ----
 
+  const fetchForModelForm = async (providerName: string) => {
+    const p = providerOf(providerName);
+    if (!p) return;
+    setModelFetch(LOADING_FETCH);
+    try {
+      const models = await api.listProviderModels(p.name, providerToInput(p), null);
+      setModelFetch({ loading: false, models, error: null });
+    } catch (e) {
+      setModelFetch({ loading: false, models: null, error: errText(e) });
+    }
+  };
+
+  /** Open the model form; for an agent CLI the model list (with efforts) is fetched right away,
+   * since it comes from this Mac rather than a remote service. */
   const openModelForm = (
     init: Partial<ModelForm> & { provider: string },
   ) => {
@@ -276,31 +315,27 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
       alias: "",
       model: "",
       effort: "",
+      temperature: "",
       ...init,
     });
-  };
-
-  const fetchForModelForm = async (providerName: string) => {
-    const p = providerOf(providerName);
-    if (!p) return;
-    setModelFetch({ loading: true, ids: null, error: null });
-    try {
-      const ids = await api.listProviderModels(p.name, providerToInput(p), null);
-      setModelFetch({ loading: false, ids, error: null });
-    } catch (e) {
-      setModelFetch({ loading: false, ids: null, error: errText(e) });
-    }
+    if (isCliKind(providerOf(init.provider)?.kind)) void fetchForModelForm(init.provider);
   };
 
   const saveModel = async () => {
     if (!modelForm) return;
     const f = modelForm;
-    const isCli = providerOf(f.provider)?.kind === "claude_cli";
+    const isApi = providerOf(f.provider)?.kind === "openai_compat";
+    const temperature = isApi ? parseTemperature(f.temperature) : null;
+    if (temperature === undefined) {
+      setError(tm.badTemperature);
+      return;
+    }
     const ok = await apply(() =>
       api.saveModel(f.originalAlias, f.alias.trim(), {
         provider: f.provider,
         model: f.model.trim() || null,
-        reasoningEffort: isCli ? null : f.effort.trim() || null,
+        reasoningEffort: f.effort.trim() || null,
+        temperature,
       }),
     );
     if (ok) setModelForm(null);
@@ -326,12 +361,12 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
     }
     setBrowsing(p.name);
     setBrowseFilter("");
-    setBrowseFetch({ loading: true, ids: null, error: null });
+    setBrowseFetch(LOADING_FETCH);
     try {
-      const ids = await api.listProviderModels(p.name, providerToInput(p), null);
-      setBrowseFetch({ loading: false, ids, error: null });
+      const models = await api.listProviderModels(p.name, providerToInput(p), null);
+      setBrowseFetch({ loading: false, models, error: null });
     } catch (e) {
-      setBrowseFetch({ loading: false, ids: null, error: errText(e) });
+      setBrowseFetch({ loading: false, models: null, error: errText(e) });
     }
   };
 
@@ -345,7 +380,12 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
       const taken = new Set(settings.models.map((m) => m.alias));
       const alias = uniqueAlias(id, provider, taken);
       await apply(() =>
-        api.saveModel(null, alias, { provider, model: id, reasoningEffort: null }),
+        api.saveModel(null, alias, {
+          provider,
+          model: id,
+          reasoningEffort: null,
+          temperature: null,
+        }),
       );
       return;
     }
@@ -362,16 +402,16 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
   };
 
   const browseIds = useMemo(() => {
-    const ids = browseFetch.ids ?? [];
+    const ids = (browseFetch.models ?? []).map((m) => m.id);
     const q = browseFilter.trim().toLowerCase();
     return q ? ids.filter((id) => id.toLowerCase().includes(q)) : ids;
-  }, [browseFetch.ids, browseFilter]);
+  }, [browseFetch.models, browseFilter]);
 
   const filteredIds = useMemo(() => {
-    const ids = modelFetch.ids ?? [];
+    const ids = (modelFetch.models ?? []).map((m) => m.id);
     const q = modelFilter.trim().toLowerCase();
     return q ? ids.filter((id) => id.toLowerCase().includes(q)) : ids;
-  }, [modelFetch.ids, modelFilter]);
+  }, [modelFetch.models, modelFilter]);
 
   if (!settings) {
     return (
@@ -391,7 +431,18 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
         (p) => p.baseUrl === normalizeUrl(modelFormProvider.baseUrl ?? ""),
       )
     : undefined;
-  const effortHints = modelFormPreset?.efforts ?? EFFORTS;
+  const modelFormIsCli = isCliKind(modelFormProvider?.kind);
+  const listed = modelForm ? listedEfforts(modelFetch.models, modelForm.model.trim()) : [];
+  const effortHints =
+    listed.length > 0 ? listed : modelFormIsCli ? [] : (modelFormPreset?.efforts ?? EFFORTS);
+  const listedDefault = modelForm
+    ? modelFetch.models?.find((m) => m.id === modelForm.model.trim())?.defaultEffort
+    : null;
+  const effortPlaceholder = listedDefault
+    ? tm.defaultIs(listedDefault)
+    : modelFormIsCli
+      ? tm.cliDefault
+      : tm.serverDefault;
 
   return (
     <>
@@ -486,8 +537,10 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                 <select
                   value={modelForm.provider}
                   onChange={(e) => {
+                    const provider = e.target.value;
                     setModelFetch(IDLE_FETCH);
-                    setModelForm({ ...modelForm, provider: e.target.value });
+                    setModelForm({ ...modelForm, provider });
+                    if (isCliKind(providerOf(provider)?.kind)) void fetchForModelForm(provider);
                   }}
                 >
                   {providers.map((p) => (
@@ -500,17 +553,13 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
               <label className="form-field">
                 <span>
                   {tm.modelId}
-                  {modelFormProvider?.kind === "claude_cli" && tm.optionalSuffix}
+                  {modelFormIsCli && tm.optionalSuffix}
                 </span>
                 <div className="input-with-action">
                   <input
                     type="text"
                     list="aj-model-ids"
-                    placeholder={
-                      modelFormProvider?.kind === "claude_cli"
-                        ? tm.cliDefault
-                        : tm.modelIdPlaceholder
-                    }
+                    placeholder={modelFormIsCli ? tm.cliDefault : tm.modelIdPlaceholder}
                     value={modelForm.model}
                     onChange={(e) =>
                       setModelForm({ ...modelForm, model: e.target.value })
@@ -526,28 +575,46 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                   </button>
                 </div>
                 <datalist id="aj-model-ids">
-                  {(modelFetch.ids ?? []).map((id) => (
-                    <option key={id} value={id} />
+                  {(modelFetch.models ?? []).map((m) => (
+                    <option key={m.id} value={m.id} />
                   ))}
                 </datalist>
               </label>
-              {modelFormProvider?.kind !== "claude_cli" && (
+              <label className="form-field">
+                <span>{tm.effort}</span>
+                <input
+                  type="text"
+                  list="aj-efforts"
+                  placeholder={effortPlaceholder}
+                  value={modelForm.effort}
+                  onChange={(e) =>
+                    setModelForm({ ...modelForm, effort: e.target.value })
+                  }
+                />
+                <datalist id="aj-efforts">
+                  {effortHints.map((x) => (
+                    <option key={x} value={x} />
+                  ))}
+                </datalist>
+              </label>
+              {modelFormProvider?.kind === "openai_compat" && (
                 <label className="form-field">
-                  <span>{tm.effort}</span>
+                  <span className="title-with-tip">
+                    {tm.temperature}
+                    <InfoTip>{tm.temperatureTip}</InfoTip>
+                  </span>
                   <input
                     type="text"
-                    list="aj-efforts"
+                    inputMode="decimal"
                     placeholder={tm.serverDefault}
-                    value={modelForm.effort}
+                    value={modelForm.temperature}
                     onChange={(e) =>
-                      setModelForm({ ...modelForm, effort: e.target.value })
+                      setModelForm({
+                        ...modelForm,
+                        temperature: e.target.value.replace(/[^0-9.]/g, ""),
+                      })
                     }
                   />
-                  <datalist id="aj-efforts">
-                    {effortHints.map((x) => (
-                      <option key={x} value={x} />
-                    ))}
-                  </datalist>
                 </label>
               )}
             </div>
@@ -555,11 +622,11 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
             {modelFetch.error && (
               <div className="warning-list">{modelFetch.error}</div>
             )}
-            {modelFetch.ids && (
+            {modelFetch.models && (
               <div className="stack">
                 <input
                   type="text"
-                  placeholder={tm.filter(modelFetch.ids.length)}
+                  placeholder={tm.filter(modelFetch.models.length)}
                   value={modelFilter}
                   onChange={(e) => setModelFilter(e.target.value)}
                 />
@@ -619,7 +686,12 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                     {t && t !== "running" && <TestBadge result={t} />}
                   </div>
                   <div className="muted-line">
-                    {[m.provider, m.model ?? tm.defaultModelId, m.reasoningEffort]
+                    {[
+                      m.provider,
+                      m.model ?? tm.defaultModelId,
+                      m.reasoningEffort,
+                      m.temperature !== null && tm.temperatureValue(m.temperature),
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </div>
@@ -659,6 +731,7 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                         provider: m.provider,
                         model: m.model ?? "",
                         effort: m.reasoningEffort ?? "",
+                        temperature: m.temperature !== null ? String(m.temperature) : "",
                       })
                     }
                   >
@@ -743,7 +816,8 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                   }
                 >
                   <option value="openai_compat">{tm.openaiType}</option>
-                  <option value="claude_cli">{tm.cliType}</option>
+                  <option value="claude_cli">{tm.claudeCliType}</option>
+                  <option value="codex_cli">{tm.codexCliType}</option>
                 </select>
               </label>
 
@@ -836,7 +910,7 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                   <span>{tm.command}</span>
                   <input
                     type="text"
-                    placeholder="claude"
+                    placeholder={defaultCommand(providerForm.kind)}
                     value={providerForm.binary}
                     onChange={(e) =>
                       setProviderForm({ ...providerForm, binary: e.target.value })
@@ -849,12 +923,12 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
             {providerFetch.error && (
               <div className="warning-list">{providerFetch.error}</div>
             )}
-            {providerFetch.ids && (
+            {providerFetch.models && (
               <div className="test-result ok">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <polyline points="4 12.5 9.5 18 20 6" />
                 </svg>
-                {tm.connected(providerFetch.ids.length)}
+                {tm.connected(providerFetch.models.length)}
               </div>
             )}
 
@@ -919,7 +993,7 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                     ))}
                 </div>
                 <div className="muted-line">
-                  {p.kind === "claude_cli" ? (p.binary ?? "claude") : p.baseUrl}
+                  {isCliKind(p.kind) ? (p.binary ?? defaultCommand(p.kind)) : p.baseUrl}
                 </div>
               </div>
               <div className="settings-item-actions">
@@ -972,12 +1046,12 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                 {browseFetch.error && (
                   <div className="warning-list">{browseFetch.error}</div>
                 )}
-                {browseFetch.ids && (
+                {browseFetch.models && (
                   <>
                     <div className="provider-models-head">
                       <input
                         type="text"
-                        placeholder={tm.filter(browseFetch.ids.length)}
+                        placeholder={tm.filter(browseFetch.models.length)}
                         value={browseFilter}
                         onChange={(e) => setBrowseFilter(e.target.value)}
                       />

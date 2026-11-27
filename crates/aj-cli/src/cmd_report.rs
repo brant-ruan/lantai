@@ -682,7 +682,7 @@ pub(crate) fn cmd_find_tools() -> Result<()> {
                     .gaps
                     .iter()
                     .map(|g| match g {
-                        local_tools::Gap::Tools => "tools cannot all be turned off",
+                        local_tools::Gap::Tools => "tools that can act stay on",
                         local_tools::Gap::Sessions => "every run leaves a session",
                     })
                     .collect::<Vec<_>>()

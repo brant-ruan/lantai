@@ -947,7 +947,7 @@ export const en = {
     aliasPlaceholder: "e.g. flash",
     provider: "Provider",
     kindName: (kind: string): string =>
-      kind === "claude_cli" ? "Claude CLI" : "OpenAI-compatible",
+      kind === "claude_cli" ? "Claude CLI" : kind === "codex_cli" ? "Codex CLI" : "OpenAI-compatible",
     modelId: "Model ID",
     optionalSuffix: " (optional)",
     cliDefault: "CLI default",
@@ -956,6 +956,12 @@ export const en = {
     fetchList: "Fetch list",
     effort: "Reasoning effort (optional)",
     serverDefault: "server default",
+    defaultIs: (effort: string) => `default: ${effort}`,
+    temperature: "Temperature (optional)",
+    temperatureTip:
+      "From 0 to 2; lower is steadier. Left blank, nothing is sent and the service's default applies. Many reasoning models accept only their default. Agent CLIs have no temperature setting.",
+    temperatureValue: (t: number) => `temperature ${t}`,
+    badTemperature: "Temperature must be a number from 0 to 2.",
     filter: (n: number) => `Filter ${n} models`,
     noMatches: "No matching models.",
     saveModel: "Save model",
@@ -974,7 +980,8 @@ export const en = {
     namePlaceholder: "e.g. openai",
     type: "Type",
     openaiType: "OpenAI-compatible API",
-    cliType: "Claude Code CLI",
+    claudeCliType: "Claude Code CLI",
+    codexCliType: "Codex CLI",
     baseUrl: "Base URL",
     preset: "Preset",
     fillPreset: "Fill from a preset\u2026",
@@ -1006,7 +1013,7 @@ export const en = {
     noModel: "No model yet. Find an agent CLI on this Mac below, or add a provider.",
     localTools: "Agent CLIs on this Mac",
     localToolsTip:
-      "Lantai can write with an agent CLI you already use. Finding only runs each tool's --version, so it checks neither sign-in nor quota; Test does. A CLI is used only if it can run once with every tool turned off and without leaving a session behind.",
+      "Lantai can write with an agent CLI you already use. Finding only runs each tool's --version, so it checks neither sign-in nor quota; Test does. A CLI is used only if it runs once without leaving a session behind and with every tool that could run commands, change files or go online turned off. The README lists what each one still declares.",
     localToolsIntro:
       "Look for Claude Code, Codex CLI, Antigravity and OpenCode on this Mac. Nothing is added until you choose.",
     findTools: "Find tools",
@@ -1017,7 +1024,7 @@ export const en = {
     addedAs: (alias: string) => `Added as \u201c${alias}\u201d`,
     cannotGenerate: "Can't generate yet",
     gaps: {
-      tools: "its tools cannot all be turned off",
+      tools: "tools that can act stay on",
       sessions: "every run leaves a session behind",
     } as Record<string, string>,
     versionUnknown: "version unknown",

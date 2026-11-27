@@ -10,16 +10,18 @@
 //! timeout_secs = 300               # optional
 //!
 //! [providers.claude]              # an agent CLI, added by finding local tools
-//! type = "claude_cli"
-//! binary = "/path/to/claude"       # optional; `claude` on PATH when unset
+//! type = "claude_cli"              # or "codex_cli"
+//! binary = "/path/to/claude"       # optional; `claude` (or `codex`) on PATH when unset
 //!
 //! [models.flash]                   # an alias the user picks in the app or with --model
 //! provider = "gateway"
 //! model = "model-a"
-//! reasoning_effort = "high"
+//! reasoning_effort = "high"        # optional; the provider's default when unset
+//! temperature = 0.3                # optional, 0-2; OpenAI-compatible providers only
 //!
 //! [models."Claude Code"]           # no `model`: the CLI's own default
 //! provider = "claude"
+//! reasoning_effort = "high"        # optional; one of `engine::CLAUDE_EFFORTS`
 //!
 //! [agents.claude]      # optional; which session sources to use
 //! enabled = true       # scan this agent's sessions (default: only Claude Code)
@@ -59,15 +61,14 @@ use serde::{Deserialize, Serialize};
 use aj_ir::AgentId;
 
 use crate::diagnose;
-use crate::engine::{ClaudeCliEngine, Engine, NoModelEngine};
+use crate::engine::{
+    ClaudeCliEngine, CodexCliEngine, Engine, ModelInfo, NoModelEngine, CLAUDE_EFFORTS,
+};
 use crate::keystore::KeyStore;
 use crate::lang::{self, Language};
 use crate::local_tools::{ToolDescriptor, ToolEngine};
 use crate::openai::{ApiKey, OpenAiCompatEngine};
 use crate::summarize::Budgets;
-
-/// Model ids the Claude CLI accepts as `--model` shorthands.
-pub const CLAUDE_CLI_MODELS: &[&str] = &["haiku", "opus", "sonnet"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -191,6 +192,10 @@ pub enum ProviderConfig {
         #[serde(skip_serializing_if = "Option::is_none")]
         binary: Option<String>,
     },
+    CodexCli {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        binary: Option<String>,
+    },
     OpenaiCompat {
         /// Like `https://host/v1`, without `/chat/completions`.
         base_url: String,
@@ -206,10 +211,16 @@ pub struct ModelConfig {
     /// Model id at the provider; required except for the Claude CLI (its default).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
-    /// Valid values are defined by the server (e.g. `none`, `low`, `high`, `max`).
+    /// Valid values are defined by the server or CLI (e.g. `none`, `low`, `high`, `max`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<String>,
+    /// Sampling temperature, 0-2; only OpenAI-compatible providers take one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
 }
+
+/// Highest temperature accepted.
+pub const MAX_TEMPERATURE: f64 = 2.0;
 
 /// What to do with the stored key when a provider is saved.
 #[derive(Debug, Clone)]
@@ -224,9 +235,59 @@ fn clean(v: Option<String>) -> Option<String> {
 }
 
 impl ProviderConfig {
+    /// The `type` written in `config.toml`, also what the app calls the kind.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            ProviderConfig::ClaudeCli { .. } => "claude_cli",
+            ProviderConfig::CodexCli { .. } => "codex_cli",
+            ProviderConfig::OpenaiCompat { .. } => "openai_compat",
+        }
+    }
+
+    /// A provider of `kind` from the fields of a settings form; fields the kind does not use
+    /// are dropped.
+    pub fn from_parts(
+        kind: &str,
+        base_url: Option<String>,
+        timeout_secs: Option<u64>,
+        binary: Option<String>,
+    ) -> Result<Self> {
+        Ok(match kind {
+            "claude_cli" => ProviderConfig::ClaudeCli { binary },
+            "codex_cli" => ProviderConfig::CodexCli { binary },
+            "openai_compat" => ProviderConfig::OpenaiCompat {
+                base_url: base_url.unwrap_or_default(),
+                timeout_secs,
+            },
+            other => bail!("unknown provider type: {other}"),
+        })
+    }
+
+    /// For an agent CLI, the command it runs: the configured path, else the command name.
+    pub fn cli_command(&self) -> Option<&str> {
+        match self {
+            ProviderConfig::ClaudeCli { binary } => Some(binary.as_deref().unwrap_or("claude")),
+            ProviderConfig::CodexCli { binary } => Some(binary.as_deref().unwrap_or("codex")),
+            ProviderConfig::OpenaiCompat { .. } => None,
+        }
+    }
+
+    /// For an agent CLI, the path configured for it, if any.
+    pub fn cli_binary(&self) -> Option<&str> {
+        match self {
+            ProviderConfig::ClaudeCli { binary } | ProviderConfig::CodexCli { binary } => {
+                binary.as_deref()
+            }
+            ProviderConfig::OpenaiCompat { .. } => None,
+        }
+    }
+
     fn normalized(self) -> Result<Self> {
         Ok(match self {
             ProviderConfig::ClaudeCli { binary } => ProviderConfig::ClaudeCli {
+                binary: clean(binary),
+            },
+            ProviderConfig::CodexCli { binary } => ProviderConfig::CodexCli {
                 binary: clean(binary),
             },
             ProviderConfig::OpenaiCompat {
@@ -247,6 +308,41 @@ impl ProviderConfig {
             }
         })
     }
+}
+
+/// Check a model alias's options against its provider: an API needs a model ID, a temperature
+/// is 0-2 and only for APIs, and Claude Code takes only the efforts it knows.
+fn validate_model(model: &ModelConfig, provider: &ProviderConfig) -> Result<()> {
+    if let Some(t) = model.temperature {
+        if !matches!(provider, ProviderConfig::OpenaiCompat { .. }) {
+            bail!(
+                "provider {} is an agent CLI, which has no temperature setting",
+                model.provider
+            );
+        }
+        if !(0.0..=MAX_TEMPERATURE).contains(&t) {
+            bail!("temperature must be between 0 and {MAX_TEMPERATURE}, got {t}");
+        }
+    }
+    match provider {
+        ProviderConfig::OpenaiCompat { .. } if model.model.is_none() => {
+            bail!("choose a model id for provider {}", model.provider)
+        }
+        ProviderConfig::ClaudeCli { .. } => {
+            if let Some(e) = model
+                .reasoning_effort
+                .as_deref()
+                .filter(|e| !CLAUDE_EFFORTS.contains(e))
+            {
+                bail!(
+                    "Claude Code's effort is one of {}, got {e}",
+                    CLAUDE_EFFORTS.join(", ")
+                );
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 /// Provider names are Keychain accounts and `security` script tokens, so they
@@ -335,13 +431,15 @@ impl AppConfig {
             );
         }
         for (alias, m) in &cfg.models {
-            if !cfg.providers.contains_key(&m.provider) {
+            let Some(provider) = cfg.providers.get(&m.provider) else {
                 bail!(
                     "model {alias} uses provider {} which is not defined in {}",
                     m.provider,
                     path.display()
                 );
-            }
+            };
+            validate_model(m, provider)
+                .with_context(|| format!("invalid model {alias} in {}", path.display()))?;
         }
         Ok(cfg)
     }
@@ -492,7 +590,7 @@ impl AppConfig {
                 m.provider = name.to_string();
             }
         }
-        let is_cli = matches!(provider, ProviderConfig::ClaudeCli { .. });
+        let is_cli = provider.cli_command().is_some();
         self.providers.insert(name.to_string(), provider);
         match key {
             _ if is_cli => self.keystore.remove(name)?,
@@ -546,7 +644,7 @@ impl AppConfig {
         }
     }
 
-    /// List the model ids a provider offers. `draft` describes a provider still
+    /// List the models a provider offers. `draft` describes a provider still
     /// being edited (not yet saved); `typed_key` is a key typed but not saved.
     /// Without a typed key, the saved provider's key (if `saved_name`) is used.
     pub fn list_provider_models(
@@ -554,17 +652,19 @@ impl AppConfig {
         saved_name: Option<&str>,
         draft: ProviderConfig,
         typed_key: Option<&str>,
-    ) -> Result<Vec<String>> {
-        match draft.normalized()? {
-            ProviderConfig::ClaudeCli { .. } => {
-                Ok(CLAUDE_CLI_MODELS.iter().map(|s| s.to_string()).collect())
+    ) -> Result<Vec<ModelInfo>> {
+        let draft = draft.normalized()?;
+        match &draft {
+            ProviderConfig::ClaudeCli { .. } => Ok(ClaudeCliEngine::models()),
+            ProviderConfig::CodexCli { .. } => {
+                CodexCliEngine::models(draft.cli_command().unwrap_or("codex"))
             }
             ProviderConfig::OpenaiCompat { base_url, .. } => {
                 let key = match typed_key.map(str::trim).filter(|k| !k.is_empty()) {
                     Some(k) => ApiKey::Value(k.to_string()),
                     None => saved_name.map_or(ApiKey::None, |n| self.api_key(n)),
                 };
-                crate::openai::list_models(&base_url, &key)
+                crate::openai::list_models(base_url, &key)
             }
         }
     }
@@ -584,21 +684,12 @@ impl AppConfig {
             provider: model.provider.trim().to_string(),
             model: clean(model.model),
             reasoning_effort: clean(model.reasoning_effort),
+            temperature: model.temperature,
         };
         let Some(provider) = self.providers.get(&model.provider) else {
             bail!("no provider named {}", model.provider);
         };
-        let model = match provider {
-            ProviderConfig::OpenaiCompat { .. } if model.model.is_none() => {
-                bail!("choose a model id for provider {}", model.provider)
-            }
-            // The CLI has no reasoning-effort setting.
-            ProviderConfig::ClaudeCli { .. } => ModelConfig {
-                reasoning_effort: None,
-                ..model
-            },
-            _ => model,
-        };
+        validate_model(&model, provider)?;
         if original != Some(alias) && self.models.contains_key(alias) {
             bail!("a model named {alias} already exists");
         }
@@ -642,21 +733,27 @@ impl AppConfig {
             return format!("unknown model {alias}");
         };
         let model = m.model.as_deref().unwrap_or("default");
+        let effort = m.reasoning_effort.as_deref().unwrap_or("default");
         match self.providers.get(&m.provider) {
-            Some(ProviderConfig::ClaudeCli { binary }) => format!(
-                "{} (claude_cli, command {})  model {model}",
-                m.provider,
-                binary.as_deref().unwrap_or("claude"),
-            ),
-            Some(ProviderConfig::OpenaiCompat { base_url, .. }) => format!(
-                "{} ({base_url})  model {model}  reasoning effort {}  key {}",
-                m.provider,
-                m.reasoning_effort.as_deref().unwrap_or("default"),
-                if self.has_key(&m.provider) {
+            Some(ProviderConfig::OpenaiCompat { base_url, .. }) => {
+                let temperature = m
+                    .temperature
+                    .map_or_else(|| "default".to_string(), |t| t.to_string());
+                let key = if self.has_key(&m.provider) {
                     "stored"
                 } else {
                     "none"
-                }
+                };
+                format!(
+                    "{} ({base_url})  model {model}  reasoning effort {effort}  temperature {temperature}  key {key}",
+                    m.provider,
+                )
+            }
+            Some(p) => format!(
+                "{} ({}, command {})  model {model}  reasoning effort {effort}",
+                m.provider,
+                p.kind(),
+                p.cli_command().unwrap_or_default(),
             ),
             None => format!("{} (missing provider)", m.provider),
         }
@@ -675,6 +772,9 @@ impl AppConfig {
             ToolEngine::ClaudeCli => ProviderConfig::ClaudeCli {
                 binary: Some(binary),
             },
+            ToolEngine::CodexCli => ProviderConfig::CodexCli {
+                binary: Some(binary),
+            },
         };
         if let Some((name, _)) = self.providers.iter().find(|(_, p)| **p == provider) {
             if let Some((alias, _)) = self.models.iter().find(|(_, m)| m.provider == *name) {
@@ -691,6 +791,7 @@ impl AppConfig {
                 provider: name,
                 model: None,
                 reasoning_effort: None,
+                temperature: None,
             },
         )?;
         Ok(alias)
@@ -728,11 +829,18 @@ impl AppConfig {
             bail!("model {alias} uses unknown provider {}", m.provider);
         };
         Ok(match provider {
-            ProviderConfig::ClaudeCli { binary } => Box::new(ClaudeCliEngine {
-                binary: binary.clone().unwrap_or_else(|| "claude".into()),
+            ProviderConfig::ClaudeCli { .. } => Box::new(ClaudeCliEngine {
+                binary: provider.cli_command().unwrap_or_default().to_string(),
                 model: m.model.clone(),
+                effort: m.reasoning_effort.clone(),
                 runner_dir: runner_dir.to_path_buf(),
             }),
+            ProviderConfig::CodexCli { .. } => Box::new(CodexCliEngine::new(
+                provider.cli_command().unwrap_or_default().to_string(),
+                m.model.clone(),
+                m.reasoning_effort.clone(),
+                runner_dir.to_path_buf(),
+            )),
             ProviderConfig::OpenaiCompat {
                 base_url,
                 timeout_secs,
@@ -742,6 +850,7 @@ impl AppConfig {
                 api_key: self.api_key(&m.provider),
                 model: m.model.clone().unwrap_or_default(),
                 reasoning_effort: m.reasoning_effort.clone(),
+                temperature: m.temperature,
                 timeout: Duration::from_secs(timeout_secs.unwrap_or(300)),
             }),
         })
@@ -784,6 +893,7 @@ mod tests {
             provider: provider.into(),
             model: Some(id.into()),
             reasoning_effort: Some("high".into()),
+            temperature: None,
         }
     }
 
@@ -1003,20 +1113,110 @@ batch_concurrency = 4
         );
         assert_eq!(cfg.models["Claude Code 2"].provider, "claude-2");
         assert_eq!(cfg.default_model_name(), Some("Claude Code"));
+        assert_eq!(
+            cfg.add_local_tool(tool("codex").unwrap(), Path::new("/opt/bin/codex"))
+                .unwrap(),
+            "Codex CLI"
+        );
+        assert_eq!(
+            cfg.providers["codex"],
+            ProviderConfig::CodexCli {
+                binary: Some("/opt/bin/codex".into())
+            }
+        );
         assert!(cfg
-            .add_local_tool(tool("codex").unwrap(), Path::new("/opt/bin/codex"))
+            .add_local_tool(tool("agy").unwrap(), Path::new("/opt/bin/agy"))
             .is_err());
         std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
-    fn claude_cli_lists_shorthand_models() {
+    fn claude_cli_lists_shorthand_models_with_efforts() {
         let dir = temp_dir("cli");
         let cfg = AppConfig::load(&dir.join("none.toml"), file_store(&dir)).unwrap();
-        let ids = cfg
+        let models = cfg
             .list_provider_models(None, ProviderConfig::ClaudeCli { binary: None }, None)
             .unwrap();
-        assert!(ids.contains(&"sonnet".to_string()));
+        let sonnet = models.iter().find(|m| m.id == "sonnet").unwrap();
+        assert!(sonnet.efforts.contains(&"max".to_string()));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn options_are_checked_against_the_provider() {
+        let dir = temp_dir("options");
+        let path = dir.join("config.toml");
+        let mut cfg = AppConfig::load(&path, file_store(&dir)).unwrap();
+        cfg.upsert_provider(None, "api", openai(), KeyUpdate::Keep)
+            .unwrap();
+        cfg.upsert_provider(
+            None,
+            "claude",
+            ProviderConfig::ClaudeCli { binary: None },
+            KeyUpdate::Keep,
+        )
+        .unwrap();
+        cfg.upsert_provider(
+            None,
+            "codex",
+            ProviderConfig::CodexCli { binary: None },
+            KeyUpdate::Keep,
+        )
+        .unwrap();
+        let with = |provider: &str, effort: Option<&str>, temperature: Option<f64>| ModelConfig {
+            provider: provider.into(),
+            model: Some("m".into()),
+            reasoning_effort: effort.map(str::to_string),
+            temperature,
+        };
+
+        // A temperature is 0-2 and only for APIs.
+        cfg.upsert_model(None, "warm", with("api", None, Some(0.3)))
+            .unwrap();
+        assert!(cfg
+            .upsert_model(None, "x", with("api", None, Some(2.5)))
+            .is_err());
+        assert!(cfg
+            .upsert_model(None, "x", with("codex", None, Some(0.3)))
+            .is_err());
+        // Claude Code takes only its own effort values; Codex passes any through.
+        cfg.upsert_model(None, "deep", with("claude", Some("max"), None))
+            .unwrap();
+        assert!(cfg
+            .upsert_model(None, "x", with("claude", Some("ultra"), None))
+            .is_err());
+        cfg.upsert_model(None, "cx", with("codex", Some("xhigh"), None))
+            .unwrap();
+        cfg.save(&path).unwrap();
+
+        let cfg = AppConfig::load(&path, file_store(&dir)).unwrap();
+        assert_eq!(cfg.models["warm"].temperature, Some(0.3));
+        let runner = dir.join("runner");
+        assert_eq!(
+            cfg.build_engine(Some("warm"), &runner).unwrap().name(),
+            "openai:m:default:t0.3"
+        );
+        assert_eq!(
+            cfg.build_engine(Some("deep"), &runner).unwrap().name(),
+            "claude-cli:m:max"
+        );
+        assert_eq!(
+            cfg.build_engine(Some("cx"), &runner).unwrap().name(),
+            "codex-cli:m:xhigh"
+        );
+        assert!(cfg
+            .describe_model("cx")
+            .contains("codex_cli, command codex"));
+        assert!(cfg.describe_model("warm").contains("temperature 0.3"));
+
+        // The same checks apply to a hand-edited file.
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(
+            &path,
+            text.replace("reasoning_effort = \"xhigh\"", "temperature = 1.0"),
+        )
+        .unwrap();
+        assert!(AppConfig::load(&path, file_store(&dir)).is_err());
         std::fs::remove_dir_all(&dir).ok();
     }
 

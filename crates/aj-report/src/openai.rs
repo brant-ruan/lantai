@@ -9,7 +9,7 @@ use std::time::Duration;
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
 
-use crate::engine::Engine;
+use crate::engine::{Engine, ModelInfo};
 use crate::prompts;
 
 /// The key to authenticate with, already resolved.
@@ -51,8 +51,8 @@ fn agent(timeout: Duration) -> ureq::Agent {
         .into()
 }
 
-/// List the model ids served at `base_url` (`GET /models`).
-pub fn list_models(base_url: &str, key: &ApiKey) -> Result<Vec<String>> {
+/// List the models served at `base_url` (`GET /models`), by ID.
+pub fn list_models(base_url: &str, key: &ApiKey) -> Result<Vec<ModelInfo>> {
     let url = format!("{}/models", base_url.trim().trim_end_matches('/'));
     let mut request = agent(Duration::from_secs(20)).get(&url);
     if let Some(auth) = key.header()? {
@@ -84,7 +84,7 @@ pub fn list_models(base_url: &str, key: &ApiKey) -> Result<Vec<String>> {
         .unwrap_or_default();
     ids.sort();
     ids.dedup();
-    Ok(ids)
+    Ok(ids.into_iter().map(ModelInfo::id_only).collect())
 }
 
 pub struct OpenAiCompatEngine {
@@ -94,6 +94,8 @@ pub struct OpenAiCompatEngine {
     pub model: String,
     /// Reasoning effort; valid values are defined by the server (e.g. `none`, `low`, `high`, `max`).
     pub reasoning_effort: Option<String>,
+    /// Sampling temperature; the server's default when unset.
+    pub temperature: Option<f64>,
     pub timeout: Duration,
 }
 
@@ -115,6 +117,9 @@ impl OpenAiCompatEngine {
         });
         if let Some(effort) = &self.reasoning_effort {
             body["reasoning_effort"] = json!(effort);
+        }
+        if let Some(t) = self.temperature {
+            body["temperature"] = json!(t);
         }
 
         // Read the body of 4xx/5xx responses too, so the server's error message reaches the user.
@@ -157,11 +162,16 @@ impl OpenAiCompatEngine {
 
 impl Engine for OpenAiCompatEngine {
     fn name(&self) -> String {
-        format!(
+        // The temperature is added only when set, so aliases without one keep their cache keys.
+        let mut name = format!(
             "openai:{}:{}",
             self.model,
             self.reasoning_effort.as_deref().unwrap_or("default")
-        )
+        );
+        if let Some(t) = self.temperature {
+            name.push_str(&format!(":t{t}"));
+        }
+        name
     }
 
     fn send(&self, prompt: &str) -> Result<String> {
