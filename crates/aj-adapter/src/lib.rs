@@ -3,7 +3,18 @@
 //! Each agent implements one [`SourceAdapter`], which discovers source files and translates raw records into IR events.
 //! Adapters are stateless; cursors are persisted by the caller (the core layer).
 
+pub mod json;
 pub mod text;
+
+/// Limits every adapter applies when writing IR, in characters.
+pub mod limits {
+    /// User input longer than this is truncated (large pasted content has no value for a journal).
+    pub const MAX_PROMPT_CHARS: usize = 20_000;
+    /// A tool action's target (a path, a command, a URL).
+    pub const MAX_TARGET_CHARS: usize = 2_000;
+    /// A one-line summary of a tool's output.
+    pub const MAX_OUTPUT_SUMMARY_CHARS: usize = 300;
+}
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};

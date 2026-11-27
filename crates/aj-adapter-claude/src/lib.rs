@@ -3,6 +3,8 @@
 //! All knowledge about the Claude Code session file format lives in this crate only.
 //! Format findings come from inspecting Claude Code 2.1.x in 2026-11; see `docs/ADAPTERS.md`.
 
+use aj_adapter::json::{line_count, str_of};
+use aj_adapter::limits::{MAX_OUTPUT_SUMMARY_CHARS, MAX_PROMPT_CHARS, MAX_TARGET_CHARS};
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 
@@ -13,11 +15,6 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
-
-/// User input longer than this is truncated (large pasted content has no value for a journal).
-const MAX_PROMPT_CHARS: usize = 20_000;
-const MAX_TARGET_CHARS: usize = 2_000;
-const MAX_OUTPUT_SUMMARY_CHARS: usize = 300;
 
 /// Known side-record types that we do not need (2026-11, Claude Code 2.1.x).
 const KNOWN_SIDE_RECORDS: [&str; 18] = [
@@ -497,13 +494,8 @@ fn assistant_blocks(
 }
 
 fn tool_action(id: String, timestamp: DateTime<Utc>, name: &str, input: &Value) -> IrEvent {
-    let s = |key: &str| input.get(key).and_then(Value::as_str).map(str::to_string);
-    let lines = |key: &str| {
-        input
-            .get(key)
-            .and_then(Value::as_str)
-            .map(|v| v.lines().count() as u32)
-    };
+    let s = |key: &str| str_of(input, key).map(str::to_string);
+    let lines = |key: &str| str_of(input, key).map(line_count);
 
     let (kind, target, summary, diff_stat) = match name {
         "Read" => (ToolKind::FileRead, s("file_path"), None, None),

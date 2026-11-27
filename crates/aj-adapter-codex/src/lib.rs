@@ -8,6 +8,8 @@
 //! structured thread item (user message, agent message, command, file change, ...). The raw model
 //! traffic in `response_item` records also carries injected context, so it is skipped.
 
+use aj_adapter::json::{line_count, str_of};
+use aj_adapter::limits::{MAX_OUTPUT_SUMMARY_CHARS, MAX_PROMPT_CHARS, MAX_TARGET_CHARS};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -21,10 +23,6 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
-
-const MAX_PROMPT_CHARS: usize = 20_000;
-const MAX_TARGET_CHARS: usize = 2_000;
-const MAX_OUTPUT_SUMMARY_CHARS: usize = 300;
 
 /// Top-level record types we do not need (2026-11).
 const KNOWN_SKIPPED_RECORDS: [&str; 7] = [
@@ -420,10 +418,6 @@ fn token_count(
     });
 }
 
-fn str_of<'v>(v: &'v Value, key: &str) -> Option<&'v str> {
-    v.get(key).and_then(Value::as_str)
-}
-
 fn item_events(item: &Value, timestamp: DateTime<Utc>, out: &mut ParseOutput) {
     let Some(ty) = str_of(item, "type") else {
         out.skipped_lines += 1;
@@ -656,7 +650,7 @@ fn file_change(item: &Value, id: &str, timestamp: DateTime<Utc>, out: &mut Parse
         return;
     };
     for (i, (path, change)) in changes.iter().enumerate() {
-        let lines = |key: &str| str_of(change, key).map(|c| c.lines().count() as u32);
+        let lines = |key: &str| str_of(change, key).map(line_count);
         let (kind, diff_stat) = match str_of(change, "type") {
             Some("add") => (
                 ToolKind::FileWrite,

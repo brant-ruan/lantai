@@ -23,6 +23,7 @@ version = "0.3.0"
 dependencies = [
  "aj-ir",
  "anyhow",
+ "serde_json",
  "zstd",
 ]
 

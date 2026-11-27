@@ -22,6 +22,8 @@ change their formats without notice; the golden tests are meant to notice first.
    `discover` lists one `SourceFile` per session, `parse` turns records from an offset into IR
    events, `normalize_cwd` optionally maps agent-made worktrees back to their repository, and
    `probe` reports which agent versions wrote the local data and whether they can be read.
+   Use `aj_adapter`'s shared pieces rather than copies: `limits` for truncation lengths, `text`
+   for tags and truncation, `json` for string fields and edit line counts.
 4. **Register it in `aj-sources`**: default session roots, an `AJ_<NAME>_ROOT` override, and one
    arm that constructs the adapter. Nothing above `aj-sources` names a concrete adapter.
 5. **Add fixtures and golden tests.** A redacted sample under `fixtures/<name>/` and its expected

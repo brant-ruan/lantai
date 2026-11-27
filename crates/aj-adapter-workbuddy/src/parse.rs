@@ -5,16 +5,14 @@
 //! The `type` field is usually not first, so every line is deserialized; serde skips the fields
 //! that are not declared below.
 
+use aj_adapter::json::{line_count, str_of};
+use aj_adapter::limits::{MAX_OUTPUT_SUMMARY_CHARS, MAX_PROMPT_CHARS, MAX_TARGET_CHARS};
 use aj_adapter::text::{strip_tag_blocks, tag_content, truncate_middle, truncate_tail};
 use aj_adapter::ParseOutput;
 use aj_ir::{DiffStat, IrEvent, ToolKind, Usage};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
-
-const MAX_PROMPT_CHARS: usize = 20_000;
-const MAX_TARGET_CHARS: usize = 2_000;
-const MAX_OUTPUT_SUMMARY_CHARS: usize = 300;
 
 /// Record types that carry nothing for a journal (2026-11, WorkBuddy 5.11).
 const KNOWN_SKIPPED_RECORDS: [&str; 4] = [
@@ -137,10 +135,6 @@ impl Parser {
     }
 }
 
-fn str_of<'v>(v: &'v Value, key: &str) -> Option<&'v str> {
-    v.get(key).and_then(Value::as_str)
-}
-
 fn flag(v: &Value, key: &str) -> bool {
     v.get(key).and_then(Value::as_bool) == Some(true)
 }
@@ -257,7 +251,7 @@ fn tool_call(rec: &Record, timestamp: DateTime<Utc>, out: &mut ParseOutput) {
         .and_then(|a| serde_json::from_str(a).ok())
         .unwrap_or(Value::Null);
     let s = |key: &str| str_of(&args, key).map(str::to_string);
-    let lines = |key: &str| str_of(&args, key).map(|v| v.lines().count() as u32);
+    let lines = |key: &str| str_of(&args, key).map(line_count);
 
     let (kind, target, summary, diff_stat) = match name {
         "Bash" => (ToolKind::BashCmd, s("command"), s("description"), None),

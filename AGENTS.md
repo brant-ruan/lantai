@@ -99,7 +99,7 @@ decided by the owner.**
 | Path | Responsibility |
 | :--- | :--- |
 | `crates/aj-ir` | IR types and version, agent identifiers and their registry, the exchange format header; no IO |
-| `crates/aj-adapter` | `SourceAdapter` and shared helpers (line reading, zstd that tolerates an incomplete last frame, `text` for tag stripping and truncation) |
+| `crates/aj-adapter` | `SourceAdapter` and shared helpers (line reading, zstd that tolerates an incomplete last frame, `text` for tag stripping and truncation, `json` for string fields and edit line counts, `limits` for truncation lengths) |
 | `crates/aj-adapter-*` | one adapter per agent: `claude`, `codex`, `antigravity`, `dsh` (DeepSeek Harness), `workbuddy`, `opencode` |
 | `crates/aj-sources` | per agent: session folders, detection, adapter construction; the only map from agent to adapter |
 | `crates/aj-store` | SQLite persistence and statistics queries |

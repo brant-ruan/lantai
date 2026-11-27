@@ -4,16 +4,14 @@
 //! Only human input, assistant messages (text and usage), tool calls and results, and titles
 //! carry anything for a journal; everything else is skipped by type without deserializing it.
 
+use aj_adapter::json::{line_count, str_of};
+use aj_adapter::limits::{MAX_OUTPUT_SUMMARY_CHARS, MAX_PROMPT_CHARS, MAX_TARGET_CHARS};
 use aj_adapter::text::{truncate_middle, truncate_tail};
 use aj_adapter::{peek_type, ParseOutput};
 use aj_ir::{DiffStat, IrEvent, ToolKind, Usage};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
-
-const MAX_PROMPT_CHARS: usize = 20_000;
-const MAX_TARGET_CHARS: usize = 2_000;
-const MAX_OUTPUT_SUMMARY_CHARS: usize = 300;
 
 /// The only session format this adapter understands.
 const FORMAT_VERSION: u64 = 4;
@@ -229,10 +227,6 @@ fn is_handled(ty: &str) -> bool {
     )
 }
 
-fn str_of<'v>(v: &'v Value, key: &str) -> Option<&'v str> {
-    v.get(key).and_then(Value::as_str)
-}
-
 /// Text blocks of a content array joined by blank lines, and the number of image blocks.
 fn content_text(content: Option<&Value>) -> (String, usize) {
     let mut texts = Vec::new();
@@ -330,7 +324,7 @@ fn tool_call(d: &Value, timestamp: DateTime<Utc>, out: &mut ParseOutput) {
         .and_then(|a| serde_json::from_str(a).ok())
         .unwrap_or(Value::Null);
     let s = |key: &str| str_of(&args, key).map(str::to_string);
-    let lines = |key: &str| str_of(&args, key).map(|v| v.lines().count() as u32);
+    let lines = |key: &str| str_of(&args, key).map(line_count);
 
     let (kind, target, summary, diff_stat) = match name {
         "bash" => (ToolKind::BashCmd, s("command"), s("description"), None),

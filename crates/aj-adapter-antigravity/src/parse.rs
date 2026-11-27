@@ -3,6 +3,8 @@
 //! Handles both the full (`transcript_full.jsonl`) and compact (`transcript.jsonl`) formats from
 //! AGY 2.0 and Antigravity IDE without touching the filesystem.
 
+use aj_adapter::json::{line_count, str_of};
+use aj_adapter::limits::{MAX_OUTPUT_SUMMARY_CHARS, MAX_PROMPT_CHARS, MAX_TARGET_CHARS};
 use std::collections::VecDeque;
 
 use aj_adapter::text::{strip_tag_blocks, tag_content, truncate_middle, truncate_tail};
@@ -14,9 +16,6 @@ use serde_json::{Map, Value};
 
 use crate::cwd::{is_internal_brain_path, CwdCandidates};
 
-const MAX_PROMPT_CHARS: usize = 20_000;
-const MAX_TARGET_CHARS: usize = 2_000;
-const MAX_OUTPUT_SUMMARY_CHARS: usize = 300;
 const MAX_ARTIFACT_SUMMARY_CHARS: usize = 300;
 
 /// Step types that carry system/lifecycle noise rather than conversation turns or actions.
@@ -517,10 +516,8 @@ fn arg_any_string(args: &Map<String, Value>, keys: &[&str]) -> Option<String> {
     arg_any_str(args, keys).map(str::to_string)
 }
 
-fn line_count(args: &Map<String, Value>, key: &str) -> Option<u32> {
-    args.get(key)
-        .and_then(Value::as_str)
-        .map(|s| s.lines().count() as u32)
+fn arg_lines(args: &Map<String, Value>, key: &str) -> Option<u32> {
+    args.get(key).and_then(Value::as_str).map(line_count)
 }
 
 fn has_artifact_metadata(args: &Map<String, Value>) -> bool {
@@ -571,14 +568,8 @@ fn multi_chunk_diff_stat(args: &Map<String, Value>) -> Option<DiffStat> {
     let mut stat = DiffStat::default();
     let mut any = false;
     for chunk in chunks {
-        let removed = chunk
-            .get("TargetContent")
-            .and_then(Value::as_str)
-            .map(|s| s.lines().count() as u32);
-        let added = chunk
-            .get("ReplacementContent")
-            .and_then(Value::as_str)
-            .map(|s| s.lines().count() as u32);
+        let removed = str_of(chunk, "TargetContent").map(line_count);
+        let added = str_of(chunk, "ReplacementContent").map(line_count);
         if removed.is_some() || added.is_some() {
             any = true;
             stat.removed += removed.unwrap_or(0);
@@ -603,7 +594,7 @@ fn map_tool(
         "view_code_item" => (ToolKind::FileRead, arg_string(args, "File"), None, None),
         "edit_file" => {
             let target = arg_string(args, "Path");
-            let diff = match (line_count(args, "Target"), line_count(args, "Replacement")) {
+            let diff = match (arg_lines(args, "Target"), arg_lines(args, "Replacement")) {
                 (Some(removed), Some(added)) => Some(DiffStat { added, removed }),
                 _ => None,
             };
@@ -612,8 +603,8 @@ fn map_tool(
         "replace_file_content" => {
             let target = arg_string(args, "TargetFile");
             let diff = match (
-                line_count(args, "TargetContent"),
-                line_count(args, "ReplacementContent"),
+                arg_lines(args, "TargetContent"),
+                arg_lines(args, "ReplacementContent"),
             ) {
                 (Some(removed), Some(added)) => Some(DiffStat { added, removed }),
                 _ => None,
@@ -627,12 +618,12 @@ fn map_tool(
         }
         "write_file" => {
             let target = arg_string(args, "Path");
-            let diff = line_count(args, "Content").map(|added| DiffStat { added, removed: 0 });
+            let diff = arg_lines(args, "Content").map(|added| DiffStat { added, removed: 0 });
             apply_artifact_guard(args, ToolKind::FileWrite, target, diff)
         }
         "write_to_file" => {
             let target = arg_string(args, "TargetFile");
-            let diff = line_count(args, "CodeContent").map(|added| DiffStat { added, removed: 0 });
+            let diff = arg_lines(args, "CodeContent").map(|added| DiffStat { added, removed: 0 });
             apply_artifact_guard(args, ToolKind::FileWrite, target, diff)
         }
         "run_command" => (

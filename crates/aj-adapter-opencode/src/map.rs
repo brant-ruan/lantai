@@ -5,6 +5,8 @@
 //! Rows are updated in place while a reply streams, and storage keeps the first version of an
 //! event, so an assistant message is only read once it has `time.completed`.
 
+use aj_adapter::json::{line_count, str_of};
+use aj_adapter::limits::{MAX_OUTPUT_SUMMARY_CHARS, MAX_PROMPT_CHARS, MAX_TARGET_CHARS};
 use std::collections::HashMap;
 
 use aj_adapter::text::{truncate_middle, truncate_tail};
@@ -14,10 +16,6 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use crate::db::{DataRow, SessionRow};
-
-const MAX_PROMPT_CHARS: usize = 20_000;
-const MAX_TARGET_CHARS: usize = 2_000;
-const MAX_OUTPUT_SUMMARY_CHARS: usize = 300;
 
 /// Placeholder title OpenCode gives a session before it has generated one.
 const DEFAULT_TITLE_PREFIX: &str = "New session";
@@ -37,10 +35,6 @@ const KNOWN_SKIPPED_PARTS: [&str; 9] = [
     "subtask",
     "retry",
 ];
-
-fn str_of<'v>(v: &'v Value, key: &str) -> Option<&'v str> {
-    v.get(key).and_then(Value::as_str)
-}
 
 fn millis(v: &Value, pointer: &str) -> Option<DateTime<Utc>> {
     v.pointer(pointer)
@@ -305,7 +299,7 @@ fn tool(part: &Value, fallback_time: DateTime<Utc>, out: &mut ParseOutput) {
     let timestamp = millis(state, "/time/start").unwrap_or(fallback_time);
     let input = state.get("input").unwrap_or(&Value::Null);
     let s = |key: &str| str_of(input, key).map(str::to_string);
-    let lines = |key: &str| str_of(input, key).map(|v| v.lines().count() as u32);
+    let lines = |key: &str| str_of(input, key).map(line_count);
 
     let actions: Vec<Action> = match name {
         "bash" => vec![(ToolKind::BashCmd, s("command"), s("description"), None)],
