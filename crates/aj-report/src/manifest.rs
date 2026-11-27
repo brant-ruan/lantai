@@ -30,6 +30,10 @@ pub struct ProjectEntry {
     pub slices: BTreeMap<i64, String>,
     /// Hash of the section body as generated. A stored section that no longer matches was edited.
     pub section_hash: String,
+    /// Name of the engine that wrote the section (`None` in manifests from before it was
+    /// recorded). Sections kept by Update keep their writer, so one version can have several.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine: Option<String>,
 }
 
 /// The material a report would be generated from now, in manifest form.
@@ -61,6 +65,49 @@ impl Manifest {
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
+}
+
+/// The sections one engine wrote in a version.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionWriter {
+    /// `None` for sections kept from a version whose manifest did not record its engine.
+    pub engine: Option<String>,
+    /// Project keys, in key order; empty when only the version's engine is known.
+    pub keys: Vec<String>,
+}
+
+/// Who wrote a version's sections, most sections first. A manifest that records no engine
+/// at all (or no manifest) falls back to the version's own engine.
+pub fn section_writers(
+    manifest: Option<&Manifest>,
+    version_engine: Option<&str>,
+) -> Vec<SectionWriter> {
+    let recorded = manifest.filter(|m| m.projects.values().any(|e| e.engine.is_some()));
+    let Some(m) = recorded else {
+        return version_engine
+            .map(|e| SectionWriter {
+                engine: Some(e.to_string()),
+                keys: manifest
+                    .map(|m| m.projects.keys().cloned().collect())
+                    .unwrap_or_default(),
+            })
+            .into_iter()
+            .collect();
+    };
+    let mut groups: BTreeMap<Option<String>, Vec<String>> = BTreeMap::new();
+    for (key, entry) in &m.projects {
+        groups
+            .entry(entry.engine.clone())
+            .or_default()
+            .push(key.clone());
+    }
+    let mut out: Vec<SectionWriter> = groups
+        .into_iter()
+        .map(|(engine, keys)| SectionWriter { engine, keys })
+        .collect();
+    // Known engines before the unrecorded group; among them, the one with most sections first.
+    out.sort_by_key(|w| (w.engine.is_none(), std::cmp::Reverse(w.keys.len())));
+    out
 }
 
 /// How the current material differs from a manifest, by project key.
@@ -144,6 +191,7 @@ mod tests {
             name: name.into(),
             slices: slices.iter().map(|(id, h)| (*id, h.to_string())).collect(),
             section_hash: String::new(),
+            engine: None,
         }
     }
 
@@ -218,10 +266,62 @@ mod tests {
         assert_eq!(d.removed_slices, 1);
     }
 
+    fn written_by(mut e: ProjectEntry, engine: &str) -> ProjectEntry {
+        e.engine = Some(engine.into());
+        e
+    }
+
+    #[test]
+    fn writers_group_sections_by_engine() {
+        let m = manifest(&[
+            ("1", written_by(entry("A", &[]), "x")),
+            ("2", written_by(entry("B", &[]), "y")),
+            ("3", written_by(entry("C", &[]), "y")),
+            ("4", entry("D", &[])),
+        ]);
+        let w = section_writers(Some(&m), Some("y"));
+        let summary: Vec<(Option<&str>, Vec<&str>)> = w
+            .iter()
+            .map(|w| {
+                (
+                    w.engine.as_deref(),
+                    w.keys.iter().map(String::as_str).collect(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            summary,
+            vec![
+                (Some("y"), vec!["2", "3"]),
+                (Some("x"), vec!["1"]),
+                (None, vec!["4"]),
+            ]
+        );
+    }
+
+    #[test]
+    fn writers_fall_back_to_the_version_engine() {
+        let m = manifest(&[("1", entry("A", &[])), ("2", entry("B", &[]))]);
+        let w = section_writers(Some(&m), Some("v"));
+        assert_eq!(w.len(), 1);
+        assert_eq!(w[0].engine.as_deref(), Some("v"));
+        assert_eq!(w[0].keys, vec!["1", "2"]);
+        assert_eq!(
+            section_writers(None, Some("v"))[0].keys,
+            Vec::<String>::new()
+        );
+        assert!(section_writers(Some(&m), None).is_empty());
+        assert!(section_writers(None, None).is_empty());
+    }
+
     #[test]
     fn manifest_round_trips_through_json() {
         let m = manifest(&[("1", entry("A", &[(10, "a")]))]);
-        assert_eq!(Manifest::parse(&m.to_json()), Some(m));
+        assert_eq!(Manifest::parse(&m.to_json()), Some(m.clone()));
+        // Older manifests have no engine; it is left out when absent.
+        assert!(!m.to_json().contains("engine"));
+        let written = manifest(&[("1", written_by(entry("A", &[]), "x"))]);
+        assert_eq!(Manifest::parse(&written.to_json()), Some(written));
         assert_eq!(Manifest::parse("not json"), None);
         assert_eq!(section_hash("- a\n"), section_hash("  - a"));
     }

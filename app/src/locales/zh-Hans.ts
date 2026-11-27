@@ -809,14 +809,17 @@ export const zhHans = {
     changed: (n: number) => `${n} 个有变化`,
     removed: (n: number) => `${n} 个已移除`,
     estimateMonthly: (weeks: number, slices: number) => `${weeks} 份周报 · ${slices} 个切片`,
-    estimate: (slices: number, cached: number, pending: number) =>
-      `${slices} 个切片（已缓存 ${cached}，待摘要 ${pending}）`,
+    estimate: (slices: number, cached: number, pending: number, otherModel: number) =>
+      `${slices} 个切片（已缓存 ${cached}，待摘要 ${pending}${otherModel > 0 ? `，其中 ${otherModel} 个此前由其他模型摘要` : ""}）`,
     chars: (n: string) => ` · 约 ${n} 字符`,
     unreportedWeeks: (month: string) => `${month} 中还没有周报的活跃周：`,
     openWeek: (w: string) => `打开 ${w} 的周报工作台`,
     writingStage: "正在撰写报告（第二阶段）",
     digestingStage: "正在摘要会话（第一阶段）",
     versionModel: (name: string) => `由 ${name} 生成`,
+    versionModels: (writers: [model: string, projects: string[]][]) =>
+      `由 ${writers.map(([m, p]) => `${m}（${p.join("、")}）`).join("；")} 生成`,
+    unrecordedModel: "此前未记录的模型",
     statusTitle: (status: string, estimate: string) =>
       `报告状态：${status === "final" ? "定稿" : "草稿"}${estimate ? ` · ${estimate}` : ""}`,
     mode: "阅读或编辑",
@@ -952,6 +955,11 @@ export const zhHans = {
     effort: "推理强度（可选）",
     serverDefault: "服务端默认",
     defaultIs: (effort: string) => `默认：${effort}`,
+    effortUnlisted: (effort: string) => `${effort}（未列出）`,
+    effortRefused: (effort: string, listed: string) =>
+      `此模型未列出推理强度「${effort}」（可选 ${listed}），无法保存。请改选其中之一，或保留默认。`,
+    effortMayFail: (effort: string, listed: string) =>
+      `此模型列出的推理强度为 ${listed}，不含「${effort}」。服务商可能会拒绝，可以点“测试”确认。`,
     temperature: "温度（可选）",
     temperatureTip:
       "取值 0 到 2，越低越稳定。留空则不发送，使用服务的默认值。很多推理模型只接受默认温度。Agent 命令行没有温度设置。",

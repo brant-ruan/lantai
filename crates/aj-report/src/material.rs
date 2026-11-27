@@ -195,6 +195,22 @@ where
     Ok(Some(material))
 }
 
+/// How many slices waiting for a digest already have one in the report language from
+/// another engine: the ones that switching models made pending.
+pub fn pending_from_other_engine(materials: &[Material], engine_name: &str) -> usize {
+    materials
+        .iter()
+        .filter(|m| m.digest.is_none())
+        .filter(|m| m.slice.digest_language.as_deref() == Some(m.language.tag))
+        .filter(|m| {
+            m.slice
+                .digest_engine
+                .as_deref()
+                .is_some_and(|e| e != engine_name)
+        })
+        .count()
+}
+
 /// Gather the slices of a day that take part in the report, with cached digests attached.
 pub fn collect<Tz: TimeZone>(
     store: &Store,

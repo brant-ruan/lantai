@@ -716,7 +716,8 @@ are kept as they are.
 
 **Input manifest:** each report version records its inputs per project (key: project ID or
 `unassigned`), with a content hash per slice (dehydrated text + note, independent of model and
-prompt) and the `section_hash` of the generated section. Edited versions inherit the manifest, and
+prompt), the `section_hash` of the generated section and the engine that wrote it (absent in
+manifests from before it was recorded). Edited versions inherit the manifest, and
 sections not rewritten keep their old record, so later updates can still tell which sections a
 person changed. `aj-report/src/manifest.rs` is pure.
 
@@ -769,7 +770,14 @@ creates a new draft version.
     again. A raw record (short slice, passed through) says no model was used.
   - Report panel: the status badge's tooltip, the version lists and the compare columns name the
     model of each version. After an Update, sections that were not rewritten keep the text an
-    earlier version's model wrote; the version names the model of this run.
+    earlier version's model wrote, and the manifest keeps that model for them, so a version can
+    have several: the lists show them all (`A + B`) and the tooltip says which sections each
+    wrote. A version whose manifest records no engine falls back to the version's engine;
+    sections an Update kept from such a version are named as an earlier, unrecorded model.
+    Hand-edited versions name the models of the text they keep.
+  - Estimate: when some slices waiting for a digest already have one from another model (in the
+    report language), the estimate says how many, since switching models is what makes them
+    pending.
   - `aj digest <S12>` prints the engine of the cached digest.
 - **Export is one way** (app → Markdown files), with anchors kept, turned into footnotes, or
   stripped. The hash of each exported file is kept in `exports.json`; if the file was edited
@@ -1241,6 +1249,16 @@ provider's or CLI's own default, and nothing is sent for them.
 | OpenAI-compatible | `GET /models` | `reasoning_effort`; hints from the preset, else a generic list | `temperature`, 0 to 2 |
 | Claude Code | a fixed list of shorthands (`fable`, `opus`, `sonnet`, `haiku`); a full model name also works | `--effort`: `low`, `medium`, `high`, `xhigh`, `max` | not offered |
 | Codex CLI | `codex debug models` (models whose visibility is `list`), 20-second limit | `model_reasoning_effort`; the values each model lists, and its default | not offered |
+
+Checking an effort when an alias is saved (`AppConfig::effort_reference`, then a pure check
+against that list): the effort must be one the chosen model lists, or, for the default model or
+a model the list does not show, one some listed model takes. For agent CLIs the check is binding
+and the form offers a list to pick from: Claude Code against its five values, Codex against
+`codex debug models`. When Codex cannot list its models the effort is typed and saved unchecked,
+because Codex passes unknown values to the server and moves a known but unsupported one to the
+nearest supported level by itself. APIs are not checked on save, since most `GET /models` give no
+efforts; when the chosen model does list some, the form warns about a value outside them. Aliases
+already in `config.toml` are not checked on load, except Claude Code's fixed values.
 
 No agent CLI has a temperature option, so the field only exists for OpenAI-compatible providers.
 `codex debug models` is a debugging command and may change; when it fails, the model ID can still

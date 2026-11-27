@@ -28,7 +28,10 @@ IR 0.3.0 · Schema 12.
 
 - **Which model wrote what:** the slice drawer names the model that wrote a digest and says when
   generating with the selected model would digest the slice again; the report panel names the
-  model of each version (status tooltip, version lists, compare). `aj digest` prints it too.
+  model of each version (status tooltip, version lists, compare), and after an Update with
+  another model, which model wrote which project's section. The estimate line says how many
+  pending digests are pending only because another model wrote them. `aj digest` prints the
+  model too.
 - Codex CLI can write reports. **Find tools** (or `aj models --add codex`) adds it; it runs
   `codex exec` without saving a session, with every feature that adds a tool turned off, a
   read-only sandbox and nothing approved. The README lists the few declarations Codex still sends.
@@ -36,6 +39,9 @@ IR 0.3.0 · Schema 12.
   the models in Codex's picker with the reasoning efforts each accepts.
 - Reasoning effort for Claude Code and Codex aliases, and a temperature (0 to 2) for
   OpenAI-compatible aliases. Both are optional; left blank, nothing is sent and caches stay valid.
+  For agent CLIs the effort is picked from the levels the chosen model lists, and saving refuses
+  any other; for APIs it is typed, with a warning when the model lists levels that do not include
+  it.
 - When a new version changes how data is stored, Lantai asks before upgrading it and first saves
   a backup (database and settings, the same zip as **Back up data**) to `backups/` in the data
   folder, or a folder you choose. A database from a newer Lantai now shows a message instead of

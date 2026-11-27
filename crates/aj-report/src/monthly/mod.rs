@@ -190,7 +190,7 @@ fn month_sections(store: &Store, month: Month, project: Option<&str>) -> Result<
             ProjectEntry {
                 name: proj.name.clone(),
                 slices,
-                section_hash: String::new(),
+                ..Default::default()
             },
         );
     }
@@ -581,6 +581,7 @@ where
         base.as_ref(),
         &write_keys,
         &result.markdown,
+        &engine_name,
     );
     if is_cancelled(opts.cancel.as_ref()) {
         bail!("report generation was cancelled");

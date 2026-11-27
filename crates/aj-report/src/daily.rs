@@ -60,6 +60,8 @@ pub struct DailyEstimate {
     pub slices_ignored: usize,
     pub digests_cached: usize,
     pub digests_pending: usize,
+    /// Of the pending ones, those with a digest from another model.
+    pub digests_other_model: usize,
     pub estimated_chars: usize,
     /// `None` when the report is up to date or has no version to compare with.
     pub staleness: Option<Staleness>,
@@ -132,6 +134,10 @@ where
         slices_ignored: collected.ignored,
         digests_cached,
         digests_pending: slices_used.saturating_sub(digests_cached),
+        digests_other_model: material::pending_from_other_engine(
+            &collected.materials,
+            ctx.engine_name,
+        ),
         estimated_chars,
         staleness: report_io::staleness(store, KIND_DAILY, date, project, &collected.materials)?,
     })
@@ -315,6 +321,7 @@ where
         base.as_ref(),
         &write_keys,
         &result.markdown,
+        &engine_name,
     );
 
     // The caller may have stopped waiting while the last call was in flight.
@@ -385,6 +392,7 @@ mod tests {
     use super::*;
     use crate::engine::testing::MockEngine;
     use crate::lang::{EN, ZH_HANS};
+    use crate::manifest::Manifest;
     use aj_core::{slice::reslice_session, Config};
     use aj_ir::{AgentId, IrEvent};
     use chrono::{DateTime, FixedOffset, Utc};
@@ -935,6 +943,25 @@ mod tests {
         )
         .unwrap();
         assert_eq!((est2.digests_cached, est2.digests_pending), (1, 1));
+        assert_eq!(est2.digests_other_model, 0);
+
+        // Another model would digest the cached slice again, and says so.
+        let est3 = estimate_daily(
+            &store,
+            &tz,
+            "2026-11-16",
+            None,
+            &ctx("other:model", &opts().budgets),
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                est3.digests_cached,
+                est3.digests_pending,
+                est3.digests_other_model
+            ),
+            (0, 2, 1)
+        );
 
         // Cancelling before completion leaves already-cached digests intact and errors cleanly.
         let cancel = Arc::new(AtomicBool::new(true));
@@ -1100,6 +1127,44 @@ mod tests {
                 language: &v.language,
             })
             .unwrap();
+    }
+
+    #[test]
+    fn update_with_another_model_records_each_sections_writer() {
+        let (mut store, tz) = fixture();
+        add_web(&mut store, &tz, "web1", "2026-11-16T04:00:00Z");
+        run(&mut store, &sectioned_mock(), &tz, &opts());
+        let app = store.find_project("app").unwrap().unwrap().id;
+        add_session(
+            &mut store,
+            &tz,
+            "late",
+            app,
+            &[turn("u1", "2026-11-16T05:00:00Z", "one more fix")],
+        );
+        let r = run(
+            &mut store,
+            &sectioned_mock().named("other"),
+            &tz,
+            &update_opts(),
+        );
+        assert_eq!(r.projects_written, vec!["app"]);
+
+        let current = store
+            .report_versions(KIND_DAILY, "2026-11-16", None)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(current.engine.as_deref(), Some("other"));
+        let m = Manifest::parse(current.input_manifest.as_deref().unwrap()).unwrap();
+        let engine_of = |name: &str| {
+            m.projects
+                .values()
+                .find(|e| e.name == name)
+                .and_then(|e| e.engine.clone())
+        };
+        assert_eq!(engine_of("app").as_deref(), Some("other"));
+        assert_eq!(engine_of("web").as_deref(), Some("mock"));
     }
 
     #[test]

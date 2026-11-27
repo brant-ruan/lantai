@@ -215,7 +215,9 @@ pub fn delete_provider(
     modify(&state, |cfg| cfg.remove_provider(&name))
 }
 
-#[tauri::command]
+/// Async: checking a Codex alias's effort runs `codex debug models`, which must neither freeze
+/// the window nor run while the configuration is locked.
+#[tauri::command(async)]
 pub fn save_model(
     state: tauri::State<'_, AppState>,
     original_alias: Option<String>,
@@ -228,8 +230,12 @@ pub fn save_model(
         reasoning_effort: model.reasoning_effort,
         temperature: model.temperature,
     };
+    let listed = state
+        .load_config()
+        .map_err(cmd_err)?
+        .effort_reference(&model);
     modify(&state, |cfg| {
-        cfg.upsert_model(original_alias.as_deref(), &alias, model)
+        cfg.upsert_model(original_alias.as_deref(), &alias, model, &listed)
     })
 }
 

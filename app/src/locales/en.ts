@@ -836,14 +836,17 @@ export const en = {
     removed: (n: number) => `${n} removed`,
     estimateMonthly: (weeks: number, slices: number) =>
       `${weeks} weekly ${weeks === 1 ? "report" : "reports"} \u00b7 ${slices} slices`,
-    estimate: (slices: number, cached: number, pending: number) =>
-      `${slices} slices (${cached} cached, ${pending} pending)`,
+    estimate: (slices: number, cached: number, pending: number, otherModel: number) =>
+      `${slices} slices (${cached} cached, ${pending} pending${otherModel > 0 ? `, ${otherModel} of them digested by another model before` : ""})`,
     chars: (n: string) => ` \u00b7 ~${n} chars`,
     unreportedWeeks: (month: string) => `Active weeks in ${month} without a weekly report yet:`,
     openWeek: (w: string) => `Open weekly workbench for ${w}`,
     writingStage: "Writing report (stage 2)",
     digestingStage: "Digesting sessions (stage 1)",
     versionModel: (name: string) => `written by ${name}`,
+    versionModels: (writers: [model: string, projects: string[]][]) =>
+      `written by ${writers.map(([m, p]) => `${m} (${p.join(", ")})`).join("; ")}`,
+    unrecordedModel: "an earlier, unrecorded model",
     statusTitle: (status: string, estimate: string) =>
       `Report status: ${status}${estimate ? ` \u00b7 ${estimate}` : ""}`,
     mode: "Reading or editing",
@@ -994,6 +997,11 @@ export const en = {
     effort: "Reasoning effort (optional)",
     serverDefault: "server default",
     defaultIs: (effort: string) => `default: ${effort}`,
+    effortUnlisted: (effort: string) => `${effort} (not listed)`,
+    effortRefused: (effort: string, listed: string) =>
+      `This model does not list reasoning effort \u201c${effort}\u201d (it takes ${listed}), so it cannot be saved. Pick one of those or leave it at the default.`,
+    effortMayFail: (effort: string, listed: string) =>
+      `This model lists reasoning effort ${listed}, not \u201c${effort}\u201d. The provider may refuse it; Test shows whether it does.`,
     temperature: "Temperature (optional)",
     temperatureTip:
       "From 0 to 2; lower is steadier. Left blank, nothing is sent and the service's default applies. Many reasoning models accept only their default. Agent CLIs have no temperature setting.",

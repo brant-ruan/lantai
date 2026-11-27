@@ -334,27 +334,32 @@ pub fn new_manifest(
     base: Option<&Base>,
     write_keys: &BTreeSet<String>,
     markdown: &str,
+    engine_name: &str,
 ) -> Manifest {
     let mut out = Manifest {
         prompt_hash,
         projects: Default::default(),
     };
     for (key, entry) in current {
-        let section_hash = match (base, write_keys.contains(&key)) {
+        let (section_hash, engine) = match (base, write_keys.contains(&key)) {
             (Some(b), false) => b
                 .manifest
                 .projects
                 .get(&key)
-                .map(|e| e.section_hash.clone())
+                .map(|e| (e.section_hash.clone(), e.engine.clone()))
                 .unwrap_or_default(),
-            _ => structure::extract_project_section(markdown, &entry.name)
-                .map(|body| manifest::section_hash(&body))
-                .unwrap_or_default(),
+            _ => (
+                structure::extract_project_section(markdown, &entry.name)
+                    .map(|body| manifest::section_hash(&body))
+                    .unwrap_or_default(),
+                Some(engine_name.to_string()),
+            ),
         };
         out.projects.insert(
             key,
             ProjectEntry {
                 section_hash,
+                engine,
                 ..entry
             },
         );

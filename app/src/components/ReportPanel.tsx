@@ -11,7 +11,7 @@ import type {
   PromptOption,
   ReportVersion,
 } from "../types";
-import { modelName } from "../modelName";
+import { writerName } from "../modelName";
 import { CopyButton } from "./CopyButton";
 import { MoreMenu } from "./DropdownMenu";
 import { EyeIcon, PencilIcon } from "./icons";
@@ -124,8 +124,17 @@ export function ReportPanel({
       t.origins[v.origin] ?? v.origin,
       v.promptName ?? "-",
       v.language,
-      ...(v.engine ? [modelName(v.engine, v.models)] : []),
+      ...(v.writers.length > 0
+        ? [v.writers.map((w) => writerName(w, t.unrecordedModel)).join(" + ")]
+        : []),
     ].join(" · ");
+  // Who wrote the version, for tooltips: per section when an Update mixed models.
+  const versionWriters = (v: ReportVersion) => {
+    const named = v.writers.map((w) => [writerName(w, t.unrecordedModel), w.projects] as const);
+    if (named.length === 0) return [];
+    if (named.length === 1) return [t.versionModel(named[0][0])];
+    return [t.versionModels(named.map(([m, p]) => [m, [...p]]))];
+  };
   const [mode, setMode] = useState<"preview" | "edit" | "compare">("preview");
   const [editorText, setEditorText] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
@@ -245,7 +254,12 @@ export function ReportPanel({
   const estimateSummary = estimate
     ? (kind === "monthly"
         ? t.estimateMonthly(estimate.digestsCached, estimate.slicesUsed)
-        : t.estimate(estimate.slicesUsed, estimate.digestsCached, estimate.digestsPending)) +
+        : t.estimate(
+            estimate.slicesUsed,
+            estimate.digestsCached,
+            estimate.digestsPending,
+            estimate.digestsOtherModel,
+          )) +
       (estimate.estimatedChars > 0 ? t.chars(estimate.estimatedChars.toLocaleString(lang)) : "")
     : "";
   const canGenerate =
@@ -280,9 +294,7 @@ export function ReportPanel({
       : t.digestingStage
     : [
         t.statusTitle(currentStatus, estimateSummary),
-        ...(currentVersion?.engine
-          ? [t.versionModel(modelName(currentVersion.engine, currentVersion.models))]
-          : []),
+        ...(currentVersion ? versionWriters(currentVersion) : []),
       ].join(" · ");
 
   // Draft / final and the version, or the generation stage; shown beside the report title.

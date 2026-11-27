@@ -76,6 +76,12 @@ function listedEfforts(models: ModelInfo[] | null, id: string): string[] {
   return [...new Set(models.flatMap((m) => m.efforts))];
 }
 
+/** The efforts a model lists for itself, or null when it is not listed with any. */
+function ownEfforts(models: ModelInfo[] | null, id: string): string[] | null {
+  const chosen = models?.find((m) => m.id === id);
+  return chosen && chosen.efforts.length > 0 ? chosen.efforts : null;
+}
+
 /** Highest temperature accepted (`aj_report::config::MAX_TEMPERATURE`). */
 const MAX_TEMPERATURE = 2;
 
@@ -460,6 +466,16 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
     : modelFormIsCli
       ? tm.cliDefault
       : tm.serverDefault;
+  // Agent CLIs pick from their list (the back end refuses anything else); with no list (not
+  // fetched, or the CLI could not give one) the effort is typed. APIs always type it, warned when
+  // the chosen model lists efforts that do not include it.
+  const effortChoices = modelFormIsCli && listed.length > 0 ? listed : null;
+  const typedEffort = modelForm?.effort.trim() ?? "";
+  const effortReference = modelFormIsCli
+    ? listed
+    : (ownEfforts(modelFetch.models, modelForm?.model.trim() ?? "") ?? []);
+  const effortOff =
+    typedEffort !== "" && effortReference.length > 0 && !effortReference.includes(typedEffort);
 
   return (
     <>
@@ -599,20 +615,37 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
               </label>
               <label className="form-field">
                 <span>{tm.effort}</span>
-                <input
-                  type="text"
-                  list="aj-efforts"
-                  placeholder={effortPlaceholder}
-                  value={modelForm.effort}
-                  onChange={(e) =>
-                    setModelForm({ ...modelForm, effort: e.target.value })
-                  }
-                />
-                <datalist id="aj-efforts">
-                  {effortHints.map((x) => (
-                    <option key={x} value={x} />
-                  ))}
-                </datalist>
+                {effortChoices ? (
+                  <select
+                    value={typedEffort}
+                    onChange={(e) => setModelForm({ ...modelForm, effort: e.target.value })}
+                  >
+                    <option value="">{effortPlaceholder}</option>
+                    {effortChoices.map((x) => (
+                      <option key={x} value={x}>
+                        {x}
+                      </option>
+                    ))}
+                    {effortOff && (
+                      <option value={typedEffort}>{tm.effortUnlisted(typedEffort)}</option>
+                    )}
+                  </select>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      list="aj-efforts"
+                      placeholder={effortPlaceholder}
+                      value={modelForm.effort}
+                      onChange={(e) => setModelForm({ ...modelForm, effort: e.target.value })}
+                    />
+                    <datalist id="aj-efforts">
+                      {effortHints.map((x) => (
+                        <option key={x} value={x} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
               </label>
               {modelFormProvider?.kind === "openai_compat" && (
                 <label className="form-field">
@@ -636,6 +669,14 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
               )}
             </div>
 
+            {effortOff && (
+              <div className="warning-list">
+                {(modelFormIsCli ? tm.effortRefused : tm.effortMayFail)(
+                  typedEffort,
+                  effortReference.join(", "),
+                )}
+              </div>
+            )}
             {modelFetch.error && (
               <div className="warning-list">{modelFetch.error}</div>
             )}

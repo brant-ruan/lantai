@@ -14,6 +14,7 @@ use aj_report::export::{
     default_daily_export_path, default_monthly_export_path, default_project_export_path,
     default_weekly_export_path, export_markdown, AnchorExportMode, ExportOutcome,
 };
+use aj_report::manifest::{section_writers, Manifest};
 use aj_report::material::MaterialContext;
 use aj_report::period::{Month, Week};
 use aj_report::progress::Progress;
@@ -45,6 +46,8 @@ pub struct DailyEstimateDto {
     pub slices_ignored: usize,
     pub digests_cached: usize,
     pub digests_pending: usize,
+    /// Of the pending digests, those another model wrote before (a model switch redoes them).
+    pub digests_other_model: usize,
     pub estimated_chars: usize,
     /// Set when the current version was generated from different material than there is now.
     pub staleness: Option<StalenessDto>,
@@ -76,8 +79,8 @@ pub struct ReportVersionDto {
     pub origin: String,
     pub markdown: String,
     pub engine: Option<String>,
-    /// The model aliases that produce `engine` now (empty when none does).
-    pub models: Vec<String>,
+    /// Who wrote the sections: one entry, or several after an Update with another model.
+    pub writers: Vec<SectionWriterDto>,
     pub prompt_name: Option<String>,
     pub prompt_snapshot: Option<String>,
     /// The language the version is written in.
@@ -87,6 +90,17 @@ pub struct ReportVersionDto {
     /// Lines the user wrote rather than the model; only on the current version, and only
     /// when its manifest allows telling them apart.
     pub edits: Option<ReportEditsDto>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SectionWriterDto {
+    /// `None` for sections kept from a version that did not record its model.
+    pub engine: Option<String>,
+    /// The model aliases that produce `engine` now (empty when none does).
+    pub aliases: Vec<String>,
+    /// Current names of the projects whose sections it wrote; empty when not recorded.
+    pub projects: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -251,6 +265,7 @@ fn daily_estimate_dto(est: DailyEstimate) -> DailyEstimateDto {
         slices_ignored: est.slices_ignored,
         digests_cached: est.digests_cached,
         digests_pending: est.digests_pending,
+        digests_other_model: est.digests_other_model,
         estimated_chars: est.estimated_chars,
         staleness: est.staleness.map(staleness_dto),
         unreported_weeks: Vec::new(),
@@ -307,26 +322,27 @@ fn build_report_state(
             } else {
                 None
             };
-            ReportVersionDto {
+            Ok(ReportVersionDto {
                 id: v.id,
                 number: v.number,
                 origin: v.origin.clone(),
                 markdown,
                 engine: v.engine.clone(),
-                models: v
-                    .engine
-                    .as_deref()
-                    .map(|e| cfg.aliases_for_engine(e))
-                    .unwrap_or_default(),
+                writers: version_writers(
+                    store,
+                    cfg,
+                    v.input_manifest.as_deref(),
+                    v.engine.as_deref(),
+                )?,
                 prompt_name: v.prompt_name.clone(),
                 prompt_snapshot: v.prompt_snapshot.clone(),
                 language: v.language.clone(),
                 created_at: v.created_at.clone(),
                 is_current: v.is_current,
                 edits,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
 
     Ok(DailyReportStateDto {
         estimate,
@@ -334,6 +350,40 @@ fn build_report_state(
         versions,
         default_export_path: default_export_path.to_string_lossy().into_owned(),
     })
+}
+
+/// The models that wrote a version's sections, named as the settings name them now.
+fn version_writers(
+    store: &Store,
+    cfg: &AppConfig,
+    manifest_json: Option<&str>,
+    engine: Option<&str>,
+) -> Result<Vec<SectionWriterDto>, String> {
+    let manifest = manifest_json.and_then(Manifest::parse);
+    section_writers(manifest.as_ref(), engine)
+        .into_iter()
+        .map(|w| {
+            let projects = match &manifest {
+                Some(m) => w
+                    .keys
+                    .iter()
+                    .filter_map(|k| m.projects.get(k).map(|e| (k, e)))
+                    .map(|(k, e)| report_io::project_name(store, k, e))
+                    .collect::<anyhow::Result<Vec<_>>>()
+                    .map_err(cmd_err)?,
+                None => Vec::new(),
+            };
+            Ok(SectionWriterDto {
+                aliases: w
+                    .engine
+                    .as_deref()
+                    .map(|e| cfg.aliases_for_engine(e))
+                    .unwrap_or_default(),
+                engine: w.engine,
+                projects,
+            })
+        })
+        .collect()
 }
 
 /// Identifies one report generation job: the period (a date or a week key), plus the
@@ -482,6 +532,7 @@ pub fn get_weekly_report_state(
             slices_ignored: est.slices_ignored,
             digests_cached: est.digests_cached,
             digests_pending: est.digests_pending,
+            digests_other_model: est.digests_other_model,
             // Weekly material size depends on per-day condensing; not estimated.
             estimated_chars: 0,
             staleness: est.staleness.map(staleness_dto),
@@ -532,6 +583,7 @@ pub fn get_monthly_report_state(
             slices_ignored: est.slices_ignored,
             digests_cached: est.weeks_reported,
             digests_pending: est.unreported_weeks.len(),
+            digests_other_model: 0,
             estimated_chars: est.estimated_chars,
             staleness: est.staleness.map(staleness_dto),
             unreported_weeks: est.unreported_weeks,

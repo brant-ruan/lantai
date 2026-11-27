@@ -285,6 +285,8 @@ export interface DailyEstimate {
   slicesIgnored: number;
   digestsCached: number;
   digestsPending: number;
+  /** Of the pending digests, those another model wrote before (a model switch redoes them). */
+  digestsOtherModel: number;
   estimatedChars: number;
   /** Set when the current version was generated from different material than there is now. */
   staleness: Staleness | null;
@@ -305,14 +307,23 @@ export interface ReportMeta {
   currentVersionId: number | null;
 }
 
+export interface SectionWriter {
+  /** `null` for sections kept from a version that did not record its model. */
+  engine: string | null;
+  /** The model aliases that produce `engine` now (empty when none does). */
+  aliases: string[];
+  /** Current names of the projects whose sections it wrote; empty when not recorded. */
+  projects: string[];
+}
+
 export interface ReportVersion {
   id: number;
   number: number;
   origin: "generated" | "user_edit";
   markdown: string;
   engine: string | null;
-  /** The model aliases that produce `engine` now (empty when none does). */
-  models: string[];
+  /** Who wrote the sections: one entry, or several after an Update with another model. */
+  writers: SectionWriter[];
   promptName: string | null;
   promptSnapshot: string | null;
   /** The language the version is written in. */

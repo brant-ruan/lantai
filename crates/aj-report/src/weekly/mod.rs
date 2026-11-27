@@ -60,6 +60,8 @@ pub struct WeeklyEstimate {
     pub slices_ignored: usize,
     pub digests_cached: usize,
     pub digests_pending: usize,
+    /// Of the pending ones, those with a digest from another model.
+    pub digests_other_model: usize,
     /// `None` when the report is up to date or has no version to compare with.
     pub staleness: Option<Staleness>,
 }
@@ -130,6 +132,7 @@ where
         slices_ignored: c.ignored,
         digests_cached: cached,
         digests_pending: c.materials.len() - cached,
+        digests_other_model: material::pending_from_other_engine(&c.materials, ctx.engine_name),
         staleness: report_io::staleness(store, KIND_WEEKLY, &week.key(), project, &c.materials)?,
     })
 }
@@ -532,6 +535,7 @@ where
         base.as_ref(),
         &write_keys,
         &result.markdown,
+        &engine_name,
     );
     if is_cancelled(opts.cancel.as_ref()) {
         bail!("report generation was cancelled");

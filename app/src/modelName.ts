@@ -5,3 +5,11 @@
 export function modelName(engine: string, aliases: readonly string[]): string {
   return aliases.length > 0 ? aliases.join(" / ") : engine;
 }
+
+/** A report section writer's name; `unrecorded` names sections whose model was not kept. */
+export function writerName(
+  w: { engine: string | null; aliases: readonly string[] },
+  unrecorded: string,
+): string {
+  return w.engine ? modelName(w.engine, w.aliases) : unrecorded;
+}

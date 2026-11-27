@@ -89,6 +89,7 @@ pub(crate) mod testing {
     pub struct MockEngine {
         pub prompts: Mutex<Vec<String>>,
         pub respond: Responder,
+        name: String,
     }
 
     impl MockEngine {
@@ -96,7 +97,14 @@ pub(crate) mod testing {
             Self {
                 prompts: Mutex::new(vec![]),
                 respond: Box::new(respond),
+                name: "mock".into(),
             }
+        }
+
+        /// The same engine under another name, as if another model answered.
+        pub fn named(mut self, name: &str) -> Self {
+            self.name = name.into();
+            self
         }
 
         pub fn call_count(&self) -> usize {
@@ -106,7 +114,7 @@ pub(crate) mod testing {
 
     impl Engine for MockEngine {
         fn name(&self) -> String {
-            "mock".into()
+            self.name.clone()
         }
 
         fn send(&self, prompt: &str) -> Result<String> {

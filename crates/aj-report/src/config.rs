@@ -61,9 +61,7 @@ use serde::{Deserialize, Serialize};
 use aj_ir::AgentId;
 
 use crate::diagnose;
-use crate::engine::{
-    ClaudeCliEngine, CodexCliEngine, Engine, ModelInfo, NoModelEngine, CLAUDE_EFFORTS,
-};
+use crate::engine::{ClaudeCliEngine, CodexCliEngine, Engine, ModelInfo, NoModelEngine};
 use crate::keystore::KeyStore;
 use crate::lang::{self, Language};
 use crate::local_tools::{ToolDescriptor, ToolEngine};
@@ -312,7 +310,13 @@ impl ProviderConfig {
 
 /// Check a model alias's options against its provider: an API needs a model ID, a temperature
 /// is 0-2 and only for APIs, and Claude Code takes only the efforts it knows.
-fn validate_model(model: &ModelConfig, provider: &ProviderConfig) -> Result<()> {
+/// Check an alias against its provider. `listed` are the models whose reasoning efforts the
+/// alias's effort is checked against ([`AppConfig::effort_reference`]); empty skips the check.
+fn validate_model(
+    model: &ModelConfig,
+    provider: &ProviderConfig,
+    listed: &[ModelInfo],
+) -> Result<()> {
     if let Some(t) = model.temperature {
         if !matches!(provider, ProviderConfig::OpenaiCompat { .. }) {
             bail!(
@@ -324,25 +328,57 @@ fn validate_model(model: &ModelConfig, provider: &ProviderConfig) -> Result<()> 
             bail!("temperature must be between 0 and {MAX_TEMPERATURE}, got {t}");
         }
     }
-    match provider {
-        ProviderConfig::OpenaiCompat { .. } if model.model.is_none() => {
-            bail!("choose a model id for provider {}", model.provider)
-        }
-        ProviderConfig::ClaudeCli { .. } => {
-            if let Some(e) = model
-                .reasoning_effort
-                .as_deref()
-                .filter(|e| !CLAUDE_EFFORTS.contains(e))
-            {
-                bail!(
-                    "Claude Code's effort is one of {}, got {e}",
-                    CLAUDE_EFFORTS.join(", ")
-                );
-            }
-        }
-        _ => {}
+    if matches!(provider, ProviderConfig::OpenaiCompat { .. }) && model.model.is_none() {
+        bail!("choose a model id for provider {}", model.provider)
+    }
+    if let Some(effort) = model.reasoning_effort.as_deref() {
+        check_listed_effort(listed, model.model.as_deref(), effort)?;
     }
     Ok(())
+}
+
+/// Whether `effort` is one the model takes according to `listed`: the model's own efforts when
+/// it is listed with some, else any listed model's (the provider's default model, or one the
+/// list does not show). Nothing to compare against passes.
+fn check_listed_effort(listed: &[ModelInfo], model: Option<&str>, effort: &str) -> Result<()> {
+    let own = model
+        .and_then(|id| listed.iter().find(|m| m.id == id))
+        .filter(|m| !m.efforts.is_empty());
+    let accepted: Vec<&str> = match own {
+        Some(m) => m.efforts.iter().map(String::as_str).collect(),
+        None => {
+            let mut all: Vec<&str> = Vec::new();
+            for e in listed.iter().flat_map(|m| &m.efforts) {
+                if !all.contains(&e.as_str()) {
+                    all.push(e);
+                }
+            }
+            all
+        }
+    };
+    if accepted.is_empty() || accepted.contains(&effort) {
+        return Ok(());
+    }
+    match own {
+        Some(m) => bail!(
+            "model {} takes reasoning effort {}, not {effort}",
+            m.id,
+            accepted.join(", ")
+        ),
+        None => bail!(
+            "reasoning effort is one of {}, not {effort}",
+            accepted.join(", ")
+        ),
+    }
+}
+
+/// The models an alias's effort is checked against without running anything: Claude Code's
+/// fixed list; nothing for other providers.
+fn known_models(provider: &ProviderConfig) -> Vec<ModelInfo> {
+    match provider {
+        ProviderConfig::ClaudeCli { .. } => ClaudeCliEngine::models(),
+        _ => Vec::new(),
+    }
 }
 
 /// Provider names are Keychain accounts and `security` script tokens, so they
@@ -438,7 +474,7 @@ impl AppConfig {
                     path.display()
                 );
             };
-            validate_model(m, provider)
+            validate_model(m, provider, &known_models(provider))
                 .with_context(|| format!("invalid model {alias} in {}", path.display()))?;
         }
         Ok(cfg)
@@ -671,12 +707,34 @@ impl AppConfig {
 
     // ---- model aliases ----
 
+    /// The models to check `model`'s reasoning effort against before saving it: for Codex, the
+    /// models `codex debug models` lists (this runs Codex, so call it outside any lock); Claude
+    /// Code's fixed list; nothing for APIs, whose lists rarely give efforts. Empty when there is
+    /// no effort to check or Codex cannot list its models, so the effort is saved as typed.
+    pub fn effort_reference(&self, model: &ModelConfig) -> Vec<ModelInfo> {
+        let Some(provider) = self.providers.get(model.provider.trim()) else {
+            return Vec::new();
+        };
+        if clean(model.reasoning_effort.clone()).is_none() {
+            return Vec::new();
+        }
+        match provider {
+            ProviderConfig::CodexCli { .. } => {
+                CodexCliEngine::models(provider.cli_command().unwrap_or("codex"))
+                    .unwrap_or_default()
+            }
+            _ => known_models(provider),
+        }
+    }
+
     /// Add or replace a model alias; `original` is its previous alias (`None` creates one).
+    /// `listed` comes from [`Self::effort_reference`] and checks the alias's reasoning effort.
     pub fn upsert_model(
         &mut self,
         original: Option<&str>,
         alias: &str,
         model: ModelConfig,
+        listed: &[ModelInfo],
     ) -> Result<()> {
         let alias = alias.trim();
         validate_model_alias(alias)?;
@@ -689,7 +747,7 @@ impl AppConfig {
         let Some(provider) = self.providers.get(&model.provider) else {
             bail!("no provider named {}", model.provider);
         };
-        validate_model(&model, provider)?;
+        validate_model(&model, provider, listed)?;
         if original != Some(alias) && self.models.contains_key(alias) {
             bail!("a model named {alias} already exists");
         }
@@ -793,6 +851,7 @@ impl AppConfig {
                 reasoning_effort: None,
                 temperature: None,
             },
+            &[],
         )?;
         Ok(alias)
     }
@@ -893,6 +952,34 @@ fn free_name(base: &str, taken: impl Fn(&str) -> bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn effort_is_checked_against_listed_models() {
+        let info = |id: &str, efforts: &[&str]| ModelInfo {
+            id: id.into(),
+            efforts: efforts.iter().map(|e| e.to_string()).collect(),
+            default_effort: None,
+        };
+        let listed = [
+            info("old", &["low", "medium", "high"]),
+            info("new", &["low", "high", "ultra"]),
+            info("bare", &[]),
+        ];
+        // A listed model takes only its own efforts.
+        assert!(check_listed_effort(&listed, Some("new"), "ultra").is_ok());
+        let err = check_listed_effort(&listed, Some("old"), "ultra").unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "model old takes reasoning effort low, medium, high, not ultra"
+        );
+        // The default model, an unlisted model or one listed without efforts: any listed effort.
+        assert!(check_listed_effort(&listed, None, "medium").is_ok());
+        assert!(check_listed_effort(&listed, Some("custom"), "ultra").is_ok());
+        assert!(check_listed_effort(&listed, Some("bare"), "high").is_ok());
+        assert!(check_listed_effort(&listed, None, "bogus").is_err());
+        // Nothing to compare against: taken as typed.
+        assert!(check_listed_effort(&[], Some("old"), "bogus").is_ok());
+    }
     use std::path::PathBuf;
 
     fn temp_dir(tag: &str) -> PathBuf {
@@ -1039,14 +1126,15 @@ batch_concurrency = 4
 
         cfg.upsert_provider(None, "p", openai(), KeyUpdate::Set("sk-secret".into()))
             .unwrap();
-        cfg.upsert_model(None, "fast", model("p", "m1")).unwrap();
+        cfg.upsert_model(None, "fast", model("p", "m1"), &[])
+            .unwrap();
         cfg.set_default_model("fast").unwrap();
         // Renaming a provider carries its key and repoints models; renaming a model keeps the default.
         cfg.upsert_provider(Some("p"), "q", openai(), KeyUpdate::Keep)
             .unwrap();
-        cfg.upsert_model(None, "Fast Model (v2)", model("q", "m3"))
+        cfg.upsert_model(None, "Fast Model (v2)", model("q", "m3"), &[])
             .unwrap();
-        cfg.upsert_model(Some("fast"), "fast2", model("q", "m2"))
+        cfg.upsert_model(Some("fast"), "fast2", model("q", "m2"), &[])
             .unwrap();
         cfg.save(&path).unwrap();
 
@@ -1059,7 +1147,7 @@ batch_concurrency = 4
         assert_eq!(cfg.models["fast2"].provider, "q");
         assert_eq!(cfg.models["Fast Model (v2)"].model.as_deref(), Some("m3"));
         assert!(cfg
-            .upsert_model(None, "two\nlines", model("q", "m"))
+            .upsert_model(None, "two\nlines", model("q", "m"), &[])
             .is_err());
         assert!(cfg.has_key("q"));
         assert!(matches!(cfg.api_key("q"), ApiKey::Value(k) if k == "sk-secret"));
@@ -1067,7 +1155,9 @@ batch_concurrency = 4
 
         // A provider in use cannot be deleted; models need a known provider and a model id.
         assert!(cfg.remove_provider("q").is_err());
-        assert!(cfg.upsert_model(None, "x", model("ghost", "m")).is_err());
+        assert!(cfg
+            .upsert_model(None, "x", model("ghost", "m"), &[])
+            .is_err());
         assert!(cfg
             .upsert_model(
                 None,
@@ -1075,7 +1165,8 @@ batch_concurrency = 4
                 ModelConfig {
                     model: None,
                     ..model("q", "m")
-                }
+                },
+                &[]
             )
             .is_err());
         assert!(cfg
@@ -1099,8 +1190,8 @@ batch_concurrency = 4
         let mut cfg = AppConfig::load(&dir.join("none.toml"), file_store(&dir)).unwrap();
         cfg.upsert_provider(None, "p", openai(), KeyUpdate::Keep)
             .unwrap();
-        cfg.upsert_model(None, "b", model("p", "m")).unwrap();
-        cfg.upsert_model(None, "a", model("p", "m")).unwrap();
+        cfg.upsert_model(None, "b", model("p", "m"), &[]).unwrap();
+        cfg.upsert_model(None, "a", model("p", "m"), &[]).unwrap();
         assert_eq!(cfg.default_model_name(), Some("b"));
         cfg.remove_model("b").unwrap();
         assert_eq!(cfg.default_model_name(), Some("a"));
@@ -1113,9 +1204,10 @@ batch_concurrency = 4
         let mut cfg = AppConfig::load(&dir.join("none.toml"), file_store(&dir)).unwrap();
         cfg.upsert_provider(None, "p", openai(), KeyUpdate::Keep)
             .unwrap();
-        cfg.upsert_model(None, "b", model("p", "m")).unwrap();
-        cfg.upsert_model(None, "a", model("p", "m")).unwrap();
-        cfg.upsert_model(None, "other", model("p", "n")).unwrap();
+        cfg.upsert_model(None, "b", model("p", "m"), &[]).unwrap();
+        cfg.upsert_model(None, "a", model("p", "m"), &[]).unwrap();
+        cfg.upsert_model(None, "other", model("p", "n"), &[])
+            .unwrap();
         let name = cfg
             .build_engine(Some("a"), Path::new("/tmp/runner"))
             .unwrap()
@@ -1213,21 +1305,32 @@ batch_concurrency = 4
         };
 
         // A temperature is 0-2 and only for APIs.
-        cfg.upsert_model(None, "warm", with("api", None, Some(0.3)))
+        cfg.upsert_model(None, "warm", with("api", None, Some(0.3)), &[])
             .unwrap();
         assert!(cfg
-            .upsert_model(None, "x", with("api", None, Some(2.5)))
+            .upsert_model(None, "x", with("api", None, Some(2.5)), &[])
             .is_err());
         assert!(cfg
-            .upsert_model(None, "x", with("codex", None, Some(0.3)))
+            .upsert_model(None, "x", with("codex", None, Some(0.3)), &[])
             .is_err());
-        // Claude Code takes only its own effort values; Codex passes any through.
-        cfg.upsert_model(None, "deep", with("claude", Some("max"), None))
-            .unwrap();
+        // Claude Code takes only its own effort values; Codex is checked against its list when
+        // it can give one (`check_listed_effort`), here it cannot.
+        cfg.upsert_model(
+            None,
+            "deep",
+            with("claude", Some("max"), None),
+            &ClaudeCliEngine::models(),
+        )
+        .unwrap();
         assert!(cfg
-            .upsert_model(None, "x", with("claude", Some("ultra"), None))
+            .upsert_model(
+                None,
+                "x",
+                with("claude", Some("ultra"), None),
+                &ClaudeCliEngine::models()
+            )
             .is_err());
-        cfg.upsert_model(None, "cx", with("codex", Some("xhigh"), None))
+        cfg.upsert_model(None, "cx", with("codex", Some("xhigh"), None), &[])
             .unwrap();
         cfg.save(&path).unwrap();
 
