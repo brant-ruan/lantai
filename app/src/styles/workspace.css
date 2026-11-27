@@ -1,0 +1,218 @@
+/* The main area: panels, panel headers and the top toolbar. */
+
+/* Main Area: flush docked panels without empty troughs */
+.main-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.main-area > .banner {
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.single-pane {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-panel);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: var(--pad-panel);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.single-pane > .panel {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  gap: 0;
+  background: var(--bg);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.single-pane > .panel > .panel-header {
+  padding: 8px 20px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Top toolbar controls: one 28px height, one radius, grouped by role. */
+.topbar-right {
+  --ctl-h: 28px;
+  --ctl-radius: 7px;
+}
+.topbar-right .btn-sm {
+  height: var(--ctl-h);
+  padding: 0 12px;
+  border-radius: var(--ctl-radius);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease, filter 0.12s ease;
+}
+.topbar-right .btn-secondary { background: var(--surface); }
+.topbar-right .btn-secondary:hover:not(:disabled) { background: var(--surface-alt); }
+.topbar-right .btn-primary:hover:not(:disabled),
+.topbar-right .btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
+.topbar-right .btn-ghost.btn-xs {
+  height: var(--ctl-h);
+  padding: 0 8px;
+  border-radius: var(--ctl-radius);
+  font-size: 12px;
+}
+.topbar-right .report-copy-btn {
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  border-radius: var(--ctl-radius);
+}
+.topbar-right .pill-group {
+  height: var(--ctl-h);
+  padding: 2px;
+  border-radius: var(--ctl-radius);
+  align-items: stretch;
+}
+.topbar-right .pill-group .pill {
+  padding: 0 12px;
+  font-size: 12px;
+}
+.topbar-right .status-badge {
+  height: var(--ctl-h);
+  padding: 0 10px;
+  border-radius: var(--ctl-radius);
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.topbar-right button.status-badge:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.ctl-group {
+  display: inline-flex;
+  align-items: stretch;
+  height: var(--ctl-h, 28px);
+  border: 1px solid var(--border);
+  border-radius: var(--ctl-radius, 7px);
+  background: var(--surface);
+  overflow: hidden;
+}
+.ctl-group select.ctl-select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  padding: 0 26px 0 11px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%238c959f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 9px center;
+}
+.ctl-group select.ctl-select:hover { background-color: var(--surface-alt); }
+.ctl-group select.ctl-select:focus { outline: none; }
+.ctl-group select.ctl-select:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-border); }
+.dropdown > .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.dropdown-chevron { opacity: 0.65; }
+
+.workspace-tabs {
+  padding: 3px;
+}
+
+.workspace-tabs .pill {
+  padding: 4px 10px;
+}
+
+.workspace-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: calc(var(--pad-panel) * 1.4) calc(var(--pad-panel) * 1.8) 36px;
+}
+
+.workspace-container {
+  max-width: 920px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-panel);
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.dropdown-meta {
+  padding: 4px 6px 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.muted-line {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}

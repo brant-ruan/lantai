@@ -3,8 +3,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { readItem, storeItem } from "./storage";
+import { readItem, storeItem } from "../storage";
 import type { SearchLayer, SearchParams, SearchResults } from "../types";
+import { errorText } from "../errors";
 
 const DEBOUNCE_MS = 250;
 const LAYER_KEY = "aj-search-layer";
@@ -53,7 +54,7 @@ export function useSearchView() {
         setError(null);
       }
     } catch (e) {
-      if (req === reqRef.current) setError(String(e));
+      if (req === reqRef.current) setError(errorText(e));
     } finally {
       if (req === reqRef.current) setLoading(false);
     }

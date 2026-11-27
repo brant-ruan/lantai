@@ -1,17 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n";
-
-function readNumber(key: string, fallback: number, min: number, max: number): number {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    const n = Number(raw);
-    if (Number.isFinite(n)) return Math.min(max, Math.max(min, n));
-  } catch {
-    // Ignore storage access errors.
-  }
-  return fallback;
-}
+import { readNumber, storeItem } from "../storage";
 
 /**
  * Persistable numeric layout dimension with clamped range.
@@ -25,11 +14,7 @@ export function useResizableValue(
   const [value, setValue] = useState(() => readNumber(storageKey, initial, min, max));
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(storageKey, String(value));
-    } catch {
-      // Ignore storage access errors.
-    }
+    storeItem(storageKey, String(value));
   }, [storageKey, value]);
 
   const startDrag = useCallback(

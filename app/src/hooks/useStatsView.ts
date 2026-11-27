@@ -3,6 +3,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { api } from "../api";
+import { errorText } from "../errors";
 import type { LantaiStats, StatsRangeKey, StatsReport } from "../types";
 
 export function useStatsView() {
@@ -26,7 +27,7 @@ export function useStatsView() {
         setLantaiError(null);
       }
     } catch (e) {
-      if (req === lantaiReqRef.current) setLantaiError(String(e));
+      if (req === lantaiReqRef.current) setLantaiError(errorText(e));
     } finally {
       if (req === lantaiReqRef.current) setLantaiLoading(false);
     }

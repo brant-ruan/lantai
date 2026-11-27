@@ -108,7 +108,7 @@ decided by the owner.**
 | `crates/aj-backup` | backup archives, and upgrading the database after one (file names passed in by callers) |
 | `crates/aj-update` | update check: parsing and comparison (pure) plus one request |
 | `crates/aj-cli` | `aj`: `main.rs` only defines and dispatches; commands live in `cmd_*` modules by area |
-| `app/` | Tauri v2 + React. `App.tsx` only composes views and cross-view actions; view state lives in `app/src/hooks/` (`usePeriodView` for day, week and month, `useProjectView`, `useStatsView`, …); the sidebar is composed from `components/sidebar/` |
+| `app/` | Tauri v2 + React. `App.tsx` only composes views and cross-view actions; view state lives in `app/src/hooks/` (`useAppMetadata` for the lists every view shares, `usePeriodView` for day, week and month, `useProjectView`, `useStatsView`, …). `components/` keeps shared widgets at the top and groups the rest by area (`sidebar/`, `slices/`, `report/`, `project/`, `human/`, `stats/`, `settings/` with `settings/models/`). `storage.ts` wraps `localStorage`, `errors.ts` turns errors into text; styles are per area in `styles/`, imported in cascade order by `styles/index.css` |
 | `fixtures/` | redacted session samples and expected output |
 | `website/` | the project site (static); see [docs/WEBSITE.md](docs/WEBSITE.md) |
 
@@ -161,7 +161,7 @@ What the code does not make obvious. The design behind each is in the spec.
   compare rectangles and cannot use `elementFromPoint`.
 - **Human journal, spacing:** note rows and report rows both use 2 px margin plus 4 px padding. On
   the project page the report body is in a flex container where margins do not collapse, so
-  `styles.css` zeroes them under `.rollup-entry`; measure both places when changing spacing.
+  `styles/human.css` zeroes them under `.rollup-entry`; measure both places when changing spacing.
 - **Human journal, marquee and undo** (`hooks/useNoteMarquee.tsx`) is the one exception to
   "shortcuts live only on the menu": it handles Backspace / Delete / Esc / Cmd+Z only when focus is
   not in an input; undo inside an editor belongs to the editor. Delete commands return the deleted

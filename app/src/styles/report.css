@@ -1,0 +1,629 @@
+/* Reports: the canvas and document, outline, status badge, edit marks, project roll-ups,
+   the editor and comparison, the export dialog and the copy button. */
+
+/* Report Panel & Editorial Outliner */
+.report-canvas {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.report-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: calc(var(--pad-panel) * 1.4) calc(var(--pad-panel) * 1.8) 40px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Drag handles just outside the left and right edges of the report document. The document's
+   width on screen is the reading width, held below the room inside the content padding. */
+.report-width-handle {
+  --doc-w: min(var(--report-width, 860px), 100% - var(--pad-panel) * 3.6);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 5;
+  cursor: col-resize;
+}
+.report-width-handle.is-left { left: calc(50% - var(--doc-w) / 2 - 12px); }
+.report-width-handle.is-right { left: calc(50% + var(--doc-w) / 2 + 2px); }
+.report-width-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s ease 0.15s;
+}
+.report-width-handle:hover::after,
+.report-canvas.is-resizing .report-width-handle::after { opacity: 0.5; transition-delay: 0s; }
+.report-width-readout {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.report-document {
+  max-width: var(--report-width, 860px);
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap-panel) + 4px);
+}
+
+.report-document.full-h {
+  flex: 1;
+  min-height: 100%;
+}
+
+.empty-card {
+  margin-top: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.empty-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.report-state-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.report-state-dot.draft { background: var(--dot-draft); }
+.report-state-dot.final { background: var(--dot-final); }
+.report-state-dot.stage1 {
+  color: var(--dot-draft);
+  background: currentColor;
+  animation: dot-breathe 3.2s ease-in-out infinite;
+}
+.report-state-dot.stage2 {
+  color: var(--accent);
+  background: currentColor;
+  animation: dot-breathe 3.2s ease-in-out infinite;
+}
+
+@keyframes dot-breathe {
+  0%, 100% {
+    opacity: 0.28;
+    transform: scale(0.84);
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 7px currentColor;
+  }
+}
+
+.warning-list {
+  color: var(--warn);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Outliner & Markdown */
+
+.markdown-body {
+  line-height: 1.6;
+}
+
+.report-doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 4px;
+  margin-bottom: 12px;
+}
+.report-doc-actions {
+  flex-shrink: 0;
+}
+.outline-all-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Report status badge: doubles as the draft/final toggle. */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+}
+button.status-badge { cursor: pointer; }
+button.status-badge:hover { background: var(--surface-alt); }
+.status-badge .report-state-dot { width: 7px; height: 7px; }
+.status-badge.working { color: var(--muted); }
+
+.report-doc-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.report-sections {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap-panel) + 4px);
+}
+
+.report-section-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: calc(var(--pad-panel) + 2px) calc(var(--pad-panel) + 6px);
+}
+
+.report-section-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-section-action,
+.rollup-entry-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.report-section-action { margin-left: auto; }
+
+/* Program-written statistics line under a weekly project heading. */
+.report-quote {
+  margin: -2px 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.report-section-head h2 {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.section-accent-bar {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.section-accent-bar.is-unassigned {
+  background: var(--muted);
+  opacity: 0.65;
+}
+
+.report-section-body > *:first-child {
+  margin-top: 0;
+}
+
+.report-section-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.report-loose-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.markdown-body h3 {
+  margin: 12px 0 6px;
+  font-size: 13.5px;
+}
+.markdown-body p { margin: 6px 0; }
+
+.md-list {
+  list-style: none;
+  margin: 2px 0;
+  padding: 0;
+}
+.md-sublist {
+  margin: 2px 0 6px 17px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text);
+}
+.outline-item {
+  margin: 2px 0;
+}
+.outline-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.md-outline-root > .outline-item > .outline-row:hover {
+  background: var(--surface-alt);
+}
+.outline-toggle {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.12s;
+}
+.outline-toggle svg {
+  transition: transform 0.16s ease;
+}
+.outline-toggle.expanded svg {
+  transform: rotate(90deg);
+}
+.outline-toggle:hover {
+  background: var(--accent-soft);
+}
+.outline-leaf-bullet {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.outline-leaf-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.72;
+}
+.md-sublist .outline-leaf-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  opacity: 0.6;
+}
+.outline-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.55;
+}
+.md-outline-root > .outline-item > .outline-row > .outline-text {
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--text);
+}
+.outline-text strong {
+  font-weight: 400;
+}
+.md-sublist .outline-text {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+  line-height: 1.6;
+}
+.outline-text.clickable {
+  cursor: pointer;
+}
+
+/* Lines the user added or rewrote in a generated report. */
+.outline-row.is-human,
+.markdown-body p.is-human {
+  box-shadow: inset 2px 0 0 var(--human);
+  background: var(--human-soft);
+}
+.md-outline-root > .outline-item > .outline-row.is-human:hover {
+  background: var(--human-soft);
+}
+.human-inside-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--human);
+  vertical-align: middle;
+}
+.human-removed-badge {
+  font-size: 11px;
+  color: var(--human);
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--human-soft);
+  cursor: default;
+  white-space: nowrap;
+}
+.human-edits-toggle[aria-pressed="true"] {
+  color: var(--human);
+}
+
+/* The roll-up header sits in the document's flex column, which adds its gap below the
+   header's own 12px margin; cancel the gap so the title-to-first-card distance matches
+   the daily report, where that margin is the only space. */
+.rollup-doc-head {
+  margin-bottom: calc(-1 * (var(--gap-panel) + 4px));
+}
+
+.rollup-unreported {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+}
+.rollup-date-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.date-chip {
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.date-chip:hover {
+  background: var(--accent-soft-hover);
+}
+.rollup-entry {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: calc(var(--pad-panel) + 2px) calc(var(--pad-panel) + 6px);
+  background: var(--surface);
+}
+.rollup-entry-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.anchor-chip {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 0 5px;
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+.anchor-chip:hover { background: var(--accent-soft-hover); }
+
+.editor-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.report-editor {
+  flex: 1;
+  min-height: 260px;
+  resize: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px;
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.compare-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+.compare-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.compare-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+.compare-col {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  min-height: 0;
+}
+.compare-col-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--surface-alt);
+  font-size: 11px;
+}
+.compare-text {
+  margin: 0;
+  padding: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  flex: 1;
+}
+.compare-text.full-height {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* Export Modal */
+.export-modal {
+  width: min(560px, 92vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.export-modal-body {
+  padding: 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.export-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.export-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.export-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-folder-display {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-folder-display code {
+  background: transparent;
+  padding: 0;
+}
+
+.export-modal-foot {
+  padding: 12px 24px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  background: var(--surface-alt);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* Hover-revealed "copy as Markdown" icon button in a report panel */
+.report-doc-action-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.report-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.report-panel:hover .report-copy-btn,
+.turn-card:hover .report-copy-btn,
+.report-copy-btn:focus-visible,
+.report-copy-btn.copied,
+.report-copy-btn.failed {
+  opacity: 1;
+}
+.report-copy-btn:hover { color: var(--text); background: var(--surface-alt); }
+.report-copy-btn.copied { color: var(--ok); }
+.report-copy-btn.failed { color: var(--err); }

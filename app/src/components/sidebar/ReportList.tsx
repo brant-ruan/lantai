@@ -6,7 +6,7 @@ import type { ReportBatch } from "../../hooks/useReportBatch";
 import { useT } from "../../i18n";
 import type { GenStage, PeriodMode } from "../../types";
 import { DropdownMenu } from "../DropdownMenu";
-import { ReportBatchBar } from "../ReportBatchBar";
+import { ReportBatchBar } from "./ReportBatchBar";
 import { StatusDot } from "./StatusDot";
 
 interface ReportListRow {

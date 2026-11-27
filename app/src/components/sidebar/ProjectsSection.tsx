@@ -2,10 +2,10 @@
 // collapsed group; each part keeps its own drag order.
 
 import { useMemo, useState } from "react";
-import { readItem, storeItem } from "../../hooks/storage";
+import { readItem, storeItem } from "../../storage";
 import { useT } from "../../i18n";
 import type { ProjectSummary } from "../../types";
-import { ProjectList } from "../ProjectList";
+import { ProjectList } from "./ProjectList";
 
 const ARCHIVED_OPEN_KEY = "lantai.sidebar.archivedOpen";
 

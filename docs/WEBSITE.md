@@ -78,7 +78,7 @@ The hero demo imitates the desktop app's layout with made-up data and can be cli
 
 - Files: `assets/demo-data.js` (data), `assets/demo-data.zh.js` (loaded by the Chinese page to
   replace text), `assets/demo.js` (derivation and rendering), `assets/demo.css` (layout sizes copied
-  from `app/src/styles.css`, colors from the GitHub themes).
+  from `app/src/styles/`, colors from the GitHub themes).
 - Four fictional projects and five agents; a `schedule` says what happened each day, and sessions,
   turns, daily and weekly reports are derived from it; the monthly report is hand-written. Human
   notes are in `notes`. The calendar is fixed to one month.

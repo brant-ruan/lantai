@@ -1,0 +1,383 @@
+/* Shared controls: dropdown menus, inputs, buttons, pills, badges, banners, the modal backdrop,
+   empty states, engine errors, info tips, hover labels, label swaps and the confirmation dialog. */
+
+/* Dropdown Menu */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pop);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 30;
+  /* Menus never take the alignment of where they open (the empty report card centres). */
+  text-align: left;
+}
+
+.dropdown-menu.align-right { right: 0; }
+.dropdown-menu.align-left { left: 0; }
+.dropdown-menu.dir-up { top: auto; bottom: calc(100% + 4px); }
+
+.dropdown-item {
+  text-align: left;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.dropdown-item:hover { background: var(--surface-alt); }
+.dropdown-item:disabled { opacity: 0.45; cursor: not-allowed; }
+.dropdown-item:disabled:hover { background: transparent; }
+.dropdown-item.danger { color: var(--err); }
+.dropdown-item-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dropdown-check-mark {
+  width: 12px;
+  text-align: center;
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.dropdown-section-label {
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dropdown-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.dropdown-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dropdown-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Buttons & Inputs */
+input[type="text"],
+input[type="password"],
+select,
+textarea {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 11px;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { padding: 4px 9px; font-size: 12px; }
+.btn-xs { padding: 2px 7px; font-size: 11px; }
+.btn-primary { background: var(--accent); color: var(--cal-strong-text); }
+.btn-secondary { background: var(--surface-alt); border-color: var(--border); color: var(--text); }
+.btn-danger { background: var(--err); color: #ffffff; }
+.btn-ghost { background: transparent; color: var(--muted); }
+.btn-ghost:hover { background: var(--surface-alt); color: var(--text); }
+.btn-ghost-danger { background: transparent; color: var(--err); }
+.btn-ghost-danger:hover { background: var(--err-soft); }
+.btn-icon {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 1px 6px;
+  cursor: pointer;
+}
+.btn-icon-sq {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.pill-group {
+  display: inline-flex;
+  background: var(--surface-alt);
+  padding: 2px;
+  border-radius: 6px;
+  gap: 2px;
+}
+.pill {
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--muted);
+}
+/* The active pill keeps the same font weight, so switching never changes widths. */
+.pill.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.pill:disabled { cursor: default; opacity: 0.45; }
+
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--surface-alt);
+  color: var(--muted);
+}
+.badge-ok { background: var(--ok-soft); color: var(--ok); }
+.badge-warn { background: var(--warn-soft); color: var(--warn); }
+.badge-err { background: var(--err-soft); color: var(--err); }
+.badge-human { background: var(--human-soft); color: var(--human); }
+
+.banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.banner-info { background: var(--accent-soft); color: var(--info-text); }
+.banner-warn { background: var(--warn-soft); color: var(--warn); }
+.banner-err { background: var(--err-soft); color: var(--err); }
+.banner-actions { display: flex; gap: 6px; }
+
+.inline-card {
+  display: flex;
+  gap: 8px;
+  padding: 9px;
+  background: var(--surface-alt);
+  border-radius: 7px;
+  flex-wrap: wrap;
+}
+.inline-card.stack,
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Backdrop shared by the settings, export and confirmation dialogs. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 24px;
+}
+
+.empty-state {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Engine errors: a known case with its next step, raw text under Details. */
+.failure-raw { overflow-wrap: anywhere; white-space: pre-wrap; }
+.failure-note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+.failure-note summary { cursor: default; opacity: 0.8; width: fit-content; }
+.failure-note pre {
+  margin: 4px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* Info tooltip: circled "?" with a floating explanation */
+.info-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--surface);
+  cursor: help;
+  vertical-align: middle;
+  flex-shrink: 0;
+  user-select: none;
+}
+.info-tip:hover,
+.info-tip:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
+}
+.info-tip-bubble {
+  position: fixed;
+  z-index: 1000;
+  max-width: 280px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  pointer-events: none;
+}
+.info-tip-bubble code { font-size: 11px; }
+
+/* Heading with an inline info tip */
+.title-with-tip {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Hover labels for icon buttons: set data-tip on the button (and data-tip-align="end" near the
+   right edge). Shown below the button after a short delay. */
+[data-tip] { position: relative; }
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: tip-in 0.12s ease 0.3s both;
+}
+[data-tip][data-tip-align="end"]:hover::after,
+[data-tip][data-tip-align="end"]:focus-visible::after { left: auto; right: 0; transform: none; }
+[data-tip][data-tip-align="start"]:hover::after,
+[data-tip][data-tip-align="start"]:focus-visible::after { left: 0; transform: none; }
+.dropdown:has(.dropdown-menu) > [data-tip]::after { display: none; }
+@keyframes tip-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Icon segments in a pill group: every segment the same size whatever it shows. */
+.pill-group.icon-pills .pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 6px;
+}
+.source-filter .pill.active .glyph-agent { color: var(--accent); }
+.source-filter .pill.active .glyph-human { color: var(--human); }
+.toolbar-icon-btn,
+.topbar-right .btn-sm.toolbar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+.toolbar-icon-btn svg,
+.pill-group.icon-pills .pill svg { flex-shrink: 0; }
+/* All labels share one grid cell, so a button keeps the width of its longest label. */
+.label-swap { display: inline-grid; }
+.label-swap > span { grid-area: 1 / 1; text-align: center; }
+.label-swap > span[aria-hidden="true"] { visibility: hidden; }
+.suggestions-more { margin: 6px 0 2px 8px; }
+
+/* Confirmation dialog (deleting a project), above Settings when opened from there. */
+.confirm-backdrop {
+  z-index: 60;
+}
+.confirm-modal {
+  width: min(460px, 92vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+.confirm-modal-body {
+  padding: 20px 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.confirm-modal-body h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+.confirm-modal-body p {
+  margin: 0;
+}
+.confirm-lead {
+  color: var(--err);
+  font-weight: 550;
+}
+.confirm-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

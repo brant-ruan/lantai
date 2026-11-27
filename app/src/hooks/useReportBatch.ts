@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { useT } from "../i18n";
 import type { BatchItem, BatchPlan, GenStage, PeriodMode, ReportBatchMode, ReportBatchRun } from "../types";
+import { errorText } from "../errors";
 
 interface BatchInputs {
   reportType: PeriodMode;
@@ -19,9 +20,6 @@ interface BatchInputs {
   refreshCurrent: () => Promise<void>;
 }
 
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 function shouldRun(item: BatchItem, mode: ReportBatchMode) {
   switch (mode) {

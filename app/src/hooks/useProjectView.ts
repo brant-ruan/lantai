@@ -3,14 +3,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
-import { readStoredChoice } from "../themes";
 import type {
   ProjectRangeKey,
   ProjectRollup,
   ProjectWorkbench,
   RollupGranularity,
 } from "../types";
-import { storeItem } from "./storage";
+import { readChoice, storeItem } from "../storage";
 
 export type ProjectPane = "rollup" | "timeline";
 /** A management card open above the project's sessions. */
@@ -43,7 +42,7 @@ export function useProjectView(today: string) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [range, setRange] = useState<ProjectRangeKey>("30d");
   const [granularity, setGranularity] = useState<RollupGranularity>(() =>
-    readStoredChoice("aj-rollup-granularity", ["daily", "weekly", "monthly"], "daily"),
+    readChoice("aj-rollup-granularity", ["daily", "weekly", "monthly"], "daily"),
   );
   useEffect(() => storeItem("aj-rollup-granularity", granularity), [granularity]);
   const [workbench, setWorkbench] = useState<ProjectWorkbench | null>(null);

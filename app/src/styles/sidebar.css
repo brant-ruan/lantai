@@ -1,0 +1,562 @@
+/* The sidebar: view switch, calendar, day and report lists, report batches, projects (rename,
+   reordering, context menu, archived group) and the footer. */
+
+/* Sidebar */
+.sidebar {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-panel);
+  padding: var(--pad-panel);
+  background: var(--bg);
+  overflow-y: auto;
+  overscroll-behavior-x: contain;
+}
+
+.calendar-swipe-area {
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
+}
+
+.sidebar-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.sidebar-section {
+  border-top: 1px solid var(--border);
+  padding-top: var(--gap-panel);
+}
+
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.section-header-row .section-label {
+  margin-bottom: 0;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.calendar-month {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.calendar-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.calendar-today-btn {
+  font-size: 11px;
+  padding: 1px 7px;
+  color: var(--muted);
+}
+
+.calendar-today-btn:not(:disabled):hover {
+  color: var(--text);
+  background: var(--surface-alt);
+}
+
+.calendar-today-btn:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+/* View switch at the top of the sidebar: day, week and month, then projects. */
+.view-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.view-switch .pill-group { flex: 3; }
+.view-switch .pill-group.view-switch-projects { flex: 1; }
+.view-switch .pill {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0;
+}
+.view-switch .pill.active { color: var(--accent); }
+.view-switch-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.calendar-today-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.calendar-month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.calendar-month-cell {
+  height: 28px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.calendar-day {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  height: 24px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+}
+
+.calendar-day.level-0 { background: var(--surface-alt); color: var(--muted); }
+.calendar-day.level-1 { background: var(--cal-1); }
+.calendar-day.level-2 { background: var(--cal-2); }
+.calendar-day.level-3 { background: var(--cal-3); color: var(--cal-strong-text); }
+.calendar-day.level-4 { background: var(--cal-4); color: var(--cal-strong-text); }
+.calendar-day.outside-month { opacity: 0.44; }
+.calendar-day.outside-month.level-0 { background: transparent; }
+.calendar-day.today { font-weight: 650; padding-bottom: 2px; }
+.calendar-day.today.level-0 { color: var(--text); }
+.calendar-day.today::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 2px;
+  border-radius: 999px;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: currentColor;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.calendar-day.selected {
+  box-shadow: inset 0 0 0 1px var(--bg), 0 0 0 1.5px var(--cal-select);
+  outline: none;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.calendar-week-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.calendar-week-row {
+  display: grid;
+  grid-template-columns: 30px repeat(7, 1fr);
+  gap: 3px;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.calendar-week-row.header { cursor: default; padding-top: 0; padding-bottom: 0; }
+.calendar-week-row:not(.header):hover { background: var(--surface-alt); }
+.calendar-week-row.selected { box-shadow: inset 0 0 0 1.5px var(--cal-select); }
+.calendar-week-row .calendar-day {
+  height: 20px;
+  font-size: 10px;
+  opacity: 0.5;
+  cursor: inherit;
+}
+.calendar-week-row .calendar-day.outside-month { opacity: 0.22; }
+
+.calendar-week-num {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 650;
+  color: var(--text);
+}
+.calendar-week-num.level-0 { background: var(--surface-alt); color: var(--muted); }
+.calendar-week-num.level-1 { background: var(--cal-1); }
+.calendar-week-num.level-2 { background: var(--cal-2); }
+.calendar-week-num.level-3 { background: var(--cal-3); color: var(--cal-strong-text); }
+.calendar-week-num.level-4 { background: var(--cal-4); color: var(--cal-strong-text); }
+.calendar-week-row.current .calendar-week-num { padding-bottom: 2px; }
+.calendar-week-row.current .calendar-week-num.level-0 { color: var(--text); }
+.calendar-week-row.current .calendar-week-num::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 2px;
+  border-radius: 999px;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: currentColor;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.calendar-week-row.selected .calendar-week-num { font-weight: 800; }
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.calendar-day .status-dot {
+  width: 5px;
+  height: 5px;
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+}
+.status-dot.draft { background: var(--dot-draft); }
+.status-dot.final { background: var(--dot-final); }
+.status-dot.none { background: transparent; box-shadow: inset 0 0 0 1px var(--border); }
+.status-dot.generating {
+  background: currentColor;
+  animation: dot-blink 1.1s ease-in-out infinite;
+}
+.status-dot.generating.stage1 { color: var(--dot-draft); }
+.status-dot.generating.stage2 { color: var(--accent); }
+@keyframes dot-blink {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+
+.days-list-wrap {
+  flex: 1;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.days-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.day-row-wrap {
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+  gap: 2px;
+}
+.day-row-wrap:hover { background: var(--surface-alt); }
+.day-row-wrap.active { background: var(--accent-soft); }
+.day-row-wrap.active .day-row { color: var(--accent); font-weight: 600; }
+.day-row-wrap.day-row-selected {
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+.day-row-wrap.day-row-selected:not(.active) {
+  background: var(--accent-soft);
+}
+.day-row-wrap .day-row {
+  flex: 1;
+  min-width: 0;
+}
+.day-row-wrap .day-row:hover { background: transparent; }
+.day-row-check {
+  margin: 0 0 0 6px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.day-row-wrap.day-row-ignored .day-row {
+  color: var(--muted);
+  opacity: 0.72;
+}
+
+.day-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 7px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text);
+}
+.day-row:hover { background: var(--surface-alt); }
+.day-row-date {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.day-row-weekday {
+  margin-left: 6px;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 11px;
+}
+.day-row-stats {
+  min-width: 46px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.day-row-notes {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--human);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.day-row-notes::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--human);
+}
+.day-row-meta .badge {
+  padding: 0 5px;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.day-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.days-menu-btn {
+  padding: 1px 6px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.report-batch-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+.report-batch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+.report-batch-close {
+  padding: 0 5px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+.report-batch-split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  flex: 1;
+  min-width: 0;
+}
+.report-batch-split .dropdown {
+  position: static;
+  display: flex;
+}
+.report-batch-split .dropdown-menu {
+  min-width: 176px;
+}
+.report-batch-main-btn {
+  flex: 1;
+  min-width: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding: 2px 5px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.report-batch-caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid var(--border);
+  padding: 2px 5px;
+  font-size: 11px;
+}
+.report-batch-status-btns {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.report-batch-status-btns .btn-xs {
+  padding: 2px 5px;
+}
+.report-batch-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+.report-batch-confirm-actions {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.report-batch-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.report-batch-coverage {
+  max-height: 76px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.report-batch-coverage li + li { margin-top: 4px; }
+.report-batch-summary {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--border);
+  padding-top: var(--gap-panel);
+}
+
+.footer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Right-click context menu (fixed at the cursor) */
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 140px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-shadow: var(--shadow-pop);
+}
+
+/* Inline project rename in the sidebar */
+.project-rename { padding: 2px 0; }
+.project-rename input { width: 100%; font-size: 12px; }
+.project-rename-error {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--err);
+}
+
+/* Project list drag-to-reorder */
+.day-row.dragging { opacity: 0.45; }
+.day-row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.day-row.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* Sidebar footer Stats toggle */
+.footer-actions .btn-icon-sq.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* Archived projects: a collapsed group at the end of the sidebar list. */
+.archived-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.archived-group-toggle:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.archived-group-toggle .chevron {
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.archived-group-toggle[aria-expanded="true"] .chevron {
+  transform: rotate(90deg);
+}
+.archived-list {
+  opacity: 0.75;
+}
+.archived-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}

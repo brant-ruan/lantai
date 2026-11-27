@@ -3,7 +3,7 @@
 // is shown.
 import { useState } from "react";
 import { useT } from "../../i18n";
-import { readItem, storeItem } from "../../hooks/storage";
+import { readItem, storeItem } from "../../storage";
 import type { SourceFilter } from "../../types";
 import { AgentIcon, HumanIcon, TogetherIcon } from "../icons";
 

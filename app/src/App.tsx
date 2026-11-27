@@ -1,21 +1,22 @@
 // Application shell: wires the sidebar, the active workspace view, the slice drawer and the
 // settings modal together. View state and refresh logic live in hooks under `hooks/`.
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
-import { ProjectRollupPanel } from "./components/ProjectRollupPanel";
-import { ProjectTimeline } from "./components/ProjectTimeline";
-import { ReportPanel } from "./components/ReportPanel";
+import { ProjectRollupPanel } from "./components/project/ProjectRollupPanel";
+import { ProjectTimeline } from "./components/project/ProjectTimeline";
+import { ReportPanel } from "./components/report/ReportPanel";
 import { useResizableValue } from "./components/Resizable";
 import { resetReportWidth } from "./hooks/useReportWidth";
-import { SettingsModal } from "./components/SettingsModal";
+import { SettingsModal } from "./components/settings/SettingsModal";
 import { Sidebar } from "./components/Sidebar";
 import { weekMonth } from "./components/sidebar/dates";
-import { SliceDrawer } from "./components/SliceDrawer";
-import { SliceList } from "./components/SliceList";
-import { StatsView } from "./components/StatsView";
+import { SliceDrawer } from "./components/slices/SliceDrawer";
+import { SliceList } from "./components/slices/SliceList";
+import { StatsView } from "./components/stats/StatsView";
 import { SearchView } from "./components/SearchView";
 import { WorkspaceTabs } from "./components/WorkspaceTabs";
+import { useAppMetadata, type MetadataSelections } from "./hooks/useAppMetadata";
 import { useAppearance } from "./hooks/useAppearance";
 import { useDateRollover } from "./hooks/useDateRollover";
 import { useReportBatch } from "./hooks/useReportBatch";
@@ -27,25 +28,19 @@ import { useProjectView } from "./hooks/useProjectView";
 import { useReportJobs } from "./hooks/useReportJobs";
 import { useSliceDrawer } from "./hooks/useSliceDrawer";
 import { useStatsView } from "./hooks/useStatsView";
-import { readItem, storeItem } from "./hooks/storage";
 import { useUpdateCheck } from "./hooks/useUpdateCheck";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { ErrorBanner } from "./components/FailureNote";
 import type {
-  DayOverview,
   DayWorkbench,
-  Diagnostics,
-  MonthOverview,
   PeriodMode,
-  ProjectsOverview,
-  PromptItem,
   SettingsTab,
   SliceCard,
   ViewMode,
-  WeekOverview,
 } from "./types";
 import { useLanguage } from "./i18n";
-import { DeleteProjectDialog, type DeleteTarget } from "./components/DeleteProjectDialog";
+import { DeleteProjectDialog, type DeleteTarget } from "./components/project/DeleteProjectDialog";
+import { errorText } from "./errors";
 
 /** Fixed sidebar width: wide enough for the full calendar, not resizable. */
 const SIDEBAR_WIDTH = 240;
@@ -63,9 +58,6 @@ const MONTHLY_LOADERS: PeriodLoaders = {
   reportState: api.getMonthlyReportState,
 };
 
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 function activeSliceCount(slices: { ignored: boolean }[] | undefined): number {
   return slices ? slices.filter((s) => !s.ignored).length : 0;
@@ -116,21 +108,6 @@ export function App() {
   const appearance = useAppearance();
   const drawerSize = useResizableValue("aj-drawer-width", 540, 360, 820);
 
-  const [days, setDays] = useState<DayOverview[]>([]);
-  const [today, setToday] = useState("");
-  const [showIgnoredDays, setShowIgnoredDays] = useState(
-    () => readItem("aj-show-ignored-days") === "1",
-  );
-  const showIgnoredDaysRef = useRef(showIgnoredDays);
-  showIgnoredDaysRef.current = showIgnoredDays;
-  const [weeks, setWeeks] = useState<WeekOverview[]>([]);
-  const [currentWeek, setCurrentWeek] = useState("");
-  const [months, setMonths] = useState<MonthOverview[]>([]);
-  const [currentMonth, setCurrentMonth] = useState("");
-  const [prompts, setPrompts] = useState<PromptItem[]>([]);
-  const [projectsOverview, setProjectsOverview] = useState<ProjectsOverview | null>(null);
-  const [health, setHealth] = useState<Diagnostics | null>(null);
-
   // The engine is shared by all report views; refreshes read it through the ref so that
   // changing it does not recreate their callbacks (which would fetch twice).
   const [selectedEngine, setSelectedEngine] = useState("");
@@ -155,6 +132,28 @@ export function App() {
     }
   }, []);
 
+  const selections = useRef<MetadataSelections | null>(null);
+  const {
+    days,
+    today,
+    showIgnoredDays,
+    setShowIgnoredDays,
+    weeks,
+    currentWeek,
+    months,
+    currentMonth,
+    prompts,
+    projectsOverview,
+    health,
+    revision: batchRevision,
+    refresh: refreshMetadata,
+    refreshDays,
+    refreshHealth,
+    dayPeriods,
+    weekPeriods,
+    monthPeriods,
+  } = useAppMetadata(selections, setErrorMsg);
+
   const jobs = useReportJobs();
   const daily = usePeriodView(DAILY_LOADERS, selectedEngineRef, setSelectedEngine);
   const weekly = usePeriodView(WEEKLY_LOADERS, selectedEngineRef, setSelectedEngine);
@@ -163,55 +162,12 @@ export function App() {
   const stats = useStatsView();
   const drawer = useSliceDrawer(runAction);
 
-  // Hook setters are stable, so this callback is too.
-  const { setSelected: setSelectedDate } = daily;
-  const { setSelected: setSelectedWeek } = weekly;
-  const { setSelected: setSelectedMonth } = monthly;
-  const { setSelectedId: setSelectedProjectId } = project;
-  const [batchRevision, setBatchRevision] = useState(0);
-  const metadataRequest = useRef(0);
-  const refreshMetadata = useCallback(async () => {
-    const request = ++metadataRequest.current;
-    const [daysRes, weeksRes, monthsRes, p, po, h] = await Promise.all([
-      api.listDays(showIgnoredDaysRef.current),
-      api.listWeeks(),
-      api.listMonths(),
-      api.listPrompts(undefined, true),
-      api.listProjectsAndRules(),
-      api.diagnostics(),
-    ]);
-    if (request !== metadataRequest.current) return;
-    setBatchRevision((revision) => revision + 1);
-    setToday(daysRes.today);
-    setDays(daysRes.days);
-    setSelectedDate((prev) => {
-      if (prev) return prev;
-      const hasToday = daysRes.days.some((d) => d.localDate === daysRes.today);
-      return hasToday ? daysRes.today : (daysRes.days[0]?.localDate ?? daysRes.today);
-    });
-    setCurrentWeek(weeksRes.currentWeek);
-    setWeeks(weeksRes.weeks);
-    setSelectedWeek((prev) => prev || (weeksRes.weeks[0]?.week ?? weeksRes.currentWeek));
-    setCurrentMonth(monthsRes.currentMonth);
-    setMonths(monthsRes.months);
-    setSelectedMonth((prev) => prev || (monthsRes.months[0]?.month ?? monthsRes.currentMonth));
-    setPrompts(p);
-    setProjectsOverview(po);
-    setHealth(h);
-    setSelectedProjectId((prev) =>
-      prev !== null && po.projects.some((proj) => proj.id === prev)
-        ? prev
-        : (po.projects[0]?.id ?? null),
-    );
-  }, [setSelectedDate, setSelectedWeek, setSelectedMonth, setSelectedProjectId]);
-
-  /** Reload only the day list (note counts changed). */
-  const refreshDays = useCallback(() => {
-    api
-      .listDays(showIgnoredDaysRef.current)
-      .then((r) => setDays(r.days))
-      .catch((e) => setErrorMsg(String(e)));
-  }, []);
+  selections.current = {
+    setSelectedDate: daily.setSelected,
+    setSelectedWeek: weekly.setSelected,
+    setSelectedMonth: monthly.setSelected,
+    setSelectedProjectId: project.setSelectedId,
+  };
 
   const refreshAfterReport = async (type: PeriodMode, key: string) => {
     await refreshMetadata();
@@ -260,15 +216,6 @@ export function App() {
     stats.includeIgnored,
   ]);
 
-  const dayPeriods = useMemo(() => days.map((d) => ({
-    key: d.localDate, slices: d.slices, reportStatus: d.reportStatus,
-  })), [days]);
-  const weekPeriods = useMemo(() => weeks.map((w) => ({
-    key: w.week, slices: w.slices, reportStatus: w.reportStatus,
-  })), [weeks]);
-  const monthPeriods = useMemo(() => months.map((m) => ({
-    key: m.month, slices: m.slices, reportStatus: m.reportStatus,
-  })), [months]);
   const batchInputs = {
     revision: batchRevision,
     engine: selectedEngine,
@@ -374,10 +321,7 @@ export function App() {
   // ---- Actions ----------------------------------------------------------
 
   const handleToggleShowIgnoredDays = () => {
-    const next = !showIgnoredDaysRef.current;
-    showIgnoredDaysRef.current = next;
-    setShowIgnoredDays(next);
-    storeItem("aj-show-ignored-days", next ? "1" : "0");
+    setShowIgnoredDays(!showIgnoredDays);
     void runAction(refreshMetadata);
   };
 
@@ -876,11 +820,7 @@ export function App() {
         onDeleteRule={(id) => mutate(() => api.deleteRule(id))}
         onSetRuleAuto={(id, autoApply) => mutate(() => api.setRuleAuto(id, autoApply))}
         health={health}
-        onRefreshHealth={() =>
-          runAction(async () => {
-            setHealth(await api.diagnostics());
-          })
-        }
+        onRefreshHealth={() => runAction(refreshHealth)}
         onModelsChanged={() =>
           runAction(async () => {
             // Re-adopt the (possibly new) default; a renamed or deleted alias must not linger.

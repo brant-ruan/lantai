@@ -48,17 +48,3 @@ export const THEMES: ThemeMeta[] = [
 
 /** Spacing densities, in menu order; their names are in the locale files. */
 export const DENSITY_OPTIONS: DensityId[] = ["compact", "default", "comfortable"];
-
-export function readStoredChoice<T extends string>(
-  key: string,
-  valid: readonly T[],
-  fallback: T,
-): T {
-  try {
-    const raw = window.localStorage.getItem(key) as T | null;
-    if (raw && valid.includes(raw)) return raw;
-  } catch {
-    // Ignore storage access errors.
-  }
-  return fallback;
-}

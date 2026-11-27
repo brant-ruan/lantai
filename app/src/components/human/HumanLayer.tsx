@@ -4,7 +4,7 @@
 // projects only people wrote about, and an "only human" view that shows nothing else. New notes
 // start from one menu in the report header; nothing is shown in the body until there is a note.
 import React, { useEffect, useMemo } from "react";
-import { readItem, storeItem } from "../../hooks/storage";
+import { readItem, storeItem } from "../../storage";
 import { NoteAddIcon } from "../icons";
 import { useT } from "../../i18n";
 import type { HumanJournal } from "../../hooks/useHumanJournal";

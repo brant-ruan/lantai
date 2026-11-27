@@ -1,7 +1,7 @@
 // Which note blocks are collapsed. Blocks start expanded; the ones a viewer folds are kept in
 // local storage on this machine (a reading convenience, not part of the journal).
 import { useCallback, useSyncExternalStore } from "react";
-import { readItem, storeItem } from "./storage";
+import { readItem, storeItem } from "../storage";
 
 const KEY = "lantai.human.collapsed";
 

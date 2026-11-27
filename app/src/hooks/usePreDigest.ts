@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { useT } from "../i18n";
 import type { AgentSource, DayWorkbench } from "../types";
+import { errorText } from "../errors";
 
 export interface PreDigestInputs {
   /** Whether pre-digesting may run now (daily view shown, no modal, nothing else busy). */
@@ -65,7 +66,7 @@ export function usePreDigest({ allowed, workbench, engine, refreshDailyView, run
           await refreshDailyView(workbench.date);
           setIdleStatus(t.cached(pending.id));
         } catch (err) {
-          setIdleStatus(t.paused(err instanceof Error ? err.message : String(err)));
+          setIdleStatus(t.paused(errorText(err)));
           setPaused(true);
         } finally {
           setDigesting(false);

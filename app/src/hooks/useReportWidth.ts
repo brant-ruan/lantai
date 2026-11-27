@@ -1,7 +1,7 @@
 // Preferred reading width of report documents, persisted per viewer and shared by every
 // report view and the settings page (a tiny external store, so all of them stay in sync).
 import { useSyncExternalStore } from "react";
-import { readItem, storeItem } from "./storage";
+import { readItem, storeItem } from "../storage";
 
 const STORAGE_KEY = "aj-report-width";
 export const REPORT_WIDTH_DEFAULT = 860;

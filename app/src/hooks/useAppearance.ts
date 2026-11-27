@@ -1,13 +1,13 @@
 // Theme and density preferences: persisted per viewer and applied to the document root.
 
 import { useEffect, useState } from "react";
-import { THEMES, readStoredChoice } from "../themes";
+import { THEMES } from "../themes";
 import type { DensityId, ThemeId } from "../types";
-import { storeItem } from "./storage";
+import { readChoice, storeItem } from "../storage";
 
 /** The theme this viewer chose (the default until they choose one). */
 export function storedTheme(): ThemeId {
-  return readStoredChoice(
+  return readChoice(
     "aj-theme",
     THEMES.map((t) => t.id),
     "github-light",
@@ -17,7 +17,7 @@ export function storedTheme(): ThemeId {
 export function useAppearance() {
   const [theme, setTheme] = useState<ThemeId>(storedTheme);
   const [density, setDensity] = useState<DensityId>(() =>
-    readStoredChoice("aj-density", ["compact", "default", "comfortable"], "default"),
+    readChoice("aj-density", ["compact", "default", "comfortable"], "default"),
   );
 
   useEffect(() => {

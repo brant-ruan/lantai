@@ -4,6 +4,7 @@
 // keyboard focus next, which blocks are selected, and the deletions that can be undone.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
+import { errorText } from "../errors";
 import { isNoteCollapsed } from "./useNoteCollapse";
 import type {
   HumanDrop,
@@ -79,7 +80,7 @@ export function useHumanJournal(
         try {
           return await task();
         } catch (e) {
-          onError(String(e));
+          onError(errorText(e));
           return null;
         }
       });

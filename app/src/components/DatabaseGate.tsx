@@ -9,6 +9,7 @@ import { storedTheme } from "../hooks/useAppearance";
 import { messagesFor, resolveUiLanguage, systemLanguages } from "../i18n";
 import type { DatabaseStatus, UpgradedDatabase } from "../types";
 import type { Messages } from "../locales/en";
+import { errorText } from "../errors";
 
 type Texts = Messages["database"];
 
@@ -26,7 +27,7 @@ export function DatabaseGate({ children }: { children: ReactNode }) {
         setStatus(s);
         if (s.database.state === "ready") setReady(true);
       })
-      .catch((e) => setLoadError(String(e)));
+      .catch((e) => setLoadError(errorText(e)));
   }, []);
 
   if (ready) return <>{children}</>;
@@ -147,7 +148,7 @@ function UpgradeDialog({
       );
       setPhase("done");
     } catch (e) {
-      setError(String(e));
+      setError(errorText(e));
       setPhase("failed");
     }
   };

@@ -1,0 +1,351 @@
+/* Sessions: the batch bar, session lists and rows, agent labels and the session drawer. */
+
+/* Batch actions on the selected sessions; replaces the list filters in the panel header so
+   the list itself never shifts while a selection is being dragged. */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 3px 0 10px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+/* Every control in the bar shares one compact height. */
+.batch-bar .batch-select,
+.batch-action,
+.batch-link {
+  height: 24px;
+  font-size: 12px;
+}
+.batch-bar .batch-select { padding: 0 6px; }
+.batch-link {
+  padding: 0 6px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 500;
+  cursor: pointer;
+}
+.batch-link:hover:not(:disabled) { color: var(--accent); }
+.batch-link:disabled { opacity: 0.5; cursor: default; }
+.batch-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+}
+.batch-action:hover:not(:disabled) { border-color: var(--accent-border); color: var(--accent); }
+.batch-action:disabled { opacity: 0.5; cursor: default; }
+.batch-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.batch-close:hover:not(:disabled) { background: var(--accent-soft-hover, var(--surface-alt)); color: var(--text); }
+
+.batch-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Slice List */
+.slice-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-panel);
+}
+
+.slice-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-list);
+}
+
+.group-heading {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.slice-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--pad-row);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+}
+.slice-row.selected { border-color: var(--accent); background: var(--accent-soft); }
+.slice-row.checked { border-color: var(--accent-border); background: var(--accent-soft); }
+.slice-row.ignored { opacity: 0.65; }
+
+/* Row actions that only appear on hover (or keyboard focus), e.g. Ignore. */
+.slice-hover-action { visibility: hidden; }
+.slice-row:hover .slice-hover-action,
+.slice-row:has(:focus-visible) .slice-hover-action { visibility: visible; }
+body.marquee-dragging .slice-hover-action { visibility: hidden; }
+
+/* Rectangle selection over session rows (useSliceSelection). */
+.marquee-host { position: relative; }
+.marquee-rect {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+body.marquee-dragging { user-select: none; -webkit-user-select: none; }
+
+.slice-main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.slice-title-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.slice-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-alt);
+  color: var(--muted);
+}
+
+.slice-meta-line {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Source agent label (sessions lists, slice drawer) */
+.agent-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 10.5px;
+  line-height: 16px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.drawer-meta-line .agent-badge { margin-right: 6px; vertical-align: 1px; }
+
+.slice-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+/* Auto width: a native select sizes itself to its widest option, so the
+   longest project name is always fully visible (and all rows line up). */
+.slice-controls select {
+  width: auto;
+  min-width: 140px;
+  max-width: none;
+}
+
+/* Drawer */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--backdrop);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 40;
+}
+.drawer {
+  max-width: 92vw;
+  height: 100%;
+  background: var(--surface);
+  display: flex;
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.24);
+}
+.drawer-inner {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+}
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+.drawer-header h3 { margin: 0 0 3px; font-size: 15px; }
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.drawer-meta-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.meta-k { color: var(--muted); font-weight: 600; }
+.drawer-controls-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.drawer-controls-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-editor {
+  display: flex;
+  gap: 8px;
+}
+.note-editor input { flex: 1; }
+
+.digest-box {
+  background: var(--surface-alt);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.digest-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.digest-box h4, .turns-section h4 { margin: 0 0 6px; font-size: 13px; }
+.digest-summary ul { margin: 4px 0; padding-left: 18px; }
+.raw-digest {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 11px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.turns-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.turn-card {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.turn-card.highlighted {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.turn-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.turn-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* The copy button floats over the header's padding so the header keeps its text height. */
+.turn-header-right .report-copy-btn {
+  width: 22px;
+  height: 22px;
+  margin: -5px 0;
+}
+.turn-index {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--accent);
+}
+.turn-prompt, .turn-conclusion {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+}
+.turn-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+}
+.tool-line {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.tool-target { color: var(--muted); word-break: break-all; }
+.tool-diff { font-family: var(--mono); font-size: 11px; color: var(--ok); }
+
+/* Which model wrote a slice digest, under the digest box's header. */
+.digest-model {
+  margin: -2px 0 6px;
+  font-size: 12px;
+}

@@ -9,7 +9,7 @@ interface DropdownMenuProps {
   size?: "sm" | "xs";
   hideChevron?: boolean;
   title?: string;
-  /** Hover label (see `[data-tip]` in styles.css); also used as the accessible name. */
+  /** Hover label (see `[data-tip]` in styles/controls.css); also used as the accessible name. */
   tip?: string;
   tipAlign?: "start" | "end";
   ariaLabel?: string;

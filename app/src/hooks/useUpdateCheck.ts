@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { UpdateCheck, UpdateSettings } from "../types";
-import { readItem, storeItem } from "./storage";
+import { readItem, storeItem } from "../storage";
+import { errorText } from "../errors";
 
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const SKIPPED_VERSION_KEY = "update-skipped-version";
@@ -54,7 +55,7 @@ export function useUpdateCheck(): UpdateCheckApi {
         setBanner({ kind: "upToDate", version: result.current });
       }
     } catch (err) {
-      if (manual) setBanner({ kind: "error", message: String(err) });
+      if (manual) setBanner({ kind: "error", message: errorText(err) });
     } finally {
       checkingRef.current = false;
       setChecking(false);
