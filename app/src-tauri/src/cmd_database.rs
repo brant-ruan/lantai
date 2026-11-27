@@ -10,8 +10,9 @@ use aj_store::DatabaseState;
 use chrono::Utc;
 use serde::Serialize;
 
+use crate::error::CmdResult;
 use crate::pickers;
-use crate::state::{cmd_err, data_files, AppState, DB_FILE};
+use crate::state::{data_files, AppState, DB_FILE};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase", tag = "state")]
@@ -53,10 +54,10 @@ fn prepare(state: &AppState) -> anyhow::Result<()> {
 /// What the front end needs before loading: whether the database can be used as it is. A ready
 /// database is prepared on the way.
 #[tauri::command(async)]
-pub fn database_status(state: tauri::State<'_, AppState>) -> Result<DatabaseStatusDto, String> {
-    let database = match aj_store::database_state(&state.data_dir.join(DB_FILE)).map_err(cmd_err)? {
+pub fn database_status(state: tauri::State<'_, AppState>) -> CmdResult<DatabaseStatusDto> {
+    let database = match aj_store::database_state(&state.data_dir.join(DB_FILE))? {
         DatabaseState::Ready => {
-            prepare(&state).map_err(cmd_err)?;
+            prepare(&state)?;
             DatabaseStateDto::Ready
         }
         DatabaseState::Outdated { from, to } => DatabaseStateDto::Outdated { from, to },
@@ -91,7 +92,7 @@ pub fn database_status(state: tauri::State<'_, AppState>) -> Result<DatabaseStat
 pub fn upgrade_database(
     state: tauri::State<'_, AppState>,
     backup_dir: Option<String>,
-) -> Result<UpgradedDto, String> {
+) -> CmdResult<UpgradedDto> {
     let backup_dir = backup_dir
         .map(PathBuf::from)
         .unwrap_or_else(|| state.data_dir.join(BACKUPS_DIR));
@@ -100,9 +101,8 @@ pub fn upgrade_database(
         &backup_dir,
         env!("CARGO_PKG_VERSION"),
         Utc::now(),
-    )
-    .map_err(cmd_err)?;
-    prepare(&state).map_err(cmd_err)?;
+    )?;
+    prepare(&state)?;
     Ok(UpgradedDto {
         from: up.from,
         to: up.to,
@@ -112,7 +112,7 @@ pub fn upgrade_database(
 
 /// Ask for a folder to keep the backup in; `None` when the user cancels.
 #[tauri::command]
-pub async fn choose_backup_folder(prompt: String, start: String) -> Result<Option<String>, String> {
+pub async fn choose_backup_folder(prompt: String, start: String) -> CmdResult<Option<String>> {
     let start = pickers::existing_dir(&PathBuf::from(start));
     Ok(pickers::choose_folder(prompt, start)
         .await?
@@ -121,10 +121,10 @@ pub async fn choose_backup_folder(prompt: String, start: String) -> Result<Optio
 
 /// Show a file in Finder.
 #[tauri::command(async)]
-pub fn reveal_in_finder(path: String) -> Result<(), String> {
+pub fn reveal_in_finder(path: String) -> CmdResult<()> {
     let path = PathBuf::from(path);
     if !path.is_absolute() || !path.exists() {
-        return Err(format!("{} does not exist", path.display()));
+        return Err(format!("{} does not exist", path.display()).into());
     }
     let status = std::process::Command::new("/usr/bin/open")
         .arg("-R")
@@ -134,7 +134,7 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        Err(format!("failed to show {}: {status}", path.display()))
+        Err(format!("failed to show {}: {status}", path.display()).into())
     }
 }
 

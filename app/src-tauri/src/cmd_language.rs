@@ -4,7 +4,8 @@
 use aj_report::lang::LANGUAGES;
 use serde::Serialize;
 
-use crate::state::{cmd_err, AppState};
+use crate::error::{CmdError, CmdResult};
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,11 +32,9 @@ pub struct LanguageSettingsDto {
 pub fn get_language_settings(
     state: tauri::State<'_, AppState>,
     system_locales: Option<Vec<String>>,
-) -> Result<LanguageSettingsDto, String> {
-    let report = state
-        .report_language(&system_locales.unwrap_or_default())
-        .map_err(cmd_err)?;
-    let cfg = state.load_config().map_err(cmd_err)?;
+) -> CmdResult<LanguageSettingsDto> {
+    let report = state.report_language(&system_locales.unwrap_or_default())?;
+    let cfg = state.load_config()?;
     Ok(LanguageSettingsDto {
         ui_language: cfg.ui_language().to_string(),
         report_language: report.tag.to_string(),
@@ -51,20 +50,17 @@ pub fn get_language_settings(
 }
 
 #[tauri::command(async)]
-pub fn set_ui_language(state: tauri::State<'_, AppState>, language: String) -> Result<(), String> {
+pub fn set_ui_language(state: tauri::State<'_, AppState>, language: String) -> CmdResult<()> {
     state
         .modify_config(|c| c.set_ui_language(&language))
         .map(|_| ())
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
-pub fn set_report_language(
-    state: tauri::State<'_, AppState>,
-    language: String,
-) -> Result<(), String> {
+pub fn set_report_language(state: tauri::State<'_, AppState>, language: String) -> CmdResult<()> {
     state
         .modify_config(|c| c.set_report_language(&language))
         .map(|_| ())
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }

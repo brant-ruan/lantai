@@ -21,6 +21,7 @@ mod cmd_search;
 mod cmd_self_stats;
 mod cmd_stats;
 mod cmd_update;
+mod error;
 mod menu;
 mod pickers;
 mod shell_env;

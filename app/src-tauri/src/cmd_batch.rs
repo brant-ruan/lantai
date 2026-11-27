@@ -5,7 +5,8 @@ use aj_store::Store;
 use chrono::Local;
 use serde::Serialize;
 
-use crate::state::{cmd_err, AppState};
+use crate::error::CmdResult;
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,13 +43,13 @@ pub async fn plan_batch(
     report_type: String,
     period_keys: Vec<String>,
     include_final: bool,
-) -> Result<BatchPlanDto, String> {
-    let cfg = state.load_config().map_err(cmd_err)?;
+) -> CmdResult<BatchPlanDto> {
+    let cfg = state.load_config()?;
     let data_dir = state.data_dir.clone();
-    let granularity = Granularity::parse(&report_type).map_err(cmd_err)?;
-    let language = state.report_language(&[]).map_err(cmd_err)?;
+    let granularity = Granularity::parse(&report_type)?;
+    let language = state.report_language(&[])?;
     tauri::async_runtime::spawn_blocking(move || {
-        let store = Store::open(&data_dir.join(crate::state::DB_FILE)).map_err(cmd_err)?;
+        let store = Store::open(&data_dir.join(crate::state::DB_FILE))?;
         let budgets = cfg.budgets();
         let plan = batch::plan_batch(
             &store,
@@ -58,8 +59,7 @@ pub async fn plan_batch(
             include_final,
             &budgets,
             language,
-        )
-        .map_err(cmd_err)?;
+        )?;
         Ok(BatchPlanDto {
             items: plan
                 .items
@@ -90,14 +90,10 @@ pub fn set_reports_status(
     report_type: String,
     period_keys: Vec<String>,
     status: String,
-) -> Result<BatchStatusResultDto, String> {
-    let kind = Granularity::parse(&report_type)
-        .map_err(cmd_err)?
-        .report_kind();
-    let mut store = state.open_store().map_err(cmd_err)?;
-    let res = store
-        .set_reports_status(kind, &period_keys, None, &status)
-        .map_err(cmd_err)?;
+) -> CmdResult<BatchStatusResultDto> {
+    let kind = Granularity::parse(&report_type)?.report_kind();
+    let mut store = state.open_store()?;
+    let res = store.set_reports_status(kind, &period_keys, None, &status)?;
     Ok(BatchStatusResultDto {
         updated: res.updated,
         skipped: res.skipped,

@@ -10,8 +10,9 @@ use chrono::{Local, Utc};
 use serde::Serialize;
 
 use crate::app_icon::{self, BundleSync};
+use crate::error::{CmdError, CmdResult};
 use crate::pickers;
-use crate::state::{cmd_err, data_files, AppState};
+use crate::state::{data_files, AppState};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,7 +56,7 @@ fn start_dir() -> Option<PathBuf> {
 pub async fn export_backup(
     state: tauri::State<'_, AppState>,
     prompt: String,
-) -> Result<Option<BackupInfoDto>, String> {
+) -> CmdResult<Option<BackupInfoDto>> {
     let name = format!("lantai-backup-{}.zip", Local::now().format("%Y-%m-%d"));
     let Some(mut path) = pickers::choose_save_file(prompt, name, start_dir()).await? else {
         return Ok(None);
@@ -75,7 +76,7 @@ pub async fn export_backup(
             Utc::now(),
         )
         .map(|m| Some(BackupInfoDto::new(&path, m)))
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
     })
     .await
     .map_err(|e| format!("backup task failed: {e}"))?
@@ -83,7 +84,7 @@ pub async fn export_backup(
 
 /// Ask for a backup file and describe it, so the user can confirm before restoring.
 #[tauri::command]
-pub async fn pick_backup(prompt: String) -> Result<Option<BackupInfoDto>, String> {
+pub async fn pick_backup(prompt: String) -> CmdResult<Option<BackupInfoDto>> {
     let picked =
         pickers::choose_file(prompt, "public.zip-archive".to_string(), start_dir()).await?;
     let Some(path) = picked else {
@@ -92,7 +93,7 @@ pub async fn pick_backup(prompt: String) -> Result<Option<BackupInfoDto>, String
     tauri::async_runtime::spawn_blocking(move || {
         aj_backup::read_manifest(&path)
             .map(|m| Some(BackupInfoDto::new(&path, m)))
-            .map_err(cmd_err)
+            .map_err(CmdError::from)
     })
     .await
     .map_err(|e| format!("backup task failed: {e}"))?
@@ -105,27 +106,26 @@ pub fn restore_backup(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     path: String,
-) -> Result<RestoredDto, String> {
+) -> CmdResult<RestoredDto> {
     let running = state
         .report_jobs
         .lock()
-        .map_err(|_| "report jobs lock poisoned".to_string())?
+        .map_err(|_| "report jobs lock poisoned")?
         .len();
     if running > 0 {
         return Err(format!(
             "{running} report generation(s) are running; wait for them to finish or cancel them, then restore"
-        ));
+        ).into());
     }
     // No settings change may land in the middle of the restore.
     let _guard = state
         .config_lock
         .lock()
-        .map_err(|_| "config lock poisoned".to_string())?;
+        .map_err(|_| "config lock poisoned")?;
     let path = PathBuf::from(path);
-    let restored =
-        aj_backup::restore(&data_files(&state.data_dir), &path, Utc::now()).map_err(cmd_err)?;
+    let restored = aj_backup::restore(&data_files(&state.data_dir), &path, Utc::now())?;
     // As at startup: built-in prompts follow this build.
-    prompt_library::sync_builtins(&mut state.open_store().map_err(cmd_err)?).map_err(cmd_err)?;
+    prompt_library::sync_builtins(&mut state.open_store()?)?;
     app_icon::apply(
         &app,
         app_icon::load_pref(&state.data_dir),

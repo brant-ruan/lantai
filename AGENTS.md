@@ -315,7 +315,9 @@ What the code does not make obvious. The design behind each is in the spec.
 - **Tauri commands** that touch the database or call a model are `#[tauri::command(async)]` or
   `async fn`: synchronous commands run on the main thread in Tauri v2, and a query or a wait on the
   write lock (`busy_timeout` of 15 seconds) would freeze the UI. Only commands that need the main
-  thread (windows, Dock icon) stay synchronous.
+  thread (windows, Dock icon) stay synchronous. Commands return `CmdResult<T>`
+  (`app/src-tauri/src/error.rs`): `?` works on `anyhow` results and on message strings, and the
+  error reaches the front end as a string with its cause chain.
 
 ## Commands
 

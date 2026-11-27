@@ -8,7 +8,8 @@ use aj_report::self_stats::{load_self_stats, DigestTally, KindTotals, PeriodCell
 use chrono::{Local, Utc};
 use serde::Serialize;
 
-use crate::state::{cmd_err, AppState};
+use crate::error::CmdResult;
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,16 +160,12 @@ fn to_dto(s: SelfStats, engine: String) -> LantaiStatsDto {
 pub fn get_lantai_stats(
     state: tauri::State<'_, AppState>,
     range: String,
-) -> Result<LantaiStatsDto, String> {
+) -> CmdResult<LantaiStatsDto> {
     let parsed =
         StatsRange::parse(&range).ok_or_else(|| format!("unknown stats range: {range}"))?;
-    let store = state.open_store().map_err(cmd_err)?;
-    let cfg = state.load_config().map_err(cmd_err)?;
-    let today = local_date(
-        Utc::now(),
-        &Local,
-        state.core_config().map_err(cmd_err)?.day_boundary_hour,
-    );
+    let store = state.open_store()?;
+    let cfg = state.load_config()?;
+    let today = local_date(Utc::now(), &Local, state.core_config()?.day_boundary_hour);
     // Without a usable default model nothing counts as reusable, which is also what generating would find.
     let engine = cfg
         .estimate_engine(None, &state.data_dir.join("runner"))
@@ -179,9 +176,8 @@ pub fn get_lantai_stats(
         engine_name: &engine,
         budgets: &budgets,
         now: Utc::now(),
-        language: state.report_language(&[]).map_err(cmd_err)?,
+        language: state.report_language(&[])?,
     };
-    let stats =
-        load_self_stats(&store, &Local, parsed.since_date(today), today, &ctx).map_err(cmd_err)?;
+    let stats = load_self_stats(&store, &Local, parsed.since_date(today), today, &ctx)?;
     Ok(to_dto(stats, engine))
 }

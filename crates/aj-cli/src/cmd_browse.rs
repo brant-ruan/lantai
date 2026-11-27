@@ -1,4 +1,5 @@
-//! Scanning and browsing: scan, days, sessions, show, digest, ignore/include, export, doctor.
+//! Scanning and browsing: scan, days, sessions, show, digest, note, ignore/include, export,
+//! doctor.
 
 use std::collections::BTreeMap;
 
@@ -255,6 +256,17 @@ pub(crate) fn cmd_digest(app: &App, reference: &str) -> Result<()> {
             slice.local_date
         ),
     }
+    Ok(())
+}
+
+pub(crate) fn cmd_note(app: &App, session: &str, text: Option<&str>) -> Result<()> {
+    let s = find_session(app, session)?;
+    app.store.set_session_note(s.id, text)?;
+    println!(
+        "Note {}: {}",
+        if text.is_some() { "set" } else { "cleared" },
+        title(&s)
+    );
     Ok(())
 }
 

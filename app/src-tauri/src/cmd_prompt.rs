@@ -9,7 +9,8 @@ use aj_report::prompt_library::{self, PromptVars};
 use anyhow::Context;
 use serde::Serialize;
 
-use crate::state::{cmd_err, AppState};
+use crate::error::{CmdError, CmdResult};
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,16 +39,15 @@ pub fn list_prompts(
     state: tauri::State<'_, AppState>,
     kind: Option<String>,
     all_languages: Option<bool>,
-) -> Result<Vec<PromptDto>, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let lang = state.report_language(&[]).map_err(cmd_err)?;
+) -> CmdResult<Vec<PromptDto>> {
+    let store = state.open_store()?;
+    let lang = state.report_language(&[])?;
     let rows = if all_languages.unwrap_or(false) {
         store.list_prompts(kind.as_deref(), None)
     } else {
         prompt_library::offered(&store, kind.as_deref(), lang)
-    }
-    .map_err(cmd_err)?;
-    let defaults = prompt_library::default_ids(&store, lang).map_err(cmd_err)?;
+    }?;
+    let defaults = prompt_library::default_ids(&store, lang)?;
     Ok(rows
         .into_iter()
         .map(|p| PromptDto {
@@ -70,14 +70,12 @@ pub fn preview_prompt(
     id: i64,
     date: Option<String>,
     project: Option<String>,
-) -> Result<String, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let lang = state.report_language(&[]).map_err(cmd_err)?;
+) -> CmdResult<String> {
+    let store = state.open_store()?;
+    let lang = state.report_language(&[])?;
     let row = store
-        .prompt(id)
-        .map_err(cmd_err)?
-        .with_context(|| format!("no prompt with ID {id}"))
-        .map_err(cmd_err)?;
+        .prompt(id)?
+        .with_context(|| format!("no prompt with ID {id}"))?;
     Ok(preview(
         &row.body,
         &PromptVars {
@@ -96,22 +94,18 @@ pub fn create_prompt(
     kind: String,
     name: String,
     body: String,
-) -> Result<i64, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let lang = state.report_language(&[]).map_err(cmd_err)?;
+) -> CmdResult<i64> {
+    let store = state.open_store()?;
+    let lang = state.report_language(&[])?;
     store
         .create_prompt(&kind, lang.tag, &name, &body)
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
-pub fn update_prompt(
-    state: tauri::State<'_, AppState>,
-    id: i64,
-    body: String,
-) -> Result<(), String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    store.update_prompt_body(id, &body).map_err(cmd_err)
+pub fn update_prompt(state: tauri::State<'_, AppState>, id: i64, body: String) -> CmdResult<()> {
+    let store = state.open_store()?;
+    store.update_prompt_body(id, &body).map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
@@ -119,21 +113,23 @@ pub fn rename_prompt(
     state: tauri::State<'_, AppState>,
     id: i64,
     new_name: String,
-) -> Result<(), String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    store.rename_prompt(id, &new_name).map_err(cmd_err)
+) -> CmdResult<()> {
+    let store = state.open_store()?;
+    store.rename_prompt(id, &new_name).map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
-pub fn delete_prompt(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
-    let mut store = state.open_store().map_err(cmd_err)?;
-    store.delete_prompt(id).map_err(cmd_err)
+pub fn delete_prompt(state: tauri::State<'_, AppState>, id: i64) -> CmdResult<()> {
+    let mut store = state.open_store()?;
+    store.delete_prompt(id).map_err(CmdError::from)
 }
 
 /// Make a prompt (of any language) the default for its kind in the current report language.
 #[tauri::command(async)]
-pub fn set_default_prompt(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
-    let mut store = state.open_store().map_err(cmd_err)?;
-    let lang = state.report_language(&[]).map_err(cmd_err)?;
-    store.set_default_prompt(id, lang.tag).map_err(cmd_err)
+pub fn set_default_prompt(state: tauri::State<'_, AppState>, id: i64) -> CmdResult<()> {
+    let mut store = state.open_store()?;
+    let lang = state.report_language(&[])?;
+    store
+        .set_default_prompt(id, lang.tag)
+        .map_err(CmdError::from)
 }

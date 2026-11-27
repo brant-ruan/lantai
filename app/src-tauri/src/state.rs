@@ -122,7 +122,3 @@ impl AppState {
         aj_sources::build_adapters(&self.data_dir, |_| true)
     }
 }
-
-pub fn cmd_err(err: anyhow::Error) -> String {
-    format!("{err:#}")
-}

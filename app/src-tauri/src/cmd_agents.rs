@@ -8,7 +8,8 @@ use aj_report::{AgentSettings, AppConfig};
 use anyhow::bail;
 use serde::Serialize;
 
-use crate::state::{cmd_err, AppState};
+use crate::error::CmdResult;
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -69,12 +70,11 @@ fn compatibility_str(c: Compatibility) -> &'static str {
     }
 }
 
-fn sources_dto(state: &AppState, cfg: &AppConfig) -> Result<Vec<AgentSourceDto>, String> {
-    let probes = aj_sources::probe_all(&state.data_dir).map_err(cmd_err)?;
+fn sources_dto(state: &AppState, cfg: &AppConfig) -> CmdResult<Vec<AgentSourceDto>> {
+    let probes = aj_sources::probe_all(&state.data_dir)?;
     let stored = state
         .open_store()
-        .and_then(|s| s.session_counts_by_agent())
-        .map_err(cmd_err)?;
+        .and_then(|s| s.session_counts_by_agent())?;
     Ok(aj_sources::all_sources()
         .into_iter()
         .map(|src| {
@@ -112,8 +112,8 @@ fn sources_dto(state: &AppState, cfg: &AppConfig) -> Result<Vec<AgentSourceDto>,
 
 // Probing reads (and for OpenCode copies) local data, so these run off the main thread.
 #[tauri::command(async)]
-pub fn agent_sources(state: tauri::State<'_, AppState>) -> Result<Vec<AgentSourceDto>, String> {
-    let cfg = state.load_config().map_err(cmd_err)?;
+pub fn agent_sources(state: tauri::State<'_, AppState>) -> CmdResult<Vec<AgentSourceDto>> {
+    let cfg = state.load_config()?;
     sources_dto(&state, &cfg)
 }
 
@@ -123,22 +123,20 @@ pub fn set_agent_settings(
     agent: String,
     enabled: bool,
     pre_digest: bool,
-) -> Result<Vec<AgentSourceDto>, String> {
-    let cfg = state
-        .modify_config(|cfg| {
-            let kind = AgentId::parse(&agent)?;
-            if !aj_sources::is_supported(&kind) {
-                bail!("Lantai cannot read {} yet", kind.product_name());
-            }
-            cfg.set_agent(
-                kind,
-                AgentSettings {
-                    enabled,
-                    pre_digest,
-                },
-            );
-            Ok(())
-        })
-        .map_err(cmd_err)?;
+) -> CmdResult<Vec<AgentSourceDto>> {
+    let cfg = state.modify_config(|cfg| {
+        let kind = AgentId::parse(&agent)?;
+        if !aj_sources::is_supported(&kind) {
+            bail!("Lantai cannot read {} yet", kind.product_name());
+        }
+        cfg.set_agent(
+            kind,
+            AgentSettings {
+                enabled,
+                pre_digest,
+            },
+        );
+        Ok(())
+    })?;
     sources_dto(&state, &cfg)
 }

@@ -14,7 +14,8 @@ use aj_report::presets::{self, PresetGroup, PresetRegion};
 use aj_report::{AppConfig, KeyUpdate, ModelConfig, ModelInfo, ProviderConfig};
 use serde::{Deserialize, Serialize};
 
-use crate::state::{cmd_err, AppState};
+use crate::error::{CmdError, CmdResult};
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -90,9 +91,9 @@ pub struct EngineTestResultDto {
 }
 
 impl ProviderInput {
-    fn into_config(self) -> Result<ProviderConfig, String> {
+    fn into_config(self) -> CmdResult<ProviderConfig> {
         ProviderConfig::from_parts(&self.kind, self.base_url, self.timeout_secs, self.binary)
-            .map_err(cmd_err)
+            .map_err(CmdError::from)
     }
 }
 
@@ -150,8 +151,8 @@ fn settings_dto(state: &AppState, cfg: &AppConfig) -> ModelSettingsDto {
 fn modify(
     state: &AppState,
     edit: impl FnOnce(&mut AppConfig) -> anyhow::Result<()>,
-) -> Result<ModelSettingsDto, String> {
-    let cfg = state.modify_config(edit).map_err(cmd_err)?;
+) -> CmdResult<ModelSettingsDto> {
+    let cfg = state.modify_config(edit)?;
     Ok(settings_dto(state, &cfg))
 }
 
@@ -183,8 +184,8 @@ pub fn provider_presets() -> Vec<ProviderPresetDto> {
 }
 
 #[tauri::command]
-pub fn model_settings(state: tauri::State<'_, AppState>) -> Result<ModelSettingsDto, String> {
-    let cfg = state.load_config().map_err(cmd_err)?;
+pub fn model_settings(state: tauri::State<'_, AppState>) -> CmdResult<ModelSettingsDto> {
+    let cfg = state.load_config()?;
     Ok(settings_dto(&state, &cfg))
 }
 
@@ -195,7 +196,7 @@ pub fn save_provider(
     name: String,
     provider: ProviderInput,
     key: KeyUpdateInput,
-) -> Result<ModelSettingsDto, String> {
+) -> CmdResult<ModelSettingsDto> {
     let provider = provider.into_config()?;
     let key = match key {
         KeyUpdateInput::Keep => KeyUpdate::Keep,
@@ -211,7 +212,7 @@ pub fn save_provider(
 pub fn delete_provider(
     state: tauri::State<'_, AppState>,
     name: String,
-) -> Result<ModelSettingsDto, String> {
+) -> CmdResult<ModelSettingsDto> {
     modify(&state, |cfg| cfg.remove_provider(&name))
 }
 
@@ -223,17 +224,14 @@ pub fn save_model(
     original_alias: Option<String>,
     alias: String,
     model: ModelInput,
-) -> Result<ModelSettingsDto, String> {
+) -> CmdResult<ModelSettingsDto> {
     let model = ModelConfig {
         provider: model.provider,
         model: model.model,
         reasoning_effort: model.reasoning_effort,
         temperature: model.temperature,
     };
-    let listed = state
-        .load_config()
-        .map_err(cmd_err)?
-        .effort_reference(&model);
+    let listed = state.load_config()?.effort_reference(&model);
     modify(&state, |cfg| {
         cfg.upsert_model(original_alias.as_deref(), &alias, model, &listed)
     })
@@ -243,7 +241,7 @@ pub fn save_model(
 pub fn delete_model(
     state: tauri::State<'_, AppState>,
     alias: String,
-) -> Result<ModelSettingsDto, String> {
+) -> CmdResult<ModelSettingsDto> {
     modify(&state, |cfg| cfg.remove_model(&alias))
 }
 
@@ -251,7 +249,7 @@ pub fn delete_model(
 pub fn set_default_model(
     state: tauri::State<'_, AppState>,
     alias: String,
-) -> Result<ModelSettingsDto, String> {
+) -> CmdResult<ModelSettingsDto> {
     modify(&state, |cfg| cfg.set_default_model(&alias))
 }
 
@@ -263,12 +261,12 @@ pub async fn list_provider_models(
     saved_name: Option<String>,
     provider: ProviderInput,
     api_key: Option<String>,
-) -> Result<Vec<ModelInfo>, String> {
-    let cfg = state.load_config().map_err(cmd_err)?;
+) -> CmdResult<Vec<ModelInfo>> {
+    let cfg = state.load_config()?;
     let draft = provider.into_config()?;
     tauri::async_runtime::spawn_blocking(move || {
         cfg.list_provider_models(saved_name.as_deref(), draft, api_key.as_deref())
-            .map_err(cmd_err)
+            .map_err(CmdError::from)
     })
     .await
     .map_err(|e| format!("model listing task failed: {e}"))?
@@ -278,13 +276,11 @@ pub async fn list_provider_models(
 pub async fn test_model(
     state: tauri::State<'_, AppState>,
     alias: String,
-) -> Result<EngineTestResultDto, String> {
-    let cfg = state.load_config().map_err(cmd_err)?;
+) -> CmdResult<EngineTestResultDto> {
+    let cfg = state.load_config()?;
     let runner_dir = state.data_dir.join("runner");
     tauri::async_runtime::spawn_blocking(move || {
-        let engine = cfg
-            .build_engine(Some(&alias), &runner_dir)
-            .map_err(cmd_err)?;
+        let engine = cfg.build_engine(Some(&alias), &runner_dir)?;
         let started = Instant::now();
         Ok(match engine.complete("Reply with exactly one word: OK") {
             Ok(reply) => EngineTestResultDto {
@@ -326,10 +322,8 @@ pub struct LocalToolDto {
 
 /// Look for known agent CLIs on PATH (runs only their version commands).
 #[tauri::command]
-pub async fn find_local_tools(
-    state: tauri::State<'_, AppState>,
-) -> Result<Vec<LocalToolDto>, String> {
-    let cfg = state.load_config().map_err(cmd_err)?;
+pub async fn find_local_tools(state: tauri::State<'_, AppState>) -> CmdResult<Vec<LocalToolDto>> {
+    let cfg = state.load_config()?;
     let found = tauri::async_runtime::spawn_blocking(local_tools::find_on_path)
         .await
         .map_err(|e| format!("tool search failed: {e}"))?;
@@ -367,7 +361,7 @@ pub async fn find_local_tools(
 pub async fn add_local_tool(
     state: tauri::State<'_, AppState>,
     command: String,
-) -> Result<ModelSettingsDto, String> {
+) -> CmdResult<ModelSettingsDto> {
     let found = tauri::async_runtime::spawn_blocking(local_tools::find_on_path)
         .await
         .map_err(|e| format!("tool search failed: {e}"))?;

@@ -3,6 +3,7 @@
 //! `menu-action` events.
 //! Standard items (Edit, Hide, Minimize, ...) are handled by the OS and never reach us.
 
+use crate::error::CmdResult;
 use serde::{Deserialize, Serialize};
 use tauri::menu::{
     Menu, MenuEvent, MenuItem, Submenu, SubmenuBuilder, HELP_SUBMENU_ID, WINDOW_SUBMENU_ID,
@@ -213,7 +214,7 @@ pub fn build_with<R: Runtime>(app: &AppHandle<R>, l: &MenuLabels) -> tauri::Resu
 
 /// Rebuild the menu bar with labels in the interface language.
 #[tauri::command]
-pub fn set_menu_labels(app: AppHandle, labels: MenuLabels) -> Result<(), String> {
+pub fn set_menu_labels(app: AppHandle, labels: MenuLabels) -> CmdResult<()> {
     let menu = build_with(&app, &labels).map_err(|e| e.to_string())?;
     app.set_menu(menu).map_err(|e| e.to_string())?;
     Ok(())

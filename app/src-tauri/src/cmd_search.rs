@@ -6,7 +6,8 @@ use aj_report::search::{search, ReportRef, SearchLayer, SearchRequest, DEFAULT_T
 use aj_store::SliceFilter;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{cmd_err, AppState};
+use crate::error::CmdResult;
+use crate::state::AppState;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -127,14 +128,14 @@ fn refs(list: Vec<ReportRef>) -> Vec<ReportRefDto> {
 pub fn search_all(
     state: tauri::State<'_, AppState>,
     params: SearchParams,
-) -> Result<SearchResultsDto, String> {
+) -> CmdResult<SearchResultsDto> {
     let agent = match params.agent.as_deref() {
         Some(key) => Some(AgentId::parse(key).map_err(|e| e.to_string())?),
         None => None,
     };
     let req = SearchRequest {
         query: params.query,
-        layer: SearchLayer::parse(&params.layer).map_err(cmd_err)?,
+        layer: SearchLayer::parse(&params.layer)?,
         filter: SliceFilter {
             since: params.since,
             until: params.until,
@@ -146,8 +147,8 @@ pub fn search_all(
         turn_limit: DEFAULT_TURN_LIMIT,
     };
     let started = std::time::Instant::now();
-    let store = state.open_store().map_err(cmd_err)?;
-    let res = search(&store, &req).map_err(cmd_err)?;
+    let store = state.open_store()?;
+    let res = search(&store, &req)?;
 
     let sessions = res
         .sessions

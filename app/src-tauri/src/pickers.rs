@@ -2,6 +2,7 @@
 //! thread and returns `None` when the user cancels. Prompts and paths go in as script
 //! arguments, never into the script text.
 
+use crate::error::CmdResult;
 use std::path::{Path, PathBuf};
 
 /// The nearest folder that exists at or above `path`.
@@ -9,10 +10,7 @@ pub fn existing_dir(path: &Path) -> Option<PathBuf> {
     path.ancestors().find(|d| d.is_dir()).map(Path::to_path_buf)
 }
 
-pub async fn choose_folder(
-    prompt: String,
-    start: Option<PathBuf>,
-) -> Result<Option<PathBuf>, String> {
+pub async fn choose_folder(prompt: String, start: Option<PathBuf>) -> CmdResult<Option<PathBuf>> {
     run(
         "choose folder with prompt (item 1 of argv)",
         vec![prompt],
@@ -26,7 +24,7 @@ pub async fn choose_save_file(
     prompt: String,
     default_name: String,
     start: Option<PathBuf>,
-) -> Result<Option<PathBuf>, String> {
+) -> CmdResult<Option<PathBuf>> {
     run(
         "choose file name with prompt (item 1 of argv) default name (item 2 of argv)",
         vec![prompt, default_name],
@@ -40,7 +38,7 @@ pub async fn choose_file(
     prompt: String,
     uti: String,
     start: Option<PathBuf>,
-) -> Result<Option<PathBuf>, String> {
+) -> CmdResult<Option<PathBuf>> {
     run(
         "choose file with prompt (item 1 of argv) of type {item 2 of argv}",
         vec![prompt, uti],
@@ -53,7 +51,7 @@ async fn run(
     command: &'static str,
     args: Vec<String>,
     start: Option<PathBuf>,
-) -> Result<Option<PathBuf>, String> {
+) -> CmdResult<Option<PathBuf>> {
     tauri::async_runtime::spawn_blocking(move || run_blocking(command, args, start))
         .await
         .map_err(|e| format!("picker task failed: {e}"))?
@@ -64,7 +62,7 @@ fn run_blocking(
     command: &str,
     mut args: Vec<String>,
     start: Option<PathBuf>,
-) -> Result<Option<PathBuf>, String> {
+) -> CmdResult<Option<PathBuf>> {
     let mut command = command.to_string();
     if let Some(dir) = start.as_deref().and_then(existing_dir) {
         args.push(dir.to_string_lossy().into_owned());
@@ -99,6 +97,6 @@ fn run_blocking(
     _command: &str,
     _args: Vec<String>,
     _start: Option<PathBuf>,
-) -> Result<Option<PathBuf>, String> {
-    Err("native pickers are currently supported on macOS only".to_string())
+) -> CmdResult<Option<PathBuf>> {
+    Err("native pickers are currently supported on macOS only".into())
 }

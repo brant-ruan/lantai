@@ -4,6 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::error::CmdResult;
 use serde::Serialize;
 
 /// Name of the bundled binary, next to the app's own executable.
@@ -61,7 +62,7 @@ fn is_lantai_binary(path: &Path) -> bool {
             .any(|p| p.extension().is_some_and(|e| e == "app"))
 }
 
-fn bundled_binary() -> Result<PathBuf, String> {
+fn bundled_binary() -> CmdResult<PathBuf> {
     let exe = std::env::current_exe().map_err(|e| format!("cannot locate the app: {e}"))?;
     let dir = exe
         .parent()
@@ -69,12 +70,12 @@ fn bundled_binary() -> Result<PathBuf, String> {
     Ok(dir.join(BINARY))
 }
 
-fn link_path() -> Result<PathBuf, String> {
+fn link_path() -> CmdResult<PathBuf> {
     let home = dirs::home_dir().ok_or_else(|| "cannot find the home folder".to_string())?;
     Ok(home.join(LINK_DIR).join(BINARY))
 }
 
-fn status() -> Result<CliToolStatus, String> {
+fn status() -> CmdResult<CliToolStatus> {
     let bundled = bundled_binary()?;
     let link = link_path()?;
     let link_target = std::fs::read_link(&link).ok();
@@ -91,12 +92,12 @@ fn status() -> Result<CliToolStatus, String> {
 }
 
 #[tauri::command(async)]
-pub fn cli_tool_status() -> Result<CliToolStatus, String> {
+pub fn cli_tool_status() -> CmdResult<CliToolStatus> {
     status()
 }
 
 #[tauri::command(async)]
-pub fn install_cli_tool() -> Result<CliToolStatus, String> {
+pub fn install_cli_tool() -> CmdResult<CliToolStatus> {
     let current = status()?;
     if !current.bundled {
         return Err("this build of Lantai does not include the command-line tool".into());
@@ -111,7 +112,8 @@ pub fn install_cli_tool() -> Result<CliToolStatus, String> {
             return Err(format!(
                 "{} already exists and was not made by Lantai; remove it first",
                 current.link_path
-            ))
+            )
+            .into())
         }
         LinkState::StaleLink => {
             std::fs::remove_file(&link).map_err(|e| format!("cannot replace the old link: {e}"))?
@@ -127,7 +129,7 @@ pub fn install_cli_tool() -> Result<CliToolStatus, String> {
 }
 
 #[tauri::command(async)]
-pub fn uninstall_cli_tool() -> Result<CliToolStatus, String> {
+pub fn uninstall_cli_tool() -> CmdResult<CliToolStatus> {
     let current = status()?;
     if matches!(current.state, LinkState::Installed | LinkState::StaleLink) {
         std::fs::remove_file(link_path()?).map_err(|e| format!("cannot remove the link: {e}"))?;

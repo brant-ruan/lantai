@@ -36,7 +36,8 @@ use chrono::{Local, Utc};
 use serde::Serialize;
 use tauri::Emitter;
 
-use crate::state::{cmd_err, AppState};
+use crate::error::{CmdError, CmdResult};
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -239,14 +240,14 @@ fn resolve_project_id(
     store: &Store,
     project_id: Option<i64>,
     project: Option<&str>,
-) -> Result<Option<i64>, String> {
+) -> CmdResult<Option<i64>> {
     if let Some(id) = project_id {
         return Ok(Some(id));
     }
     project
         .map(|name| store.require_project(name).map(|p| p.id))
         .transpose()
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 fn staleness_dto(s: Staleness) -> StalenessDto {
@@ -279,16 +280,14 @@ fn build_report_state(
     project_id: Option<i64>,
     estimate: DailyEstimateDto,
     default_export_path: PathBuf,
-) -> Result<DailyReportStateDto, String> {
+) -> CmdResult<DailyReportStateDto> {
     let meta = store
-        .report_meta(report_type, period_key, project_id)
-        .map_err(cmd_err)?
+        .report_meta(report_type, period_key, project_id)?
         .map(|m| ReportMetaDto {
             status: m.status,
             current_version_id: m.current_version_id,
         });
-    let versions = versions::shown_versions(store, report_type, period_key, project_id)
-        .map_err(cmd_err)?
+    let versions = versions::shown_versions(store, report_type, period_key, project_id)?
         .into_iter()
         .map(|s| ReportVersionDto {
             id: s.version.id,
@@ -336,13 +335,13 @@ fn job_key(period: &str, project: Option<&str>) -> String {
 }
 
 /// Registers a job and returns its cancel flag; fails if the same scope is already running.
-fn start_job(state: &AppState, key: &str) -> Result<Arc<AtomicBool>, String> {
+fn start_job(state: &AppState, key: &str) -> CmdResult<Arc<AtomicBool>> {
     let mut jobs = state
         .report_jobs
         .lock()
-        .map_err(|_| "internal lock error".to_string())?;
+        .map_err(|_| "internal lock error")?;
     if jobs.contains_key(key) {
-        return Err(format!("a report for {key} is already being generated"));
+        return Err(format!("a report for {key} is already being generated").into());
     }
     let flag = Arc::new(AtomicBool::new(false));
     jobs.insert(key.to_string(), flag.clone());
@@ -397,15 +396,14 @@ pub fn get_daily_report_state(
     date: String,
     project: Option<String>,
     engine: Option<String>,
-) -> Result<DailyReportStateDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let cfg = state.load_config().map_err(cmd_err)?;
+) -> CmdResult<DailyReportStateDto> {
+    let store = state.open_store()?;
+    let cfg = state.load_config()?;
     let engine_name = cfg
-        .estimate_engine(engine.as_deref(), &state.data_dir.join("runner"))
-        .map_err(cmd_err)?
+        .estimate_engine(engine.as_deref(), &state.data_dir.join("runner"))?
         .name();
     let budgets = cfg.budgets();
-    let language = state.report_language(&[]).map_err(cmd_err)?;
+    let language = state.report_language(&[])?;
     let est = estimate_daily(
         &store,
         &Local,
@@ -417,8 +415,7 @@ pub fn get_daily_report_state(
             now: Utc::now(),
             language,
         },
-    )
-    .map_err(cmd_err)?;
+    )?;
     let project_id = resolve_project_id(&store, None, project.as_deref())?;
     build_report_state(
         &store,
@@ -437,16 +434,15 @@ pub fn get_weekly_report_state(
     state: tauri::State<'_, AppState>,
     week: String,
     engine: Option<String>,
-) -> Result<DailyReportStateDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let cfg = state.load_config().map_err(cmd_err)?;
-    let week = Week::parse(&week).map_err(cmd_err)?;
+) -> CmdResult<DailyReportStateDto> {
+    let store = state.open_store()?;
+    let cfg = state.load_config()?;
+    let week = Week::parse(&week)?;
     let engine_name = cfg
-        .estimate_engine(engine.as_deref(), &state.data_dir.join("runner"))
-        .map_err(cmd_err)?
+        .estimate_engine(engine.as_deref(), &state.data_dir.join("runner"))?
         .name();
     let budgets = cfg.budgets();
-    let language = state.report_language(&[]).map_err(cmd_err)?;
+    let language = state.report_language(&[])?;
     let est = estimate_weekly(
         &store,
         &Local,
@@ -458,8 +454,7 @@ pub fn get_weekly_report_state(
             now: Utc::now(),
             language,
         },
-    )
-    .map_err(cmd_err)?;
+    )?;
     let key = week.key();
     build_report_state(
         &store,
@@ -488,16 +483,15 @@ pub fn get_monthly_report_state(
     state: tauri::State<'_, AppState>,
     month: String,
     engine: Option<String>,
-) -> Result<DailyReportStateDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let cfg = state.load_config().map_err(cmd_err)?;
-    let month = Month::parse(&month).map_err(cmd_err)?;
+) -> CmdResult<DailyReportStateDto> {
+    let store = state.open_store()?;
+    let cfg = state.load_config()?;
+    let month = Month::parse(&month)?;
     let engine_name = cfg
-        .estimate_engine(engine.as_deref(), &state.data_dir.join("runner"))
-        .map_err(cmd_err)?
+        .estimate_engine(engine.as_deref(), &state.data_dir.join("runner"))?
         .name();
     let budgets = cfg.budgets();
-    let language = state.report_language(&[]).map_err(cmd_err)?;
+    let language = state.report_language(&[])?;
     let est = estimate_monthly(
         &store,
         &Local,
@@ -509,8 +503,7 @@ pub fn get_monthly_report_state(
             now: Utc::now(),
             language,
         },
-    )
-    .map_err(cmd_err)?;
+    )?;
     let key = month.key();
     build_report_state(
         &store,
@@ -541,14 +534,12 @@ pub fn get_project_rollup(
     granularity: String,
     since_date: Option<String>,
     until_date: Option<String>,
-) -> Result<ProjectRollupDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let granularity = Granularity::parse(&granularity).map_err(cmd_err)?;
+) -> CmdResult<ProjectRollupDto> {
+    let store = state.open_store()?;
+    let granularity = Granularity::parse(&granularity)?;
     let project = store
-        .project(project_id)
-        .map_err(cmd_err)?
-        .with_context(|| format!("no project with ID {project_id}"))
-        .map_err(cmd_err)?;
+        .project(project_id)?
+        .with_context(|| format!("no project with ID {project_id}"))?;
     let rollup = project_rollup(
         &store,
         project_id,
@@ -557,8 +548,7 @@ pub fn get_project_rollup(
         since_date.as_deref(),
         until_date.as_deref(),
         &period_key,
-    )
-    .map_err(cmd_err)?;
+    )?;
     let default_export_path =
         default_project_export_path(&state.export_dir, &project.name, &period_key)
             .to_string_lossy()
@@ -591,17 +581,15 @@ pub async fn digest_slice_now(
     state: tauri::State<'_, AppState>,
     slice_id: i64,
     engine: Option<String>,
-) -> Result<StoredDigest, String> {
-    let cfg = state.load_config().map_err(cmd_err)?;
-    let language = state.report_language(&[]).map_err(cmd_err)?;
+) -> CmdResult<StoredDigest> {
+    let cfg = state.load_config()?;
+    let language = state.report_language(&[])?;
     let data_dir = state.data_dir.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-        let built_engine = cfg
-            .build_engine(engine.as_deref(), &data_dir.join("runner"))
-            .map_err(cmd_err)?;
+        let built_engine = cfg.build_engine(engine.as_deref(), &data_dir.join("runner"))?;
         let budgets = cfg.budgets();
-        let mut store = Store::open(&data_dir.join(crate::state::DB_FILE)).map_err(cmd_err)?;
+        let mut store = Store::open(&data_dir.join(crate::state::DB_FILE))?;
         digest_single_slice(
             &mut store,
             built_engine.as_ref(),
@@ -611,7 +599,7 @@ pub async fn digest_slice_now(
             Utc::now(),
             language,
         )
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
     })
     .await
     .map_err(|e| format!("slice digest task failed: {e}"))?
@@ -626,17 +614,17 @@ async fn run_report_job<T, F>(
     state: &AppState,
     key: String,
     work: F,
-) -> Result<T, String>
+) -> CmdResult<T>
 where
     T: Send + 'static,
-    F: FnOnce(Arc<AtomicBool>, &mut dyn FnMut(&Progress)) -> Result<T, String> + Send + 'static,
+    F: FnOnce(Arc<AtomicBool>, &mut dyn FnMut(&Progress)) -> CmdResult<T> + Send + 'static,
 {
     let cancel_flag = start_job(state, &key)?;
     let progress_key = key.clone();
     let progress_flag = cancel_flag.clone();
     let worker_flag = cancel_flag.clone();
     let progress_window = window.clone();
-    let (tx, rx) = std::sync::mpsc::channel::<Result<T, String>>();
+    let (tx, rx) = std::sync::mpsc::channel::<CmdResult<T>>();
     std::thread::spawn(move || {
         let mut progress = |p: &Progress| {
             eprintln!("[report {progress_key}] {p}");
@@ -659,16 +647,16 @@ where
             Ok(r) => return r,
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                 if cancel_flag.load(Ordering::Relaxed) {
-                    return Err("report generation was cancelled".to_string());
+                    return Err("report generation was cancelled".into());
                 }
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                return Err("report task stopped unexpectedly".to_string())
+                return Err("report task stopped unexpectedly".into())
             }
         }
     })
     .await
-    .map_err(|e| format!("report task failed: {e}"))
+    .map_err(|e| CmdError::from(format!("report task failed: {e}")))
     .and_then(|r| r);
 
     finish_job(state, &key);
@@ -703,20 +691,18 @@ async fn run_generation<P, R, T>(
     req: GenerateRequest<P>,
     generate: GenerateFn<P, R>,
     to_dto: fn(R) -> T,
-) -> Result<T, String>
+) -> CmdResult<T>
 where
     P: Send + 'static,
     R: 'static,
     T: Send + 'static,
 {
-    let cfg = state.load_config().map_err(cmd_err)?;
-    let language = state.report_language(&[]).map_err(cmd_err)?;
+    let cfg = state.load_config()?;
+    let language = state.report_language(&[])?;
     let data_dir = state.data_dir.clone();
     run_report_job(window, state, key, move |cancel, progress| {
-        let engine = cfg
-            .build_engine(req.engine.as_deref(), &data_dir.join("runner"))
-            .map_err(cmd_err)?;
-        let mut store = Store::open(&data_dir.join(crate::state::DB_FILE)).map_err(cmd_err)?;
+        let engine = cfg.build_engine(req.engine.as_deref(), &data_dir.join("runner"))?;
+        let mut store = Store::open(&data_dir.join(crate::state::DB_FILE))?;
         let opts = ReportOptions {
             language,
             period: req.period,
@@ -729,7 +715,7 @@ where
             mode: ReportMode::from_update(req.update.unwrap_or(false)),
             now: Utc::now(),
         };
-        let r = generate(&mut store, engine.as_ref(), &Local, &opts, progress).map_err(cmd_err)?;
+        let r = generate(&mut store, engine.as_ref(), &Local, &opts, progress)?;
         Ok(to_dto(r))
     })
     .await
@@ -744,7 +730,7 @@ pub async fn generate_daily_report(
     prompt: Option<String>,
     engine: Option<String>,
     update: Option<bool>,
-) -> Result<DailyResultDto, String> {
+) -> CmdResult<DailyResultDto> {
     let key = job_key(&date, project.as_deref());
     let req = GenerateRequest {
         period: date,
@@ -765,8 +751,8 @@ pub async fn generate_weekly_report(
     prompt: Option<String>,
     engine: Option<String>,
     update: Option<bool>,
-) -> Result<WeeklyResultDto, String> {
-    let week = Week::parse(&week).map_err(cmd_err)?;
+) -> CmdResult<WeeklyResultDto> {
+    let week = Week::parse(&week)?;
     let key = week.key();
     let req = GenerateRequest {
         period: week,
@@ -801,8 +787,8 @@ pub async fn generate_monthly_report(
     prompt: Option<String>,
     engine: Option<String>,
     update: Option<bool>,
-) -> Result<WeeklyResultDto, String> {
-    let month = Month::parse(&month).map_err(cmd_err)?;
+) -> CmdResult<WeeklyResultDto> {
+    let month = Month::parse(&month)?;
     let key = month.key();
     let req = GenerateRequest {
         period: month,
@@ -862,13 +848,13 @@ pub fn save_report_edit(
     project_id: Option<i64>,
     project: Option<String>,
     markdown: String,
-) -> Result<i64, String> {
-    let mut store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<i64> {
+    let mut store = state.open_store()?;
     let kind = report_type.as_deref().unwrap_or(KIND_DAILY);
     let pid = resolve_project_id(&store, project_id, project.as_deref())?;
-    let language = state.report_language(&[]).map_err(cmd_err)?;
+    let language = state.report_language(&[])?;
     versions::save_user_edit(&mut store, kind, &period_key, pid, &markdown, language)
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
@@ -879,13 +865,13 @@ pub fn set_report_status(
     project_id: Option<i64>,
     project: Option<String>,
     status: String,
-) -> Result<bool, String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<bool> {
+    let store = state.open_store()?;
     let kind = report_type.as_deref().unwrap_or(KIND_DAILY);
     let pid = resolve_project_id(&store, project_id, project.as_deref())?;
     store
         .set_report_status(kind, &period_key, pid, &status)
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
@@ -896,13 +882,13 @@ pub fn restore_report_version(
     project_id: Option<i64>,
     project: Option<String>,
     version_id: i64,
-) -> Result<bool, String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<bool> {
+    let store = state.open_store()?;
     let kind = report_type.as_deref().unwrap_or(KIND_DAILY);
     let pid = resolve_project_id(&store, project_id, project.as_deref())?;
     store
         .set_current_report_version(kind, &period_key, pid, version_id)
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -916,8 +902,8 @@ pub fn export_daily_report(
     custom_path: Option<String>,
     anchor_mode: String,
     force: bool,
-) -> Result<ExportResultDto, String> {
-    let mode = AnchorExportMode::parse(&anchor_mode).map_err(cmd_err)?;
+) -> CmdResult<ExportResultDto> {
+    let mode = AnchorExportMode::parse(&anchor_mode)?;
     let target = match custom_path
         .as_deref()
         .map(str::trim)
@@ -937,7 +923,7 @@ pub fn export_daily_report(
         }
         None => default_daily_export_path(&state.export_dir, &period_key),
     };
-    match export_markdown(&state.data_dir, &target, &markdown, mode, force).map_err(cmd_err)? {
+    match export_markdown(&state.data_dir, &target, &markdown, mode, force)? {
         ExportOutcome::Written { path, bytes } => Ok(ExportResultDto {
             status: "written".into(),
             path: path.to_string_lossy().into_owned(),
@@ -957,7 +943,7 @@ pub fn export_daily_report(
 }
 
 #[tauri::command]
-pub async fn pick_export_directory(default_dir: Option<String>) -> Result<Option<String>, String> {
+pub async fn pick_export_directory(default_dir: Option<String>) -> CmdResult<Option<String>> {
     let start = default_dir.map(|raw| PathBuf::from(raw.trim()));
     let picked = crate::pickers::choose_folder("Select Export Folder".to_string(), start).await?;
     Ok(picked.map(|p| p.to_string_lossy().into_owned()))

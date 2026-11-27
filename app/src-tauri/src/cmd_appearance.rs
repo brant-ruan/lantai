@@ -3,7 +3,8 @@
 use serde::Serialize;
 
 use crate::app_icon::{self, BundleSync};
-use crate::state::{cmd_err, AppState};
+use crate::error::CmdResult;
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,9 +32,9 @@ pub fn set_app_icon(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     id: String,
-) -> Result<(), String> {
+) -> CmdResult<()> {
     let icon = app_icon::find(&id).ok_or_else(|| format!("unknown app icon: {id}"))?;
-    app_icon::save_pref(&state.data_dir, icon).map_err(cmd_err)?;
+    app_icon::save_pref(&state.data_dir, icon)?;
     app_icon::apply(&app, icon, BundleSync::Always);
     Ok(())
 }

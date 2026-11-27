@@ -9,7 +9,8 @@ use aj_report::rollup::Granularity;
 use aj_store::{HumanNodeRow, HumanPosition, Store};
 use serde::{Deserialize, Serialize};
 
-use crate::state::{cmd_err, AppState};
+use crate::error::{CmdError, CmdResult};
+use crate::state::AppState;
 
 /// Where a project note shows in its project's section (mirrors [`HumanPosition`]).
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -186,7 +187,7 @@ fn position_or_bottom(p: Option<PositionParam>) -> HumanPosition {
     p.map(HumanPosition::from).unwrap_or_default()
 }
 
-fn load(store: &Store, scope: &ScopeParam) -> Result<HumanViewDto, String> {
+fn load(store: &Store, scope: &ScopeParam) -> CmdResult<HumanViewDto> {
     let view = match scope {
         ScopeParam::Period { kind, period } => human::load(store, kind, period),
         ScopeParam::Project {
@@ -195,16 +196,13 @@ fn load(store: &Store, scope: &ScopeParam) -> Result<HumanViewDto, String> {
         } => Granularity::parse(granularity)
             .and_then(|g| project_journal::load(store, *project_id, g)),
     };
-    view.map(view_dto).map_err(cmd_err)
+    view.map(view_dto).map_err(CmdError::from)
 }
 
 /// The nodes of a scope with where each annotation shows.
 #[tauri::command(async)]
-pub fn human_load(
-    state: tauri::State<'_, AppState>,
-    scope: ScopeParam,
-) -> Result<HumanViewDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
+pub fn human_load(state: tauri::State<'_, AppState>, scope: ScopeParam) -> CmdResult<HumanViewDto> {
+    let store = state.open_store()?;
     load(&store, &scope)
 }
 
@@ -214,8 +212,8 @@ pub fn human_create(
     scope: ScopeParam,
     place: NewPlaceParam,
     body: String,
-) -> Result<HumanCreatedDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<HumanCreatedDto> {
+    let store = state.open_store()?;
     let id = match &scope {
         ScopeParam::Period { kind, period } => {
             let place = match place {
@@ -256,8 +254,7 @@ pub fn human_create(
             Granularity::parse(granularity)
                 .and_then(|g| project_journal::create(&store, *project_id, g, place, &body))
         }
-    }
-    .map_err(cmd_err)?;
+    }?;
     Ok(HumanCreatedDto {
         id,
         view: load(&store, &scope)?,
@@ -270,13 +267,12 @@ pub fn human_update(
     scope: ScopeParam,
     id: i64,
     body: String,
-) -> Result<HumanViewDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<HumanViewDto> {
+    let store = state.open_store()?;
     match &scope {
         ScopeParam::Period { kind, period } => human::update_body(&store, kind, period, id, &body),
         ScopeParam::Project { .. } => project_journal::update_body(&store, id, &body),
-    }
-    .map_err(cmd_err)?;
+    }?;
     load(&store, &scope)
 }
 
@@ -286,19 +282,18 @@ pub fn human_move(
     scope: ScopeParam,
     id: i64,
     direction: MoveParam,
-) -> Result<HumanViewDto, String> {
+) -> CmdResult<HumanViewDto> {
     let m = match direction {
         MoveParam::Up => Move::Up,
         MoveParam::Down => Move::Down,
         MoveParam::Indent => Move::Indent,
         MoveParam::Outdent => Move::Outdent,
     };
-    let mut store = state.open_store().map_err(cmd_err)?;
+    let mut store = state.open_store()?;
     match &scope {
         ScopeParam::Period { kind, period } => human::move_node(&mut store, kind, period, id, m),
         ScopeParam::Project { .. } => project_journal::move_node(&mut store, id, m),
-    }
-    .map_err(cmd_err)?;
+    }?;
     load(&store, &scope)
 }
 
@@ -332,7 +327,7 @@ pub fn human_move_to(
     scope: ScopeParam,
     ids: Vec<i64>,
     drop: DropParam,
-) -> Result<HumanViewDto, String> {
+) -> CmdResult<HumanViewDto> {
     let drop = match drop {
         DropParam::Notes {
             project_id,
@@ -346,12 +341,11 @@ pub fn human_move_to(
         DropParam::Annotations { with, after } => Drop::Annotations { with, after },
         DropParam::Children { parent, after } => Drop::Children { parent, after },
     };
-    let mut store = state.open_store().map_err(cmd_err)?;
+    let mut store = state.open_store()?;
     match &scope {
         ScopeParam::Period { kind, period } => human::move_to(&mut store, kind, period, &ids, drop),
         ScopeParam::Project { .. } => project_journal::move_to(&mut store, &ids, drop),
-    }
-    .map_err(cmd_err)?;
+    }?;
     load(&store, &scope)
 }
 
@@ -421,9 +415,9 @@ pub fn human_delete(
     state: tauri::State<'_, AppState>,
     scope: ScopeParam,
     ids: Vec<i64>,
-) -> Result<HumanDeletedDto, String> {
-    let mut store = state.open_store().map_err(cmd_err)?;
-    let removed = human::delete(&mut store, &ids).map_err(cmd_err)?;
+) -> CmdResult<HumanDeletedDto> {
+    let mut store = state.open_store()?;
+    let removed = human::delete(&mut store, &ids)?;
     Ok(HumanDeletedDto {
         removed: removed.into_iter().map(RemovedNodeDto::from).collect(),
         view: load(&store, &scope)?,
@@ -436,9 +430,9 @@ pub fn human_restore(
     state: tauri::State<'_, AppState>,
     scope: ScopeParam,
     rows: Vec<RemovedNodeDto>,
-) -> Result<HumanViewDto, String> {
+) -> CmdResult<HumanViewDto> {
     let rows: Vec<HumanNodeRow> = rows.into_iter().map(HumanNodeRow::from).collect();
-    let mut store = state.open_store().map_err(cmd_err)?;
-    human::restore(&mut store, &rows).map_err(cmd_err)?;
+    let mut store = state.open_store()?;
+    human::restore(&mut store, &rows)?;
     load(&store, &scope)
 }

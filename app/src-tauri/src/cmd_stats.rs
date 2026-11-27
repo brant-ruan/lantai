@@ -6,7 +6,8 @@ use aj_ir::Usage;
 use chrono::{Local, Utc};
 use serde::Serialize;
 
-use crate::state::{cmd_err, AppState};
+use crate::error::CmdResult;
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -285,22 +286,17 @@ pub fn get_stats(
     state: tauri::State<'_, AppState>,
     range: String,
     include_ignored: Option<bool>,
-) -> Result<StatsReportDto, String> {
+) -> CmdResult<StatsReportDto> {
     let parsed_range =
         StatsRange::parse(&range).ok_or_else(|| format!("unknown stats range: {range}"))?;
-    let store = state.open_store().map_err(cmd_err)?;
-    let today = local_date(
-        Utc::now(),
-        &Local,
-        state.core_config().map_err(cmd_err)?.day_boundary_hour,
-    );
+    let store = state.open_store()?;
+    let today = local_date(Utc::now(), &Local, state.core_config()?.day_boundary_hour);
     let report = load_stats(
         &store,
         parsed_range,
         include_ignored.unwrap_or(false),
         today,
         &Local,
-    )
-    .map_err(cmd_err)?;
+    )?;
     Ok(report.into())
 }

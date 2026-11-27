@@ -14,7 +14,8 @@ use aj_core::scan::normalized_cwd;
 use aj_store::NewRule;
 use serde::Serialize;
 
-use crate::state::{cmd_err, AppState};
+use crate::error::{CmdError, CmdResult};
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -87,26 +88,25 @@ pub struct AssignOutcomeDto {
     pub uncovered_path: Option<String>,
 }
 
-fn reevaluate(state: &AppState, store: &aj_store::Store) -> Result<(), String> {
-    let adapters = state.adapters().map_err(cmd_err)?;
+fn reevaluate(state: &AppState, store: &aj_store::Store) -> CmdResult<()> {
+    let adapters = state.adapters()?;
     let refs: Vec<&dyn SourceAdapter> = adapters.iter().map(|a| a.as_ref()).collect();
-    evaluate_all(store, &|s| normalized_cwd(&refs, s)).map_err(cmd_err)?;
+    evaluate_all(store, &|s| normalized_cwd(&refs, s))?;
     Ok(())
 }
 
 #[tauri::command(async)]
 pub fn list_projects_and_rules(
     state: tauri::State<'_, AppState>,
-) -> Result<ProjectsOverviewDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let projects = store.project_summaries().map_err(cmd_err)?;
+) -> CmdResult<ProjectsOverviewDto> {
+    let store = state.open_store()?;
+    let projects = store.project_summaries()?;
     let names: HashMap<i64, String> = projects
         .iter()
         .map(|p| (p.project.id, p.project.name.clone()))
         .collect();
     let rules = store
-        .rules()
-        .map_err(cmd_err)?
+        .rules()?
         .into_iter()
         .map(|r| RuleDto {
             id: r.id,
@@ -119,8 +119,7 @@ pub fn list_projects_and_rules(
         })
         .collect();
     let candidates = store
-        .project_candidates()
-        .map_err(cmd_err)?
+        .project_candidates()?
         .into_iter()
         .map(|c| CandidateDto {
             root: c.root,
@@ -148,7 +147,7 @@ pub fn create_project(
     regexes: Option<Vec<String>>,
     regex_field: Option<String>,
     auto_apply: Option<bool>,
-) -> Result<i64, String> {
+) -> CmdResult<i64> {
     // The form sends a line per pattern; empty lines are not rules.
     let given = |v: Option<Vec<String>>| -> Vec<String> {
         v.unwrap_or_default()
@@ -163,17 +162,14 @@ pub fn create_project(
         regexes: &regexes,
         regex_field: regex_field.as_deref().unwrap_or("any"),
         auto_apply: auto_apply.unwrap_or(false),
-    })
-    .map_err(cmd_err)?;
+    })?;
     let new: Vec<NewRule> = rules.iter().map(ValidRule::as_new).collect();
     let desc = description
         .as_deref()
         .map(str::trim)
         .filter(|d| !d.is_empty());
-    let mut store = state.open_store().map_err(cmd_err)?;
-    let (id, rule_ids) = store
-        .create_project_with_rules(&name, desc, &new)
-        .map_err(cmd_err)?;
+    let mut store = state.open_store()?;
+    let (id, rule_ids) = store.create_project_with_rules(&name, desc, &new)?;
     if !rule_ids.is_empty() {
         reevaluate(&state, &store)?;
     }
@@ -185,19 +181,19 @@ pub fn rename_project(
     state: tauri::State<'_, AppState>,
     id: i64,
     new_name: String,
-) -> Result<(), String> {
-    let mut store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<()> {
+    let mut store = state.open_store()?;
     store
         .rename_project(id, &new_name, aj_report::structure::rename_project_heading)
         .map(|_| ())
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 /// Save the user's project display order (also used to order daily report sections).
 #[tauri::command(async)]
-pub fn reorder_projects(state: tauri::State<'_, AppState>, ids: Vec<i64>) -> Result<(), String> {
-    let mut store = state.open_store().map_err(cmd_err)?;
-    store.reorder_projects(&ids).map_err(cmd_err)
+pub fn reorder_projects(state: tauri::State<'_, AppState>, ids: Vec<i64>) -> CmdResult<()> {
+    let mut store = state.open_store()?;
+    store.reorder_projects(&ids).map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
@@ -205,13 +201,15 @@ pub fn describe_project(
     state: tauri::State<'_, AppState>,
     id: i64,
     description: Option<String>,
-) -> Result<(), String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<()> {
+    let store = state.open_store()?;
     let desc = description
         .as_deref()
         .map(str::trim)
         .filter(|d| !d.is_empty());
-    store.set_project_description(id, desc).map_err(cmd_err)
+    store
+        .set_project_description(id, desc)
+        .map_err(CmdError::from)
 }
 
 /// Archive or restore a project, then re-evaluate assignments (its rules pause or resume).
@@ -220,9 +218,9 @@ pub fn set_project_archived(
     state: tauri::State<'_, AppState>,
     id: i64,
     archived: bool,
-) -> Result<(), String> {
-    let mut store = state.open_store().map_err(cmd_err)?;
-    store.set_project_archived(id, archived).map_err(cmd_err)?;
+) -> CmdResult<()> {
+    let mut store = state.open_store()?;
+    store.set_project_archived(id, archived)?;
     reevaluate(&state, &store)
 }
 
@@ -230,9 +228,9 @@ pub fn set_project_archived(
 pub fn project_delete_impact(
     state: tauri::State<'_, AppState>,
     id: i64,
-) -> Result<DeleteImpactDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let i = store.project_delete_impact(id).map_err(cmd_err)?;
+) -> CmdResult<DeleteImpactDto> {
+    let store = state.open_store()?;
+    let i = store.project_delete_impact(id)?;
     Ok(DeleteImpactDto {
         sessions: i.sessions,
         reports: i.reports,
@@ -242,11 +240,11 @@ pub fn project_delete_impact(
 }
 
 #[tauri::command(async)]
-pub fn delete_project(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
-    let hour = state.core_config().map_err(cmd_err)?.day_boundary_hour;
+pub fn delete_project(state: tauri::State<'_, AppState>, id: i64) -> CmdResult<()> {
+    let hour = state.core_config()?.day_boundary_hour;
     let today = aj_core::slice::local_date(chrono::Utc::now(), &chrono::Local, hour).to_string();
-    let mut store = state.open_store().map_err(cmd_err)?;
-    store.delete_project(id, &today).map_err(cmd_err)?;
+    let mut store = state.open_store()?;
+    store.delete_project(id, &today)?;
     reevaluate(&state, &store)
 }
 
@@ -258,33 +256,31 @@ pub fn add_rule(
     target_field: Option<String>,
     pattern: String,
     auto_apply: bool,
-) -> Result<i64, String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<i64> {
+    let store = state.open_store()?;
     let field = if rule_type == RULE_REGEX {
         Some(target_field.as_deref().unwrap_or("any"))
     } else {
         None
     };
-    let normalized = validate_rule(&rule_type, field, &pattern).map_err(cmd_err)?;
-    let id = store
-        .add_rule(
-            project_id,
-            &NewRule {
-                rule_type: &rule_type,
-                target_field: field,
-                pattern: &normalized,
-                auto_apply,
-            },
-        )
-        .map_err(cmd_err)?;
+    let normalized = validate_rule(&rule_type, field, &pattern)?;
+    let id = store.add_rule(
+        project_id,
+        &NewRule {
+            rule_type: &rule_type,
+            target_field: field,
+            pattern: &normalized,
+            auto_apply,
+        },
+    )?;
     reevaluate(&state, &store)?;
     Ok(id)
 }
 
 #[tauri::command(async)]
-pub fn delete_rule(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    store.delete_rule(id).map_err(cmd_err)?;
+pub fn delete_rule(state: tauri::State<'_, AppState>, id: i64) -> CmdResult<()> {
+    let store = state.open_store()?;
+    store.delete_rule(id)?;
     reevaluate(&state, &store)
 }
 
@@ -293,9 +289,9 @@ pub fn set_rule_auto(
     state: tauri::State<'_, AppState>,
     id: i64,
     auto_apply: bool,
-) -> Result<(), String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    store.set_rule_auto_apply(id, auto_apply).map_err(cmd_err)?;
+) -> CmdResult<()> {
+    let store = state.open_store()?;
+    store.set_rule_auto_apply(id, auto_apply)?;
     reevaluate(&state, &store)
 }
 
@@ -304,16 +300,13 @@ pub fn assign_session(
     state: tauri::State<'_, AppState>,
     session_id: i64,
     project_id: Option<i64>,
-) -> Result<AssignOutcomeDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    store
-        .assign_manual(session_id, project_id)
-        .map_err(cmd_err)?;
+) -> CmdResult<AssignOutcomeDto> {
+    let store = state.open_store()?;
+    store.assign_manual(session_id, project_id)?;
     let uncovered = if project_id.is_some() {
-        let rules = store.rules().map_err(cmd_err)?;
+        let rules = store.rules()?;
         store
-            .session(session_id)
-            .map_err(cmd_err)?
+            .session(session_id)?
             .and_then(|s| uncovered_path(&rules, &s))
     } else {
         None
@@ -328,17 +321,17 @@ pub fn assign_slice(
     state: tauri::State<'_, AppState>,
     slice_id: i64,
     project_id: Option<i64>,
-) -> Result<(), String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<()> {
+    let store = state.open_store()?;
     store
         .set_slice_project_override(slice_id, project_id)
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
-pub fn unassign_session(state: tauri::State<'_, AppState>, session_id: i64) -> Result<(), String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    store.clear_manual(session_id).map_err(cmd_err)?;
+pub fn unassign_session(state: tauri::State<'_, AppState>, session_id: i64) -> CmdResult<()> {
+    let store = state.open_store()?;
+    store.clear_manual(session_id)?;
     reevaluate(&state, &store)
 }
 
@@ -346,11 +339,11 @@ pub fn unassign_session(state: tauri::State<'_, AppState>, session_id: i64) -> R
 pub fn accept_suggestions(
     state: tauri::State<'_, AppState>,
     session_ids: Vec<i64>,
-) -> Result<u64, String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<u64> {
+    let store = state.open_store()?;
     let mut accepted = 0u64;
     for id in session_ids {
-        if store.accept_suggestion(id).map_err(cmd_err)? {
+        if store.accept_suggestion(id)? {
             accepted += 1;
         }
     }

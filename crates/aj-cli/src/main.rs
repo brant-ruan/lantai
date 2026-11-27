@@ -11,16 +11,18 @@ use clap::{Parser, Subcommand};
 mod app;
 mod cmd_browse;
 mod cmd_migrate;
+mod cmd_models;
 mod cmd_project;
 mod cmd_prompt;
 mod cmd_report;
 mod cmd_search;
 
-use app::{find_session, resolve_date, title, App};
+use app::{resolve_date, App};
 use cmd_browse::*;
+use cmd_models::ModelsArgs;
 use cmd_project::{AssignArgs, ProjectCmd, RuleCmd};
 use cmd_prompt::PromptCmd;
-use cmd_report::{cmd_add_tool, cmd_find_tools, cmd_models, ReportKind};
+use cmd_report::ReportKind;
 use cmd_search::SearchArgs;
 
 #[derive(Parser)]
@@ -132,20 +134,7 @@ enum Cmd {
         session: Option<String>,
     },
     /// List the configured model aliases and their providers; find and add local agent CLIs
-    Models {
-        /// Send a tiny request to each model (or the one given by --model) to check connectivity
-        #[arg(long)]
-        test: bool,
-        /// Only list/test this model alias
-        #[arg(long)]
-        model: Option<String>,
-        /// Look for known agent CLIs on PATH and say which can generate reports (runs only `--version`)
-        #[arg(long, conflicts_with_all = ["test", "model"])]
-        find: bool,
-        /// Add a local agent CLI found on PATH as a provider and model (`claude` or `codex`)
-        #[arg(long, value_name = "TOOL", conflicts_with_all = ["test", "model", "find"])]
-        add: Option<String>,
-    },
+    Models(ModelsArgs),
     /// Show the parsing health of each source
     Doctor,
     /// Back up a database left by an older Lantai, then upgrade it to this version
@@ -199,16 +188,7 @@ fn main() -> Result<()> {
         Cmd::Show { target, full } => cmd_show(&app, &target, full),
         Cmd::Digest { slice } => cmd_digest(&app, &slice),
         Cmd::Search(args) => cmd_search::cmd_search(&app, args),
-        Cmd::Note { session, text } => {
-            let s = find_session(&app, &session)?;
-            app.store.set_session_note(s.id, text.as_deref())?;
-            println!(
-                "Note {}: {}",
-                if text.is_some() { "set" } else { "cleared" },
-                title(&s)
-            );
-            Ok(())
-        }
+        Cmd::Note { session, text } => cmd_note(&app, &session, text.as_deref()),
         Cmd::Ignore { session } => set_ignored(&app, &session, true),
         Cmd::Include { session } => set_ignored(&app, &session, false),
         Cmd::Report { kind } => cmd_report::cmd_report(&mut app, kind),
@@ -223,11 +203,7 @@ fn main() -> Result<()> {
             project,
             all,
         } => cmd_project::cmd_accept(&app, &targets, date.as_deref(), project.as_deref(), all),
-        Cmd::Models { find: true, .. } => cmd_find_tools(),
-        Cmd::Models {
-            add: Some(tool), ..
-        } => cmd_add_tool(&app, &tool),
-        Cmd::Models { test, model, .. } => cmd_models(&app, test, model.as_deref()),
+        Cmd::Models(args) => cmd_models::cmd_models(&app, args),
         Cmd::Export { session } => cmd_export(&app, session.as_deref()),
         Cmd::Doctor => cmd_doctor(&app),
         Cmd::Migrate { .. } => unreachable!("handled before the database is opened"),

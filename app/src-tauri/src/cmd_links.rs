@@ -2,6 +2,7 @@
 //! links people write in their notes, which must be plain http(s) addresses so that nothing
 //! else (files, other URL schemes, command-line flags) can be opened through this path.
 
+use crate::error::CmdResult;
 use serde::Deserialize;
 
 /// Where a sponsor can support Lantai.
@@ -21,7 +22,7 @@ impl SponsorChannel {
     }
 }
 
-pub(crate) fn open_in_browser(url: &str) -> Result<(), String> {
+pub(crate) fn open_in_browser(url: &str) -> CmdResult<()> {
     let status = std::process::Command::new("/usr/bin/open")
         .arg(url)
         .status()
@@ -29,12 +30,12 @@ pub(crate) fn open_in_browser(url: &str) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        Err(format!("failed to open {url}: {status}"))
+        Err(format!("failed to open {url}: {status}").into())
     }
 }
 
 #[tauri::command(async)]
-pub fn open_sponsor_page(channel: SponsorChannel) -> Result<(), String> {
+pub fn open_sponsor_page(channel: SponsorChannel) -> CmdResult<()> {
     open_in_browser(channel.url())
 }
 
@@ -46,9 +47,9 @@ fn is_web_link(url: &str) -> bool {
 }
 
 #[tauri::command(async)]
-pub fn open_note_link(url: String) -> Result<(), String> {
+pub fn open_note_link(url: String) -> CmdResult<()> {
     if !is_web_link(&url) {
-        return Err(format!("not a web link: {url}"));
+        return Err(format!("not a web link: {url}").into());
     }
     open_in_browser(&url)
 }

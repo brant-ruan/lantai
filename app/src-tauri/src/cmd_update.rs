@@ -4,7 +4,8 @@
 use aj_update::UpdateCheck;
 use serde::Serialize;
 
-use crate::state::{cmd_err, AppState};
+use crate::error::{CmdError, CmdResult};
+use crate::state::AppState;
 
 /// The running app's version (the workspace version).
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -17,8 +18,8 @@ pub struct UpdateSettingsDto {
 }
 
 #[tauri::command(async)]
-pub fn update_settings(state: tauri::State<'_, AppState>) -> Result<UpdateSettingsDto, String> {
-    let cfg = state.load_config().map_err(cmd_err)?;
+pub fn update_settings(state: tauri::State<'_, AppState>) -> CmdResult<UpdateSettingsDto> {
+    let cfg = state.load_config()?;
     Ok(UpdateSettingsDto {
         check_updates: cfg.check_updates(),
         current_version: CURRENT_VERSION.to_string(),
@@ -26,26 +27,26 @@ pub fn update_settings(state: tauri::State<'_, AppState>) -> Result<UpdateSettin
 }
 
 #[tauri::command(async)]
-pub fn set_check_updates(state: tauri::State<'_, AppState>, on: bool) -> Result<(), String> {
+pub fn set_check_updates(state: tauri::State<'_, AppState>, on: bool) -> CmdResult<()> {
     state
         .modify_config(|c| {
             c.set_check_updates(on);
             Ok(())
         })
         .map(|_| ())
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
-pub fn check_for_updates() -> Result<UpdateCheck, String> {
-    aj_update::check(CURRENT_VERSION).map_err(cmd_err)
+pub fn check_for_updates() -> CmdResult<UpdateCheck> {
+    aj_update::check(CURRENT_VERSION).map_err(CmdError::from)
 }
 
 /// Open a release page from a check result; only pages of Lantai's own releases open here.
 #[tauri::command(async)]
-pub fn open_release_page(url: String) -> Result<(), String> {
+pub fn open_release_page(url: String) -> CmdResult<()> {
     if !is_release_page(&url) {
-        return Err(format!("not a Lantai release page: {url}"));
+        return Err(format!("not a Lantai release page: {url}").into());
     }
     crate::cmd_links::open_in_browser(&url)
 }

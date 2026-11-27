@@ -22,7 +22,8 @@ use chrono::{Datelike, Local, Utc};
 use serde::Serialize;
 
 use crate::cmd_project::{ProjectDto, RuleDto};
-use crate::state::{cmd_err, AppState};
+use crate::error::{CmdError, CmdResult};
+use crate::state::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -282,15 +283,13 @@ fn build_slice_card(
 pub async fn scan_sessions(
     state: tauri::State<'_, AppState>,
     since_days: Option<i64>,
-) -> Result<ScanResultDto, String> {
+) -> CmdResult<ScanResultDto> {
     let data_dir = state.data_dir.clone();
-    let app_cfg = state.load_config().map_err(cmd_err)?;
+    let app_cfg = state.load_config()?;
     let cfg = app_cfg.core_config();
     tauri::async_runtime::spawn_blocking(move || {
-        let adapters = aj_sources::build_adapters(&data_dir, |kind| app_cfg.agent(kind).enabled)
-            .map_err(cmd_err)?;
-        let mut store =
-            aj_store::Store::open(&data_dir.join(crate::state::DB_FILE)).map_err(cmd_err)?;
+        let adapters = aj_sources::build_adapters(&data_dir, |kind| app_cfg.agent(kind).enabled)?;
+        let mut store = aj_store::Store::open(&data_dir.join(crate::state::DB_FILE))?;
         let refs: Vec<&dyn SourceAdapter> = adapters.iter().map(|a| a.as_ref()).collect();
         let r = scan(
             &mut store,
@@ -300,8 +299,7 @@ pub async fn scan_sessions(
             &ScanOptions {
                 since_days: Some(since_days.unwrap_or(90)),
             },
-        )
-        .map_err(cmd_err)?;
+        )?;
         Ok(ScanResultDto {
             files_seen: r.files_seen,
             files_parsed: r.files_parsed,
@@ -327,9 +325,9 @@ pub struct DayBoundaryDto {
 }
 
 #[tauri::command(async)]
-pub fn get_day_boundary(state: tauri::State<'_, AppState>) -> Result<DayBoundaryDto, String> {
+pub fn get_day_boundary(state: tauri::State<'_, AppState>) -> CmdResult<DayBoundaryDto> {
     Ok(DayBoundaryDto {
-        hour: state.core_config().map_err(cmd_err)?.day_boundary_hour,
+        hour: state.core_config()?.day_boundary_hour,
         max_hour: aj_report::MAX_DAY_BOUNDARY_HOUR,
     })
 }
@@ -339,16 +337,14 @@ pub fn get_day_boundary(state: tauri::State<'_, AppState>) -> Result<DayBoundary
 pub async fn set_day_boundary(
     state: tauri::State<'_, AppState>,
     hour: u32,
-) -> Result<DayBoundaryDto, String> {
+) -> CmdResult<DayBoundaryDto> {
     let cfg = state
-        .modify_config(|cfg| cfg.set_day_boundary_hour(hour))
-        .map_err(cmd_err)?
+        .modify_config(|cfg| cfg.set_day_boundary_hour(hour))?
         .core_config();
     let data_dir = state.data_dir.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut store =
-            aj_store::Store::open(&data_dir.join(crate::state::DB_FILE)).map_err(cmd_err)?;
-        aj_core::slice::reslice_all(&mut store, &cfg, &Local).map_err(cmd_err)?;
+        let mut store = aj_store::Store::open(&data_dir.join(crate::state::DB_FILE))?;
+        aj_core::slice::reslice_all(&mut store, &cfg, &Local)?;
         Ok(DayBoundaryDto {
             hour: cfg.day_boundary_hour,
             max_hour: aj_report::MAX_DAY_BOUNDARY_HOUR,
@@ -362,16 +358,10 @@ pub async fn set_day_boundary(
 pub fn list_days(
     state: tauri::State<'_, AppState>,
     include_ignored: Option<bool>,
-) -> Result<DaysResponseDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let rows =
-        aj_core::overview::day_rows(&store, include_ignored.unwrap_or(false)).map_err(cmd_err)?;
-    let today = local_date(
-        Utc::now(),
-        &Local,
-        state.core_config().map_err(cmd_err)?.day_boundary_hour,
-    )
-    .to_string();
+) -> CmdResult<DaysResponseDto> {
+    let store = state.open_store()?;
+    let rows = aj_core::overview::day_rows(&store, include_ignored.unwrap_or(false))?;
+    let today = local_date(Utc::now(), &Local, state.core_config()?.day_boundary_hour).to_string();
     Ok(DaysResponseDto {
         today,
         days: rows
@@ -411,14 +401,10 @@ pub struct WeeksResponseDto {
 
 /// Every week with activity, newest first.
 #[tauri::command(async)]
-pub fn list_weeks(state: tauri::State<'_, AppState>) -> Result<WeeksResponseDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let today = local_date(
-        Utc::now(),
-        &Local,
-        state.core_config().map_err(cmd_err)?.day_boundary_hour,
-    );
-    let weeks = week_overviews(&store).map_err(cmd_err)?;
+pub fn list_weeks(state: tauri::State<'_, AppState>) -> CmdResult<WeeksResponseDto> {
+    let store = state.open_store()?;
+    let today = local_date(Utc::now(), &Local, state.core_config()?.day_boundary_hour);
+    let weeks = week_overviews(&store)?;
     Ok(WeeksResponseDto {
         current_week: Week::containing(today).key(),
         weeks: weeks
@@ -461,14 +447,10 @@ pub struct MonthsResponseDto {
 
 /// Every calendar month with activity, newest first.
 #[tauri::command(async)]
-pub fn list_months(state: tauri::State<'_, AppState>) -> Result<MonthsResponseDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let today = local_date(
-        Utc::now(),
-        &Local,
-        state.core_config().map_err(cmd_err)?.day_boundary_hour,
-    );
-    let months = month_overviews(&store).map_err(cmd_err)?;
+pub fn list_months(state: tauri::State<'_, AppState>) -> CmdResult<MonthsResponseDto> {
+    let store = state.open_store()?;
+    let today = local_date(Utc::now(), &Local, state.core_config()?.day_boundary_hour);
+    let months = month_overviews(&store)?;
     Ok(MonthsResponseDto {
         current_month: Month::containing(today).key(),
         months: months
@@ -515,10 +497,10 @@ fn map_slice_cards(
     project_names: &HashMap<i64, String>,
     rules: &[aj_store::RuleRow],
     lang: &Language,
-) -> Result<Vec<SliceCardDto>, String> {
+) -> CmdResult<Vec<SliceCardDto>> {
     let mut out = Vec::with_capacity(slices.len());
     for slice in slices {
-        if let Some(session) = store.session(slice.session_id).map_err(cmd_err)? {
+        if let Some(session) = store.session(slice.session_id)? {
             out.push(build_slice_card(
                 &slice,
                 &session,
@@ -533,13 +515,9 @@ fn map_slice_cards(
 
 /// The prompts to pick from for `kind` reports in `lang`, marking its default;
 /// a default borrowed from another language is offered too.
-fn prompt_options(
-    store: &Store,
-    kind: &str,
-    lang: &Language,
-) -> Result<Vec<PromptOptionDto>, String> {
-    let default = prompt_library::default_prompt(store, kind, lang).map_err(cmd_err)?;
-    let mut rows = prompt_library::offered(store, Some(kind), lang).map_err(cmd_err)?;
+fn prompt_options(store: &Store, kind: &str, lang: &Language) -> CmdResult<Vec<PromptOptionDto>> {
+    let default = prompt_library::default_prompt(store, kind, lang)?;
+    let mut rows = prompt_library::offered(store, Some(kind), lang)?;
     if !rows.iter().any(|p| p.id == default.id) {
         rows.insert(0, default.clone());
     }
@@ -558,9 +536,9 @@ fn prompt_options(
 pub fn day_workbench(
     state: tauri::State<'_, AppState>,
     date: String,
-) -> Result<DayWorkbenchDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let slices = store.slices_for_date(&date).map_err(cmd_err)?;
+) -> CmdResult<DayWorkbenchDto> {
+    let store = state.open_store()?;
+    let slices = store.slices_for_date(&date)?;
     build_workbench(&state, &store, date, slices, KIND_DAILY)
 }
 
@@ -569,12 +547,12 @@ pub fn day_workbench(
 pub fn week_workbench(
     state: tauri::State<'_, AppState>,
     week: String,
-) -> Result<DayWorkbenchDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let week = Week::parse(&week).map_err(cmd_err)?;
+) -> CmdResult<DayWorkbenchDto> {
+    let store = state.open_store()?;
+    let week = Week::parse(&week)?;
     let mut slices = Vec::new();
     for date in week.dates() {
-        slices.extend(store.slices_for_date(&date.to_string()).map_err(cmd_err)?);
+        slices.extend(store.slices_for_date(&date.to_string())?);
     }
     build_workbench(&state, &store, week.key(), slices, KIND_WEEKLY)
 }
@@ -584,13 +562,13 @@ pub fn week_workbench(
 pub fn month_workbench(
     state: tauri::State<'_, AppState>,
     month: String,
-) -> Result<DayWorkbenchDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let month = Month::parse(&month).map_err(cmd_err)?;
+) -> CmdResult<DayWorkbenchDto> {
+    let store = state.open_store()?;
+    let month = Month::parse(&month)?;
     let mut slices = Vec::new();
     for week in month.weeks() {
         for date in week.dates() {
-            slices.extend(store.slices_for_date(&date.to_string()).map_err(cmd_err)?);
+            slices.extend(store.slices_for_date(&date.to_string())?);
         }
     }
     build_workbench(&state, &store, month.key(), slices, KIND_MONTHLY)
@@ -602,15 +580,15 @@ fn build_workbench(
     period: String,
     slice_rows: Vec<SliceRow>,
     prompt_kind: &str,
-) -> Result<DayWorkbenchDto, String> {
-    let cfg = state.load_config().map_err(cmd_err)?;
-    let project_rows = store.projects().map_err(cmd_err)?;
+) -> CmdResult<DayWorkbenchDto> {
+    let cfg = state.load_config()?;
+    let project_rows = store.projects()?;
     let project_names: HashMap<i64, String> = project_rows
         .iter()
         .map(|p| (p.id, p.name.clone()))
         .collect();
-    let rules = store.rules().map_err(cmd_err)?;
-    let lang = state.report_language(&[]).map_err(cmd_err)?;
+    let rules = store.rules()?;
+    let lang = state.report_language(&[])?;
     let slices = map_slice_cards(store, slice_rows, &project_names, &rules, lang)?;
 
     let projects = project_rows
@@ -636,9 +614,9 @@ pub fn project_workbench(
     project_id: i64,
     since_date: Option<String>,
     until_date: Option<String>,
-) -> Result<ProjectWorkbenchDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let project_rows = store.project_summaries().map_err(cmd_err)?;
+) -> CmdResult<ProjectWorkbenchDto> {
+    let store = state.open_store()?;
+    let project_rows = store.project_summaries()?;
     let project_names: HashMap<i64, String> = project_rows
         .iter()
         .map(|p| (p.project.id, p.project.name.clone()))
@@ -646,26 +624,21 @@ pub fn project_workbench(
     let summary = project_rows
         .iter()
         .find(|p| p.project.id == project_id)
-        .with_context(|| format!("no project with ID {project_id}"))
-        .map_err(cmd_err)?;
+        .with_context(|| format!("no project with ID {project_id}"))?;
     let project = ProjectDto::from(summary);
 
-    let all_rules = store.rules().map_err(cmd_err)?;
-    let lang = state.report_language(&[]).map_err(cmd_err)?;
+    let all_rules = store.rules()?;
+    let lang = state.report_language(&[])?;
     let slices = map_slice_cards(
         &store,
-        store
-            .slices_for_project(project_id, since_date.as_deref(), until_date.as_deref())
-            .map_err(cmd_err)?,
+        store.slices_for_project(project_id, since_date.as_deref(), until_date.as_deref())?,
         &project_names,
         &all_rules,
         lang,
     )?;
     let suggested_slices = map_slice_cards(
         &store,
-        store
-            .suggested_slices_for_project(project_id)
-            .map_err(cmd_err)?,
+        store.suggested_slices_for_project(project_id)?,
         &project_names,
         &all_rules,
         lang,
@@ -698,29 +671,21 @@ pub fn project_workbench(
 }
 
 #[tauri::command(async)]
-pub fn slice_detail(
-    state: tauri::State<'_, AppState>,
-    slice_id: i64,
-) -> Result<SliceDetailDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
+pub fn slice_detail(state: tauri::State<'_, AppState>, slice_id: i64) -> CmdResult<SliceDetailDto> {
+    let store = state.open_store()?;
     let slice = store
-        .slice(slice_id)
-        .map_err(cmd_err)?
-        .with_context(|| format!("no slice S{slice_id}"))
-        .map_err(cmd_err)?;
+        .slice(slice_id)?
+        .with_context(|| format!("no slice S{slice_id}"))?;
     let session = store
-        .session(slice.session_id)
-        .map_err(cmd_err)?
-        .context("the session this slice belongs to does not exist")
-        .map_err(cmd_err)?;
-    let project_names = store.project_names().map_err(cmd_err)?;
-    let rules = store.rules().map_err(cmd_err)?;
-    let lang = state.report_language(&[]).map_err(cmd_err)?;
-    let cfg = state.load_config().map_err(cmd_err)?;
+        .session(slice.session_id)?
+        .context("the session this slice belongs to does not exist")?;
+    let project_names = store.project_names()?;
+    let rules = store.rules()?;
+    let lang = state.report_language(&[])?;
+    let cfg = state.load_config()?;
     let card = build_slice_card(&slice, &session, &project_names, &rules, lang);
 
-    let dehydrated_chars = dehydrate_slice(&store, &session, &slice, &Local)
-        .map_err(cmd_err)?
+    let dehydrated_chars = dehydrate_slice(&store, &session, &slice, &Local)?
         .text()
         .chars()
         .count();
@@ -734,11 +699,8 @@ pub fn slice_detail(
         });
 
     let mut turns = Vec::new();
-    for turn in store
-        .turns(session.id, slice.start_turn_index, slice.end_turn_index)
-        .map_err(cmd_err)?
-    {
-        let items = store.turn_items(turn.id).map_err(cmd_err)?;
+    for turn in store.turns(session.id, slice.start_turn_index, slice.end_turn_index)? {
+        let items = store.turn_items(turn.id)?;
         let mut messages = Vec::new();
         let mut tools = Vec::new();
         for item in items {
@@ -804,8 +766,8 @@ pub fn set_session_note(
     state: tauri::State<'_, AppState>,
     session_id: i64,
     note: Option<String>,
-) -> Result<(), String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<()> {
+    let store = state.open_store()?;
     let trimmed = note
         .as_deref()
         .map(str::trim)
@@ -813,7 +775,7 @@ pub fn set_session_note(
         .map(str::to_string);
     store
         .set_session_note(session_id, trimmed.as_deref())
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
@@ -821,11 +783,11 @@ pub fn set_session_ignored(
     state: tauri::State<'_, AppState>,
     session_id: i64,
     ignored: bool,
-) -> Result<(), String> {
-    let store = state.open_store().map_err(cmd_err)?;
+) -> CmdResult<()> {
+    let store = state.open_store()?;
     store
         .set_session_ignored(session_id, ignored)
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
@@ -833,23 +795,22 @@ pub fn set_slice_ignore_state(
     state: tauri::State<'_, AppState>,
     slice_id: i64,
     ignore_state: String,
-) -> Result<(), String> {
+) -> CmdResult<()> {
     if !matches!(ignore_state.as_str(), "inherit" | "ignored" | "included") {
-        return Err(format!("invalid slice ignore state: {ignore_state}"));
+        return Err(format!("invalid slice ignore state: {ignore_state}").into());
     }
-    let store = state.open_store().map_err(cmd_err)?;
+    let store = state.open_store()?;
     store
         .set_slice_ignore_state(slice_id, &ignore_state)
-        .map_err(cmd_err)
+        .map_err(CmdError::from)
 }
 
 #[tauri::command(async)]
-pub fn diagnostics(state: tauri::State<'_, AppState>) -> Result<DiagnosticsDto, String> {
-    let store = state.open_store().map_err(cmd_err)?;
-    let (sessions, turns) = store.session_count().map_err(cmd_err)?;
+pub fn diagnostics(state: tauri::State<'_, AppState>) -> CmdResult<DiagnosticsDto> {
+    let store = state.open_store()?;
+    let (sessions, turns) = store.session_count()?;
     let sources = store
-        .source_health()
-        .map_err(cmd_err)?
+        .source_health()?
         .into_iter()
         .map(|h| SourceHealthDto {
             agent: aj_ir::AgentId::parse(&h.agent)
