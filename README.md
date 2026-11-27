@@ -315,7 +315,7 @@ chunk_chars = 40000                # longest record in one digest request
 stage2_chars = 60000               # most material in one report request
 ```
 
-The full reference is at the top of [`crates/aj-report/src/config.rs`](crates/aj-report/src/config.rs).
+The full reference is at the top of [`crates/aj-report/src/config/mod.rs`](crates/aj-report/src/config/mod.rs).
 
 </details>
 

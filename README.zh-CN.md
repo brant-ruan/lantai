@@ -315,7 +315,7 @@ chunk_chars = 40000                # 单次摘要请求的上限
 stage2_chars = 60000               # 单次报告请求的素材上限
 ```
 
-完整说明见 [`crates/aj-report/src/config.rs`](crates/aj-report/src/config.rs) 顶部的注释。
+完整说明见 [`crates/aj-report/src/config/mod.rs`](crates/aj-report/src/config/mod.rs) 顶部的注释。
 
 </details>
 

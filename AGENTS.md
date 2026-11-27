@@ -119,13 +119,13 @@ layers never read an agent's raw files.
 
 What the code does not make obvious. The design behind each is in the spec.
 
-- **Report pipeline:** versions, input manifests, staleness and Update for daily, weekly and
-  monthly reports are shared in `aj-report/src/report_io.rs`, as are their run options
-  (`ReportOptions<P>`, where only the period type differs); `daily.rs`, `weekly/` and `monthly/`
-  only orchestrate. Showing versions and saving a user's edit are `aj_report::versions`. Stage 1's worker pool is `stage1.rs`; only the main thread touches
-  the database. Titles come from `structure::report_title` (rewritten on validation and on read;
-  the model's title is dropped); weekly and monthly stats lines (`> `) come from
-  `report_io::stats_line`. Daily generation checks each new section's anchors against that
+- **Report pipeline:** versions, input manifests, staleness and Update for daily, weekly and monthly
+  reports are shared in `aj-report/src/report_io.rs`, as are their run options (`ReportOptions<P>`,
+  where only the period type differs); `daily/`, `weekly/` and `monthly/` only orchestrate. Showing
+  versions and saving a user's edit are `aj_report::versions`. Stage 1's worker pool is `stage1.rs`;
+  only the main thread touches the database. Titles come from `structure::report_title` (rewritten
+  on validation and on read; the model's title is dropped); weekly and monthly stats lines (`> `)
+  come from `report_io::stats_line`. Daily generation checks each new section's anchors against that
   project's slices before splicing in sections kept by Update.
 - **Prompts:** built-in prompts are synced into the database at startup; once a user edits one it
   becomes theirs and is no longer overwritten. Which prompts a language offers (its own plus the
@@ -344,6 +344,6 @@ Keep debugging data out of the real database with these variables:
   avoids the keychain)
 
 Providers and model aliases are configured in `<data dir>/config.toml` (format at the top of
-`crates/aj-report/src/config.rs`); keys are entered in the settings page. `aj models --test` checks
-connectivity. `aj report daily --dry-run` prints the material that would be sent without calling a
-model, which is handy for debugging dehydration.
+`crates/aj-report/src/config/mod.rs`); keys are entered in the settings page. `aj models --test`
+checks connectivity. `aj report daily --dry-run` prints the material that would be sent without
+calling a model, which is handy for debugging dehydration.

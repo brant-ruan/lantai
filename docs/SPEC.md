@@ -737,7 +737,7 @@ under Options. Nothing regenerates by itself. CLI: `aj report daily --update`.
    material. It joins sections in project order, rewrites the title, and saves a new version.
 
 Daily, weekly and monthly reports share versions, manifests, staleness and Update in
-`report_io.rs`; `daily.rs`, `weekly/` and `monthly/` only orchestrate. Updating a final report
+`report_io.rs`; `daily/`, `weekly/` and `monthly/` only orchestrate. Updating a final report
 creates a new draft version.
 
 ### Anchors
@@ -1105,7 +1105,7 @@ so search and copy need no conversion.
 ## Engines
 
 One interface, `Engine::complete(prompt) -> String`. Configuration is in `<data dir>/config.toml`
-in two levels (format documented at the top of `crates/aj-report/src/config.rs`):
+in two levels (format documented at the top of `crates/aj-report/src/config/mod.rs`):
 
 - **Providers:** a connection with type, address and timeout. Keys are stored separately.
 - **Models:** aliases of provider + model ID + options such as reasoning effort. Users pick aliases;
