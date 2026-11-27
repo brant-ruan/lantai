@@ -11,7 +11,7 @@ use anyhow::{Context, Result};
 
 /// The icon baked into the bundle (`icons/icon.icns`); choosing it removes any override.
 pub const DEFAULT_ICON: &str = "bowl-navy";
-pub const PREF_FILE: &str = "app-icon";
+pub const PREF_FILE: &str = aj_core::data_files::APP_ICON;
 
 pub struct IconInfo {
     pub id: &'static str,

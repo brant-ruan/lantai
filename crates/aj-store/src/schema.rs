@@ -5,7 +5,10 @@
 //! Session data can be regenerated from the source files, but projects, rules, prompts and reports cannot.
 //!
 //! A new database gets [`SCHEMA`] directly. An older one is brought forward one version at a
-//! time by [`MIGRATIONS`]; a version without a migration cannot be opened.
+//! time by [`MIGRATIONS`], but only through [`upgrade`]: opening never migrates (docs/SPEC.md,
+//! "Upgrading the database"). A version without a migration cannot be upgraded.
+
+use std::fmt;
 
 use anyhow::{bail, Result};
 use rusqlite::Connection;
@@ -342,26 +345,93 @@ pub fn version(conn: &Connection) -> Result<i64> {
     Ok(conn.query_row("PRAGMA user_version", [], |r| r.get(0))?)
 }
 
+/// Whether a database can be used by this build as it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DatabaseState {
+    /// At this build's schema, or no database yet (one is created when opened).
+    Ready,
+    /// An older schema that [`upgrade`] can bring to `to`.
+    Outdated { from: i64, to: i64 },
+    /// An older schema without a migration path.
+    TooOld { found: i64 },
+    /// Written by a newer Lantai.
+    TooNew { found: i64 },
+}
+
+impl DatabaseState {
+    /// The state of a database at schema `version` (0: none yet).
+    pub fn of_version(version: i64) -> Self {
+        let oldest = MIGRATIONS.first().map_or(SCHEMA_VERSION, |m| m.from);
+        match version {
+            0 => Self::Ready,
+            v if v == SCHEMA_VERSION => Self::Ready,
+            v if v > SCHEMA_VERSION => Self::TooNew { found: v },
+            v if v < oldest => Self::TooOld { found: v },
+            v => Self::Outdated {
+                from: v,
+                to: SCHEMA_VERSION,
+            },
+        }
+    }
+}
+
+/// The error of opening a database that is not [`DatabaseState::Ready`]; callers find it with
+/// `anyhow::Error::downcast_ref` to say what to do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NotReady(pub DatabaseState);
+
+impl fmt::Display for NotReady {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            DatabaseState::Ready => write!(f, "the database is ready"),
+            DatabaseState::Outdated { from, to } => write!(
+                f,
+                "the database was written by an older version of Lantai (schema {from}, this \
+                 build uses {to}) and must be upgraded first"
+            ),
+            DatabaseState::TooOld { found } => write!(
+                f,
+                "the database was written by an early version of Lantai (schema {found}) that this \
+                 build cannot upgrade; it was left untouched"
+            ),
+            DatabaseState::TooNew { found } => write!(
+                f,
+                "the database was written by a newer version of Lantai (schema {found}, this build \
+                 knows {SCHEMA_VERSION}); update Lantai to open it"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for NotReady {}
+
+/// Create the schema in a new database; accept one at this build's schema; refuse any other.
 pub fn init(conn: &Connection) -> Result<()> {
-    let mut current = version(conn)?;
+    let current = version(conn)?;
     if current == 0 {
         conn.execute_batch(&format!(
             "BEGIN;\n{SCHEMA}\nPRAGMA user_version = {SCHEMA_VERSION};\nCOMMIT;"
         ))?;
         return Ok(());
     }
-    if current > SCHEMA_VERSION {
-        bail!(
-            "the database was written by a newer version of Lantai (schema {current}, this build \
-             knows {SCHEMA_VERSION}); update Lantai to open it"
-        );
+    match DatabaseState::of_version(current) {
+        DatabaseState::Ready => Ok(()),
+        state => Err(NotReady(state).into()),
+    }
+}
+
+/// Bring an outdated database to this build's schema, one version at a time, each step in its own
+/// transaction. A current database is left as it is; any other state is refused.
+pub fn upgrade(conn: &Connection) -> Result<()> {
+    let mut current = version(conn)?;
+    match DatabaseState::of_version(current) {
+        DatabaseState::Ready => return Ok(()),
+        DatabaseState::Outdated { .. } => {}
+        state => return Err(NotReady(state).into()),
     }
     while current < SCHEMA_VERSION {
         let Some(m) = MIGRATIONS.iter().find(|m| m.from == current) else {
-            bail!(
-                "the database schema is too old to migrate (found version {current}, need \
-                 {SCHEMA_VERSION}). Delete journal.sqlite in the data directory and run `aj scan` again."
-            );
+            bail!("no migration from schema {current}");
         };
         migrate(conn, m)?;
         current += 1;
@@ -457,7 +527,7 @@ mod tests {
     #[test]
     fn migrated_database_matches_a_fresh_one() {
         let migrated = v8_database();
-        init(&migrated).unwrap();
+        upgrade(&migrated).unwrap();
         let fresh = Connection::open_in_memory().unwrap();
         init(&fresh).unwrap();
 
@@ -483,7 +553,7 @@ mod tests {
     #[test]
     fn migration_keeps_prompts_defaults_reports_and_caches_as_chinese() {
         let conn = v8_database();
-        init(&conn).unwrap();
+        upgrade(&conn).unwrap();
         let one = |sql: &str| -> String { conn.query_row(sql, [], |r| r.get(0)).unwrap() };
 
         assert_eq!(
@@ -536,7 +606,7 @@ mod tests {
                  VALUES (1, 'day', '2026-11-21', 'V', 'kept', 't', 't');",
         )
         .unwrap();
-        init(&conn).unwrap();
+        upgrade(&conn).unwrap();
         let (body, position): (String, String) = conn
             .query_row(
                 "SELECT body, position FROM human_nodes WHERE id = 1",
@@ -547,12 +617,36 @@ mod tests {
         assert_eq!((body.as_str(), position.as_str()), ("kept", "bottom"));
     }
 
+    fn not_ready(err: anyhow::Error) -> DatabaseState {
+        err.downcast_ref::<NotReady>().expect("a NotReady error").0
+    }
+
+    #[test]
+    fn opening_never_migrates() {
+        let conn = v8_database();
+        assert_eq!(
+            not_ready(init(&conn).unwrap_err()),
+            DatabaseState::Outdated {
+                from: 8,
+                to: SCHEMA_VERSION
+            }
+        );
+        assert_eq!(version(&conn).unwrap(), 8);
+    }
+
     #[test]
     fn unknown_older_and_newer_versions_are_refused() {
         let old = Connection::open_in_memory().unwrap();
         old.execute_batch("CREATE TABLE t (x); PRAGMA user_version = 3;")
             .unwrap();
-        assert!(init(&old).unwrap_err().to_string().contains("too old"));
+        assert_eq!(
+            not_ready(init(&old).unwrap_err()),
+            DatabaseState::TooOld { found: 3 }
+        );
+        assert_eq!(
+            not_ready(upgrade(&old).unwrap_err()),
+            DatabaseState::TooOld { found: 3 }
+        );
 
         let newer = Connection::open_in_memory().unwrap();
         newer
@@ -561,6 +655,13 @@ mod tests {
                 SCHEMA_VERSION + 1
             ))
             .unwrap();
-        assert!(init(&newer).unwrap_err().to_string().contains("newer"));
+        let err = upgrade(&newer).unwrap_err();
+        assert!(err.to_string().contains("update Lantai"), "{err}");
+        assert_eq!(
+            not_ready(err),
+            DatabaseState::TooNew {
+                found: SCHEMA_VERSION + 1
+            }
+        );
     }
 }

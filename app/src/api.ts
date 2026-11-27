@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   BackupInfo,
+  DatabaseStatus,
+  UpgradedDatabase,
   CliToolStatus,
   UpdateCheck,
   UpdateSettings,
@@ -102,6 +104,15 @@ export const api = {
   /** Asks GitHub for the recent releases; nothing is downloaded. */
   checkForUpdates: () => invoke<UpdateCheck>("check_for_updates"),
   openReleasePage: (url: string) => invoke<void>("open_release_page", { url }),
+  /** Checked before the interface loads; a ready database is prepared on the way. */
+  databaseStatus: () => invoke<DatabaseStatus>("database_status"),
+  /** Backs up the data (into `backupDir`, else the default folder), then upgrades the database. */
+  upgradeDatabase: (backupDir: string | null) =>
+    invoke<UpgradedDatabase>("upgrade_database", { backupDir }),
+  chooseBackupFolder: (prompt: string, start: string) =>
+    invoke<string | null>("choose_backup_folder", { prompt, start }),
+  revealInFinder: (path: string) => invoke<void>("reveal_in_finder", { path }),
+  quitApp: () => invoke<void>("quit_app"),
   cliToolStatus: () => invoke<CliToolStatus>("cli_tool_status"),
   installCliTool: () => invoke<CliToolStatus>("install_cli_tool"),
   uninstallCliTool: () => invoke<CliToolStatus>("uninstall_cli_tool"),

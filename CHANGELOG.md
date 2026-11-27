@@ -23,9 +23,18 @@ stored data or exported IR is affected:
   the models in Codex's picker with the reasoning efforts each accepts.
 - Reasoning effort for Claude Code and Codex aliases, and a temperature (0 to 2) for
   OpenAI-compatible aliases. Both are optional; left blank, nothing is sent and caches stay valid.
+- When a new version changes how data is stored, Lantai asks before upgrading it and first saves
+  a backup (database and settings, the same zip as **Back up data**) to `backups/` in the data
+  folder, or a folder you choose. A database from a newer Lantai now shows a message instead of
+  the app failing to start. `aj migrate` does the same on the command line.
 
 ### Changed
 
+- `aj` no longer upgrades the database on its own: on data from an older Lantai it stops and
+  asks you to run `aj migrate` (or open the app).
+- Backups before an upgrade are now zip archives in `backups/` instead of
+  `journal.sqlite.bak-schema-<n>` files next to the database. Existing `.bak-schema-` files are
+  left as they are; delete them when you no longer need them.
 - The rule for using an agent CLI is now "the fewest tools it allows, and nothing left that can
   run commands, change files or go online" instead of "every tool off". The README has a table of
   what each CLI still declares.

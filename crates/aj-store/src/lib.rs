@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use aj_ir::{AgentId, IrEvent, ToolKind};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
 
@@ -20,7 +20,7 @@ mod schema;
 mod search;
 mod stats;
 
-pub use backup::{file_schema_version, SCHEMA_VERSION};
+pub use backup::{database_state, file_schema_version, snapshot_file, SCHEMA_VERSION};
 pub use chunks::{ChunkDigestRow, ProjectBriefRow};
 pub use human::{
     HumanCountRow, HumanNodeRow, HumanPosition, HumanRelocation, NewHumanRoot, PROJECT_PERIOD,
@@ -30,6 +30,7 @@ pub use prompts::{BuiltinPrompt, PromptRow};
 pub use reports::{
     NewReportVersion, PeriodReportRow, ReportMeta, ReportSummaryRow, ReportVersionRow,
 };
+pub use schema::{DatabaseState, NotReady};
 pub use search::{
     like_pattern, ReportTextRow, SearchField, SliceFilter, SliceRef, SliceSearchRow, TurnSearchRow,
 };
@@ -318,42 +319,39 @@ fn slice_from_row(r: &Row) -> rusqlite::Result<SliceRow> {
     })
 }
 
-/// Before an older database is migrated, keep a consistent copy of it next to the original
-/// (`journal.sqlite.bak-schema-<old version>`), so that going back to an older build of Lantai
-/// stays possible. Made once per old version; an existing copy is left alone.
-fn backup_before_migration(conn: &Connection, path: &Path) -> Result<()> {
-    let current = schema::version(conn)?;
-    if current == 0 || current >= schema::SCHEMA_VERSION {
-        return Ok(());
-    }
-    let mut name = path.file_name().unwrap_or_default().to_os_string();
-    name.push(format!(".bak-schema-{current}"));
-    let backup = path.with_file_name(name);
-    if backup.exists() {
-        return Ok(());
-    }
-    conn.execute("VACUUM INTO ?1", [backup.to_string_lossy()])
-        .with_context(|| format!("failed to back up the database to {}", backup.display()))?;
-    Ok(())
-}
-
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
 impl Store {
+    /// Open the database at `path`, creating it (and its folder) when there is none. A database
+    /// at another schema version is refused with a [`NotReady`] error; see [`Store::migrate`].
     pub fn open(path: &Path) -> Result<Self> {
+        Self::init(Self::connect(path)?)
+    }
+
+    /// Bring the database at `path` to this build's schema. Callers back it up first
+    /// (docs/SPEC.md, "Upgrading the database"); a current database is left as it is.
+    pub fn migrate(path: &Path) -> Result<()> {
+        if !path.exists() {
+            bail!("no database at {}", path.display());
+        }
+        let conn = Self::connect(path)?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        schema::upgrade(&conn)
+    }
+
+    fn connect(path: &Path) -> Result<Connection> {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)
                 .with_context(|| format!("failed to create {}", dir.display()))?;
         }
         let conn = Connection::open(path)
             .with_context(|| format!("failed to open database {}", path.display()))?;
-        backup_before_migration(&conn, path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         // Several report jobs may write at once; wait for the lock instead of failing.
         conn.busy_timeout(std::time::Duration::from_secs(15))?;
-        Self::init(conn)
+        Ok(conn)
     }
 
     pub fn open_in_memory() -> Result<Self> {
@@ -1160,11 +1158,12 @@ mod tests {
     }
 
     #[test]
-    fn migrating_keeps_a_backup_of_the_old_database() {
-        let dir = std::env::temp_dir().join(format!("aj-store-backup-{}", std::process::id()));
+    fn open_refuses_an_old_database_until_it_is_migrated() {
+        let dir = std::env::temp_dir().join(format!("aj-store-migrate-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("journal.sqlite");
+        assert_eq!(database_state(&path).unwrap(), DatabaseState::Ready);
         {
             let conn = Connection::open(&path).unwrap();
             conn.execute_batch(&format!(
@@ -1173,30 +1172,20 @@ mod tests {
             ))
             .unwrap();
         }
-        let version = |p: &Path| -> i64 {
-            Connection::open(p)
-                .unwrap()
-                .query_row("PRAGMA user_version", [], |r| r.get(0))
-                .unwrap()
+        let outdated = DatabaseState::Outdated {
+            from: 8,
+            to: schema::SCHEMA_VERSION,
         };
-        drop(Store::open(&path).unwrap());
-        let backup = dir.join("journal.sqlite.bak-schema-8");
-        assert_eq!(version(&backup), 8);
-        assert_eq!(version(&path), schema::SCHEMA_VERSION);
-        // A current database is opened without another copy.
-        drop(Store::open(&path).unwrap());
-        assert_eq!(
-            std::fs::read_dir(&dir)
-                .unwrap()
-                .filter(|e| e
-                    .as_ref()
-                    .unwrap()
-                    .file_name()
-                    .to_string_lossy()
-                    .contains(".bak-"))
-                .count(),
-            1
-        );
+        assert_eq!(database_state(&path).unwrap(), outdated);
+        let err = Store::open(&path).err().unwrap();
+        assert_eq!(err.downcast_ref::<NotReady>(), Some(&NotReady(outdated)));
+        assert_eq!(file_schema_version(&path).unwrap(), 8);
+
+        Store::migrate(&path).unwrap();
+        assert_eq!(database_state(&path).unwrap(), DatabaseState::Ready);
+        Store::open(&path).unwrap();
+        // Migrating a current database changes nothing.
+        Store::migrate(&path).unwrap();
         let _ = std::fs::remove_dir_all(&dir);
     }
 

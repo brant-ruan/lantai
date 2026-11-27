@@ -105,7 +105,7 @@ decided by the owner.**
 | `crates/aj-store` | SQLite persistence and statistics queries |
 | `crates/aj-core` | scanning, daily slices, dehydration and redaction, statistics; `project/` splits rule matching (pure), Git detection (read-only file system) and assignment |
 | `crates/aj-report` | digests, reports, engines, anchors, export, human journal |
-| `crates/aj-backup` | backup archives (file names passed in by callers) |
+| `crates/aj-backup` | backup archives, and upgrading the database after one (file names passed in by callers) |
 | `crates/aj-update` | update check: parsing and comparison (pure) plus one request |
 | `crates/aj-cli` | `aj`: `main.rs` only defines and dispatches; commands live in `cmd_*` modules by area |
 | `app/` | Tauri v2 + React. `App.tsx` only composes views and cross-view actions; view state lives in `app/src/hooks/` (`usePeriodView` for day, week and month, `useProjectView`, `useStatsView`, …); the sidebar is composed from `components/sidebar/` |
@@ -180,9 +180,14 @@ What the code does not make obvious. The design behind each is in the spec.
   the whole database into the existing one with SQLite's online backup API
   (`Store::replace_with`); never replace the file instead, which breaks WAL consistency with
   `-wal` / `-shm`. Keychain secrets are not backed up. Configuration files included are
-  `CONFIG_FILES` in `cmd_backup.rs`; add new user config files in the data directory there.
-- **Migration backups:** before any migration, `Store::open` writes
-  `journal.sqlite.bak-schema-<old version>` with `VACUUM INTO`, once per old version.
+  `aj_core::data_files::CONFIG_FILES`; add new user config files in the data directory there.
+- **Upgrading the database:** `Store::open` never migrates; it fails with `aj_store::NotReady`
+  for any other schema version. Only `aj_backup::upgrade` migrates (`Store::migrate`), after
+  writing a backup archive to `backups/`. The app checks first: `DatabaseGate.tsx` wraps
+  everything, including `LanguageProvider`, and calls `database_status` (`cmd_database.rs`), which
+  also syncs built-in prompts, so no other command opens the database before that; `AppState::new`
+  does not open it. `aj` refuses an outdated database and points to `aj migrate`. A new migration
+  needs nothing else: the dialog and the backup come with it.
 - **Archived projects** (`logical_projects.is_archived`): rules pause through
   `aj_core::project::ActiveRules`; sessions already assigned by a rule stay; `candidate_projects`
   and model suggestion parsing skip archived projects; front-end assignment menus filter through

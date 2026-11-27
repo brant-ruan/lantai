@@ -300,6 +300,37 @@ export const en = {
       `Restored. The replaced data is kept in ${previous}. Reloading\u2026`,
   },
 
+  database: {
+    upgradeTitle: "Upgrade your data",
+    upgradeLead: (from: number, to: number) =>
+      `This version of Lantai stores data differently. Your data (format ${from}) needs upgrading to format ${to} before Lantai can open it.`,
+    backupTo: "Lantai first backs up the database and settings to:",
+    changeFolder: "Change\u2026",
+    chooseFolderPrompt: "Keep the backup in:",
+    keysNote: "API keys stay in the keychain and are not affected.",
+    upgrade: "Back up and upgrade",
+    upgrading: "Backing up and upgrading\u2026",
+    doneTitle: "Upgrade complete",
+    backupAt: "The backup is at:",
+    goBackNote:
+      "To go back to the previous version of Lantai, restore this backup there (Settings \u2192 System).",
+    showInFinder: "Show in Finder",
+    continue: "Continue",
+    failedTitle: "The upgrade failed",
+    failedNote:
+      "If the backup was written, it is in the folder above; your data was not deleted. Quit and try again, or report the error.",
+    showBackups: "Show backups",
+    tooNewTitle: "Update Lantai",
+    tooNewLead: (found: number, known: number) =>
+      `Your data was written by a newer version of Lantai (format ${found}; this version knows ${known}). Install the latest version to open it. Nothing was changed.`,
+    download: "Download the latest version",
+    tooOldTitle: "This data cannot be upgraded",
+    tooOldLead: (found: number) =>
+      `Your data comes from an early version of Lantai (format ${found}) that this version cannot upgrade. It was left untouched in:`,
+    errorTitle: "Lantai cannot open its data",
+    quit: "Quit",
+  },
+
   infoTip: {
     label: "More information",
   },

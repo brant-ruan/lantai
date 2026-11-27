@@ -9,6 +9,7 @@ mod cmd_backup;
 mod cmd_batch;
 mod cmd_browse;
 mod cmd_cli;
+mod cmd_database;
 mod cmd_engine;
 mod cmd_human;
 mod cmd_language;
@@ -79,6 +80,11 @@ pub fn run() {
             cmd_cli::cli_tool_status,
             cmd_cli::install_cli_tool,
             cmd_cli::uninstall_cli_tool,
+            cmd_database::database_status,
+            cmd_database::upgrade_database,
+            cmd_database::choose_backup_folder,
+            cmd_database::reveal_in_finder,
+            cmd_database::quit_app,
             cmd_update::update_settings,
             cmd_update::set_check_updates,
             cmd_update::check_for_updates,

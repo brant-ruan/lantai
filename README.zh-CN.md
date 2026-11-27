@@ -264,6 +264,7 @@ aj report history | show         查看报告的各个版本
 aj prompt list | show | new | edit | rename | delete | default
 aj export [--session <前缀>]      以 IR 交换格式导出会话
 aj models [--test] [--find]      列出模型别名、测试连通性，或查找本机 Agent 命令行（--add claude|codex）
+aj migrate                       备份并升级旧版兰台留下的数据
 aj doctor                        查看各数据源的解析状态
 ```
 
@@ -340,7 +341,7 @@ stage2_chars = 60000               # 单次报告请求的素材上限
 所有数据都在 `~/Library/Application Support/lantai`：数据库 `journal.sqlite`、设置 `config.toml` 和缓存。数据库里的会话随时可以从各 Agent 的日志重建；你的项目、规则、提示词、报告、修改和笔记只存在这里。
 
 - **备份与恢复**在「设置 → 系统」里。备份是一个 zip 文件，包含数据库和设置；API 密钥留在钥匙串里，不在备份中。恢复之前会先保留一份被替换的数据。
-- **beta 期间的更新：**先看该版本的 **Breaking** 部分。新版本改变数据库格式时，兰台会在迁移前把旧数据库复制一份放在旁边（`journal.sqlite.bak-schema-<n>`）。
+- **beta 期间的更新：**先看该版本的 **Breaking** 部分。新版本改变数据库格式时，兰台会先征求你的同意再升级数据，并在升级前把数据库和设置备份到上述文件夹的 `backups/` 里（与手动备份相同的 zip 文件），也可以另选文件夹。想回到旧版本时，在旧版里恢复这份备份即可。命令行下用 `aj migrate` 完成同样的事。
 - **卸载：**删除应用和上面的文件夹；如果装了命令行工具，再删除 `~/.local/bin/aj`；最后在「钥匙串访问」里删除 `lantai` 条目。
 - **导出数据：**报告可以导出为 Markdown；`aj export` 按兰台中间表示的交换格式（每行一个 JSON）导出会话，格式带版本号，见 [docs/SPEC.md](docs/SPEC.md)。
 

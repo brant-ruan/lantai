@@ -133,6 +133,7 @@ dependencies = [
  "aj-store",
  "anyhow",
  "chrono",
+ "rusqlite",
  "serde",
  "serde_json",
  "zip",
@@ -143,6 +144,7 @@ name = "aj-cli"
 version = "0.2.0"
 dependencies = [
  "aj-adapter",
+ "aj-backup",
  "aj-core",
  "aj-ir",
  "aj-report",

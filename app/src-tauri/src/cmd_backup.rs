@@ -4,25 +4,14 @@
 
 use std::path::{Path, PathBuf};
 
-use aj_backup::{DataFiles, Manifest};
+use aj_backup::Manifest;
 use aj_report::prompt_library;
 use chrono::{Local, Utc};
 use serde::Serialize;
 
 use crate::app_icon::{self, BundleSync};
 use crate::pickers;
-use crate::state::{cmd_err, AppState, DB_FILE};
-
-/// The configuration files a backup carries besides the database.
-const CONFIG_FILES: &[&str] = &["config.toml", app_icon::PREF_FILE];
-
-fn data_files(dir: &Path) -> DataFiles<'_> {
-    DataFiles {
-        dir,
-        database: DB_FILE,
-        files: CONFIG_FILES,
-    }
-}
+use crate::state::{cmd_err, data_files, AppState};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

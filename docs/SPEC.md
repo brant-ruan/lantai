@@ -220,10 +220,10 @@ Notes:
 - **Ignore state** has three values, `inherit`, `ignored`, `included`; a slice inherits from its
   session unless overridden.
 - **Local dates live only on slices**, so changing the day boundary only recomputes slices.
-- **Migrations:** before any migration, `Store::open` copies the database with `VACUUM INTO` to
-  `journal.sqlite.bak-schema-<old version>` in the data directory (once per old version), so an
-  older Lantai can be restored if needed. Concurrent writers wait (`busy_timeout` of 15 seconds)
-  instead of failing.
+- **Migrations** never happen as a side effect of opening the database: `Store::open` refuses a
+  database at another schema version, and only an explicit upgrade migrates it, after a backup
+  (see [Upgrading the database](#upgrading-the-database)). Concurrent writers wait
+  (`busy_timeout` of 15 seconds) instead of failing.
 
 ## Scanning and adapters
 
@@ -428,6 +428,7 @@ aj prompt …                           report prompts
 aj report daily|weekly|monthly        generate (--update, --dry-run, --lang); history / show
 aj export                             IR events in the exchange format
 aj models [--test] [--find] [--add T] model aliases, connectivity, local tools
+aj migrate [--backup-dir D]           back up and upgrade a database from an older Lantai
 aj doctor                             parse health and source status
 ```
 
@@ -492,14 +493,15 @@ edits and notes cannot, and they are what a backup protects.
 
 - **Contents** (archive format 1, `aj-backup`'s `FORMAT`): `manifest.json` (format, Lantai version,
   schema version, UTC time, file list), `journal.sqlite` (a consistent `VACUUM INTO` snapshot) and
-  the configuration files listed in `cmd_backup.rs`'s `CONFIG_FILES` (`config.toml`, `app-icon`).
+  the configuration files in `aj_core::data_files::CONFIG_FILES` (`config.toml`, `app-icon`).
   **No secrets:** API keys in the keychain (or the debug `secrets.toml`) are not included and must
-  be entered again after restoring on another machine. No `cache/` and no migration backups.
+  be entered again after restoring on another machine. No `cache/` and no `backups/`. The manifest's
+  schema version is that of the database in the archive (older for upgrade backups).
 - **Export:** a save dialog defaulting to `lantai-backup-<local date>.zip` in Downloads; written to
   `<file>.partial` first, then renamed.
 - **Restore:** the manifest is read and its time and version shown before anything changes. A
   newer format or schema is refused (update Lantai first); an older database is migrated in a
-  temporary folder through `Store::open` and checked with `PRAGMA quick_check` first. The current
+  temporary folder (`Store::migrate`) and checked with `PRAGMA quick_check` first. The current
   database and the configuration files about to be replaced are saved to
   `backups/before-restore-<UTC time>/`. The database is written into the existing one with SQLite's
   online backup API (other connections see either the old or the new database; replacing files
@@ -509,6 +511,41 @@ edits and notes cannot, and they are what a backup protects.
 - `aj-store/src/backup.rs` (snapshot, replacement, integrity check), `aj-backup` (archive format,
   export and restore; file names passed in by callers), `cmd_backup.rs` in the app. Not available
   in the CLI yet.
+
+## Upgrading the database
+
+A new Lantai may store data differently. Moving an existing database forward is never silent:
+the person sees what will happen, a backup is written first, and nothing changes until they
+agree.
+
+- **State** (`aj_store::database_state`, read without changing the file): *ready* (current, or no
+  database yet), *outdated* (an older schema with migrations to the current one), *too old* (no
+  migration path) or *too new* (written by a newer Lantai). Every `Store::open` outside the
+  upgrade fails unless the state is ready; a new database is created at the current schema.
+- **Upgrade** (`aj_backup::upgrade`, shared by the app and the CLI): writes a backup archive in the
+  usual format (see [Backup and restore](#backup-and-restore)) holding the database at its old
+  schema and the configuration files, then migrates one version at a time, each step in its own
+  transaction. The archive is `lantai-before-upgrade-schema-<old>-<UTC time>.zip`, by default in
+  `backups/` in the data directory; it is written before the first migration, so a step that fails
+  leaves the database where it stopped and the backup intact. Restoring that archive in this
+  Lantai migrates it again; in the older Lantai it restores as it was.
+- **Backup location:** the data directory by default, not Documents: writing to `~/Documents`
+  needs a macOS permission prompt and is often synced to iCloud, and the database holds session
+  content. The dialog can choose another folder through the system's folder picker.
+- **App:** before the interface loads, the front end asks for the state (`database_status`, which
+  also returns the interface language setting from `config.toml`, so the dialog is in the right
+  language without touching the database). Ready loads the app as usual (built-in prompts are
+  synced first). Otherwise a dialog covers the window:
+  - *outdated*: the versions, where the backup will go ("Change…" picks another folder), and
+    **Back up and upgrade** or **Quit**. Afterwards it shows the backup's path with "Show in Finder"
+    and **Continue**; a failure shows the error, says the backup is kept, and offers **Quit**.
+  - *too new*: update Lantai (opens the release page) or quit; nothing is changed.
+  - *too old*: the database cannot be upgraded by this Lantai and is left untouched; quit.
+- **CLI:** `aj` refuses to run on a database that is not ready and says why; for an outdated one
+  it points to `aj migrate`, which upgrades with the same backup (`--backup-dir` picks the folder)
+  and prints where the backup went. The app and `aj` share the database, so either may upgrade it.
+- **Configuration:** a future change to the `config.toml` format goes through the same dialog and
+  the same backup, so there is one place where users meet upgrades.
 
 ## Distribution
 

@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 aj-adapter = { path = "../aj-adapter" }
+aj-backup = { path = "../aj-backup" }
 aj-core = { path = "../aj-core" }
 aj-ir = { path = "../aj-ir" }
 aj-sources = { path = "../aj-sources" }

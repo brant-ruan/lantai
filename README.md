@@ -264,6 +264,7 @@ aj report history | show         List and print saved report versions
 aj prompt list | show | new | edit | rename | delete | default
 aj export [--session <prefix>]   Export sessions in the IR exchange format
 aj models [--test] [--find]      List model aliases, test them, or find agent CLIs (--add claude|codex)
+aj migrate                       Back up and upgrade data left by an older Lantai
 aj doctor                        Show the parsing health of each source
 ```
 
@@ -340,7 +341,7 @@ The prompt decides a report's structure, length and tone. Built-in prompts for d
 Everything lives in `~/Library/Application Support/lantai`: the database `journal.sqlite`, the settings `config.toml` and a cache. Sessions in the database can always be rebuilt from your agents' logs; your projects, rules, prompts, reports, edits and notes exist only there.
 
 - **Back up and restore** in **Settings → System**. A backup is one zip file with the database and settings; API keys stay in the Keychain and are not included. Restoring first keeps a copy of what it replaces.
-- **Updating during the beta:** read the release's **Breaking** section first. When a new version changes the database format, Lantai keeps a copy of the old database next to it (`journal.sqlite.bak-schema-<n>`) before migrating.
+- **Updating during the beta:** read the release's **Breaking** section first. When a new version changes the database format, Lantai asks before upgrading your data and first saves a backup (database and settings, the same zip as a manual backup) to `backups/` in the folder above, or a folder you choose. To go back to the older version, restore that backup there. On the command line, `aj migrate` does the same.
 - **Uninstalling:** delete the app, the folder above and `~/.local/bin/aj` if you installed the command-line tool, and remove the `lantai` items in Keychain Access.
 - **Getting the data out:** reports export as Markdown; `aj export` writes the sessions in the exchange format of Lantai's versioned intermediate representation (JSON lines), described in [docs/SPEC.md](docs/SPEC.md).
 

@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use aj_core::data_files;
 use aj_report::{AppConfig, KeyStore};
 use aj_store::Store;
 use anyhow::{Context, Result};
@@ -9,6 +10,7 @@ use clap::{Parser, Subcommand};
 
 mod app;
 mod cmd_browse;
+mod cmd_migrate;
 mod cmd_project;
 mod cmd_prompt;
 mod cmd_report;
@@ -146,6 +148,12 @@ enum Cmd {
     },
     /// Show the parsing health of each source
     Doctor,
+    /// Back up a database left by an older Lantai, then upgrade it to this version
+    Migrate {
+        /// Folder for the backup (defaults to backups in the data directory)
+        #[arg(long)]
+        backup_dir: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -165,10 +173,15 @@ fn main() -> Result<()> {
             .context("cannot determine the application data directory")?
             .join(aj_core::APP_DATA_DIR_NAME),
     };
-    let mut store = Store::open(&data_dir.join("journal.sqlite"))?;
+    // The only command that may run on a database from another version.
+    if let Cmd::Migrate { backup_dir } = cli.command {
+        return cmd_migrate::cmd_migrate(&data_dir, backup_dir);
+    }
+    let mut store = Store::open(&data_dir.join(data_files::DATABASE))
+        .map_err(cmd_migrate::explain_open_error)?;
     aj_report::prompt_library::sync_builtins(&mut store)?;
     let cfg = AppConfig::load(
-        &data_dir.join("config.toml"),
+        &data_dir.join(data_files::CONFIG),
         KeyStore::platform_default(&data_dir),
     )?
     .core_config();
@@ -217,5 +230,6 @@ fn main() -> Result<()> {
         Cmd::Models { test, model, .. } => cmd_models(&app, test, model.as_deref()),
         Cmd::Export { session } => cmd_export(&app, session.as_deref()),
         Cmd::Doctor => cmd_doctor(&app),
+        Cmd::Migrate { .. } => unreachable!("handled before the database is opened"),
     }
 }

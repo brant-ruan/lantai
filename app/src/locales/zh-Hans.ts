@@ -285,6 +285,35 @@ export const zhHans = {
     restored: (previous: string) => `已恢复，被替换的内容保存在 ${previous}。正在重新载入…`,
   },
 
+  database: {
+    upgradeTitle: "升级数据",
+    upgradeLead: (from: number, to: number) =>
+      `这个版本的兰台改变了数据的存储方式。你的数据（格式 ${from}）需要升级到格式 ${to} 才能打开。`,
+    backupTo: "升级前，兰台会先把数据库和设置备份到：",
+    changeFolder: "更改…",
+    chooseFolderPrompt: "把备份保存在：",
+    keysNote: "API 密钥在钥匙串里，不受影响。",
+    upgrade: "备份并升级",
+    upgrading: "正在备份并升级…",
+    doneTitle: "升级完成",
+    backupAt: "备份保存在：",
+    goBackNote: "如需回到之前的版本，在旧版兰台里恢复这份备份即可（设置 → 系统）。",
+    showInFinder: "在 Finder 中显示",
+    continue: "继续",
+    failedTitle: "升级失败",
+    failedNote: "如果备份已写好，它在上面的文件夹里；你的数据没有被删除。可以退出后重试，或反馈这个错误。",
+    showBackups: "显示备份",
+    tooNewTitle: "需要更新兰台",
+    tooNewLead: (found: number, known: number) =>
+      `你的数据由更新版本的兰台写入（格式 ${found}，此版本只认识 ${known}）。请安装最新版本后再打开。数据没有被改动。`,
+    download: "下载最新版本",
+    tooOldTitle: "这份数据无法升级",
+    tooOldLead: (found: number) =>
+      `你的数据来自早期版本的兰台（格式 ${found}），此版本无法升级。数据没有被改动，位于：`,
+    errorTitle: "兰台无法打开数据",
+    quit: "退出",
+  },
+
   infoTip: {
     label: "更多信息",
   },

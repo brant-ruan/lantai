@@ -1,14 +1,18 @@
 //! Backup archives of Lantai's own data: a consistent copy of the database and the
 //! configuration files, packed into one zip file, and restoring them from such a file
 //! (docs/SPEC.md, "Backup and restore"). Secrets are never part of an archive; API keys stay in the
-//! keychain. The caller names the files ([`DataFiles`]); this crate knows nothing else about
-//! them.
+//! keychain. Upgrading an older database goes through here too, so it is always backed up first
+//! (docs/SPEC.md, "Upgrading the database"). The caller names the files ([`DataFiles`]); this crate
+//! knows nothing else about them.
 
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-use aj_store::{file_schema_version, Store, SCHEMA_VERSION};
+use aj_store::{
+    database_state, file_schema_version, snapshot_file, DatabaseState, NotReady, Store,
+    SCHEMA_VERSION,
+};
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
@@ -59,7 +63,17 @@ pub struct Restored {
     pub previous: PathBuf,
 }
 
-/// Write an archive of `data` to `dest` (replaced if it exists).
+/// The result of an upgrade.
+#[derive(Debug, Clone)]
+pub struct Upgraded {
+    pub from: i64,
+    pub to: i64,
+    /// The archive written before migrating.
+    pub backup: PathBuf,
+}
+
+/// Write an archive of `data` to `dest` (replaced if it exists). The database is copied at
+/// whatever schema it is, and the manifest says which.
 pub fn export(
     data: &DataFiles,
     dest: &Path,
@@ -68,7 +82,8 @@ pub fn export(
 ) -> Result<Manifest> {
     let work = WorkDir::create(data.dir, "export", now)?;
     let snapshot = work.path.join(data.database);
-    Store::open(&data.database_path())?.snapshot_to(&snapshot)?;
+    snapshot_file(&data.database_path(), &snapshot)?;
+    let schema_version = file_schema_version(&snapshot)?;
 
     let files: Vec<&str> = data
         .files
@@ -79,7 +94,7 @@ pub fn export(
     let manifest = Manifest {
         format: FORMAT,
         app_version: app_version.to_string(),
-        schema_version: SCHEMA_VERSION,
+        schema_version,
         created_at: now.to_rfc3339_opts(SecondsFormat::Secs, true),
         database: data.database.to_string(),
         files: files.iter().map(|f| f.to_string()).collect(),
@@ -110,6 +125,43 @@ pub fn export(
     Ok(manifest)
 }
 
+/// The file name of the archive written before upgrading from schema `from`.
+pub fn upgrade_backup_name(from: i64, now: DateTime<Utc>) -> String {
+    format!(
+        "lantai-before-upgrade-schema-{from}-{}.zip",
+        now.format("%Y%m%d-%H%M%S")
+    )
+}
+
+/// Back `data` up into `backup_dir` (created if missing), then migrate its database to this
+/// build's schema. Only an outdated database is upgraded; any other state is refused unchanged.
+/// When a migration step fails, the error names the backup, which is kept.
+pub fn upgrade(
+    data: &DataFiles,
+    backup_dir: &Path,
+    app_version: &str,
+    now: DateTime<Utc>,
+) -> Result<Upgraded> {
+    let database = data.database_path();
+    let (from, to) = match database_state(&database)? {
+        DatabaseState::Outdated { from, to } => (from, to),
+        DatabaseState::Ready => bail!("the database is already up to date"),
+        state => return Err(NotReady(state).into()),
+    };
+    std::fs::create_dir_all(backup_dir)
+        .with_context(|| format!("failed to create {}", backup_dir.display()))?;
+    let backup = backup_dir.join(upgrade_backup_name(from, now));
+    export(data, &backup, app_version, now)
+        .context("the backup before upgrading failed; nothing was changed")?;
+    Store::migrate(&database).with_context(|| {
+        format!(
+            "the upgrade failed; the backup made before it is at {}",
+            backup.display()
+        )
+    })?;
+    Ok(Upgraded { from, to, backup })
+}
+
 /// The manifest of an archive, checked to be one this build can restore.
 pub fn read_manifest(archive: &Path) -> Result<Manifest> {
     let mut zip = open_archive(archive)?;
@@ -135,8 +187,8 @@ pub fn read_manifest(archive: &Path) -> Result<Manifest> {
     Ok(manifest)
 }
 
-/// Replace the database and the configuration files of `data` with the archive's. What is
-/// replaced is first copied to `backups/before-restore-<time>/` in the data directory. Files of
+/// Replace the database and the configuration files of `data` with the archive's, bringing an
+/// older database to this build's schema. What is replaced is first copied to `backups/before-restore-<time>/` in the data directory. Files of
 /// `data` that the archive does not hold are left as they are; files in the archive that
 /// `data` does not name are ignored.
 pub fn restore(data: &DataFiles, archive: &Path, now: DateTime<Utc>) -> Result<Restored> {
@@ -154,6 +206,7 @@ pub fn restore(data: &DataFiles, archive: &Path, now: DateTime<Utc>) -> Result<R
         );
     }
     {
+        Store::migrate(&incoming).context("the backup's database cannot be upgraded")?;
         let store = Store::open(&incoming).context("the backup's database cannot be opened")?;
         store.check_integrity()?;
     }
@@ -335,6 +388,67 @@ mod tests {
             .filter(|e| e.file_name().to_string_lossy().starts_with('.'))
             .collect();
         assert!(leftovers.is_empty());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// A database at schema 8 with one project, as an older Lantai left it.
+    fn old_database(dir: &Path) {
+        let conn = rusqlite::Connection::open(dir.join("journal.sqlite")).unwrap();
+        conn.execute_batch(&format!(
+            "{}\nPRAGMA user_version = 8;\n\
+             INSERT INTO logical_projects (id, name, created_at) VALUES (1, 'old', 't');",
+            include_str!("../../aj-store/tests/fixtures/schema_v8.sql")
+        ))
+        .unwrap();
+    }
+
+    #[test]
+    fn upgrade_backs_up_then_migrates_and_the_backup_restores() {
+        let root = temp_dir("upgrade");
+        let dir = root.join("data");
+        std::fs::create_dir_all(&dir).unwrap();
+        old_database(&dir);
+        std::fs::write(dir.join("config.toml"), "default_model = \"a\"\n").unwrap();
+        let db = dir.join("journal.sqlite");
+        assert!(Store::open(&db).is_err(), "opening never migrates");
+
+        let backups = dir.join(BACKUPS_DIR);
+        let now = Utc::now();
+        let up = upgrade(&data(&dir), &backups, "0.3.0", now).unwrap();
+        assert_eq!((up.from, up.to), (8, SCHEMA_VERSION));
+        assert_eq!(up.backup, backups.join(upgrade_backup_name(8, now)));
+        let manifest = read_manifest(&up.backup).unwrap();
+        assert_eq!(manifest.schema_version, 8);
+        assert_eq!(manifest.files, vec!["config.toml".to_string()]);
+        assert_eq!(projects(&dir), vec!["old".to_string()]);
+        let err = upgrade(&data(&dir), &backups, "0.3.0", now).unwrap_err();
+        assert!(err.to_string().contains("up to date"), "{err}");
+
+        // The old-schema backup restores into this build, migrated on the way.
+        Store::open(&db)
+            .unwrap()
+            .create_project("later", None)
+            .unwrap();
+        restore(&data(&dir), &up.backup, now).unwrap();
+        assert_eq!(projects(&dir), vec!["old".to_string()]);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn upgrade_refuses_a_newer_database_without_a_backup() {
+        let root = temp_dir("upgrade-newer");
+        let db = root.join("journal.sqlite");
+        rusqlite::Connection::open(&db)
+            .unwrap()
+            .execute_batch(&format!(
+                "CREATE TABLE t (x); PRAGMA user_version = {};",
+                SCHEMA_VERSION + 1
+            ))
+            .unwrap();
+        let backups = root.join(BACKUPS_DIR);
+        let err = upgrade(&data(&root), &backups, "0.3.0", Utc::now()).unwrap_err();
+        assert!(err.to_string().contains("update Lantai"), "{err}");
+        assert!(!backups.exists());
         std::fs::remove_dir_all(&root).unwrap();
     }
 

@@ -1,23 +1,33 @@
 //! Shared application state and thin environment helpers for the desktop shell.
 //!
-//! Resolves data and export directories, opens SQLite connections, loads `config.toml`,
+//! Resolves data and export directories, names the files in the data directory, opens SQLite
+//! connections, loads `config.toml`,
 //! and provides source adapters without holding any business rules.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 use aj_adapter::SourceAdapter;
-use aj_core::Config;
+use aj_backup::DataFiles;
+use aj_core::{data_files, Config};
 use aj_report::lang::{self, Language};
-use aj_report::prompt_library;
 use aj_report::{AppConfig, KeyStore};
 use aj_store::Store;
 use anyhow::{Context, Result};
 
 /// The database's file name in the data directory.
-pub const DB_FILE: &str = "journal.sqlite";
+pub const DB_FILE: &str = data_files::DATABASE;
+
+/// What a backup holds of the data directory `dir`.
+pub fn data_files(dir: &Path) -> DataFiles<'_> {
+    DataFiles {
+        dir,
+        database: DB_FILE,
+        files: data_files::CONFIG_FILES,
+    }
+}
 
 pub struct AppState {
     pub data_dir: PathBuf,
@@ -41,10 +51,8 @@ impl AppState {
             .context("cannot determine the home directory")?
             .join("WorkJournal");
 
-        // Ensure the schema exists and built-in prompts are synced on startup.
-        let mut store = Store::open(&data_dir.join(DB_FILE))?;
-        prompt_library::sync_builtins(&mut store)?;
-
+        // The database is not opened here: it may first need the person's go-ahead to be
+        // upgraded (`cmd_database`), which also syncs built-in prompts once it is ready.
         Ok(Self {
             data_dir,
             export_dir,
@@ -106,7 +114,7 @@ impl AppState {
     }
 
     pub fn config_path(&self) -> PathBuf {
-        self.data_dir.join("config.toml")
+        self.data_dir.join(data_files::CONFIG)
     }
 
     /// Adapters for every supported agent, enabled or not (reading already-stored sessions).

@@ -987,3 +987,25 @@ export interface RestoredBackup {
   /** Where the data that was replaced is kept. */
   previous: string;
 }
+
+/** Whether the database can be used as it is (docs/SPEC.md, "Upgrading the database"). */
+export type DatabaseState =
+  | { state: "ready" }
+  | { state: "outdated"; from: number; to: number }
+  | { state: "tooOld"; found: number }
+  | { state: "tooNew"; found: number; known: number };
+
+export interface DatabaseStatus {
+  database: DatabaseState;
+  /** The interface language setting ("auto" or a tag), read without the database. */
+  uiLanguage: string;
+  backupDir: string;
+  dataDir: string;
+  releaseUrl: string;
+}
+
+export interface UpgradedDatabase {
+  from: number;
+  to: number;
+  backup: string;
+}

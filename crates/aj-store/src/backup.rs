@@ -1,5 +1,5 @@
-//! Whole-database copies for backup and restore: a consistent snapshot of the open database
-//! into a new file, and replacing its whole content with another database file while other
+//! Whole-database copies for backup and restore: a consistent snapshot of a database into a new
+//! file, and replacing its whole content with another database file while other
 //! connections may be open (SQLite's online backup, so they see either the old or the new
 //! content, never a mix).
 
@@ -10,7 +10,8 @@ use anyhow::{bail, Context, Result};
 use rusqlite::backup::{Backup, StepResult};
 use rusqlite::{Connection, OpenFlags};
 
-use crate::{schema, Store};
+use crate::schema::{self, DatabaseState};
+use crate::Store;
 
 /// How many times a restore waits 100 ms for other connections to release the database.
 const RESTORE_ATTEMPTS: usize = 150;
@@ -25,20 +26,40 @@ pub fn file_schema_version(path: &Path) -> Result<i64> {
     schema::version(&conn)
 }
 
+/// Whether the database at `path` can be opened as it is, read without changing it. No file
+/// yet is ready: opening creates one.
+pub fn database_state(path: &Path) -> Result<DatabaseState> {
+    if !path.exists() {
+        return Ok(DatabaseState::Ready);
+    }
+    Ok(DatabaseState::of_version(file_schema_version(path)?))
+}
+
+/// Write a consistent copy of the database file `src`, at whatever schema it is, to `dest`, which
+/// must not exist yet.
+pub fn snapshot_file(src: &Path, dest: &Path) -> Result<()> {
+    let conn = Connection::open_with_flags(src, OpenFlags::SQLITE_OPEN_READ_WRITE)
+        .with_context(|| format!("failed to open database {}", src.display()))?;
+    vacuum_into(&conn, dest)
+}
+
+fn vacuum_into(conn: &Connection, dest: &Path) -> Result<()> {
+    if dest.exists() {
+        bail!("{} already exists", dest.display());
+    }
+    conn.execute("VACUUM INTO ?1", [dest.to_string_lossy()])
+        .with_context(|| format!("failed to copy the database to {}", dest.display()))?;
+    Ok(())
+}
+
 impl Store {
     /// Write a consistent copy of the database to `dest`, which must not exist yet.
     pub fn snapshot_to(&self, dest: &Path) -> Result<()> {
-        if dest.exists() {
-            bail!("{} already exists", dest.display());
-        }
-        self.conn
-            .execute("VACUUM INTO ?1", [dest.to_string_lossy()])
-            .with_context(|| format!("failed to copy the database to {}", dest.display()))?;
-        Ok(())
+        vacuum_into(&self.conn, dest)
     }
 
     /// Replace the whole database with the content of the database file `src`, which should
-    /// already be at this build's schema (open it with [`Store::open`] first to migrate it).
+    /// already be at this build's schema (bring it there with [`Store::migrate`] first).
     pub fn replace_with(&mut self, src: &Path) -> Result<()> {
         let version = file_schema_version(src)?;
         if version != SCHEMA_VERSION {
