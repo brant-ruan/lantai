@@ -13,7 +13,7 @@ use std::fmt;
 use anyhow::{bail, Result};
 use rusqlite::Connection;
 
-pub const SCHEMA_VERSION: i64 = 11;
+pub const SCHEMA_VERSION: i64 = 12;
 
 /// Human journal entries: day notes, project notes and annotations on generated report points
 /// (see `aj_store::human`), as the full schema creates them.
@@ -161,6 +161,8 @@ CREATE TABLE session_daily_slices (
     -- Last turn the digest covers, and how many incremental updates it has had since a full digest.
     digest_covered_turn   INTEGER,
     digest_update_count   INTEGER NOT NULL DEFAULT 0,
+    -- Engine that wrote the cached digest (NULL for digests from before schema 12).
+    digest_engine         TEXT,
     UNIQUE (session_id, local_date)
 );
 CREATE INDEX slices_by_date ON session_daily_slices (local_date);
@@ -174,6 +176,7 @@ CREATE TABLE digest_chunks (
     input_hash       TEXT NOT NULL,
     digest_json      TEXT NOT NULL,
     language         TEXT NOT NULL,
+    engine           TEXT,
     UNIQUE (slice_id, start_turn_index)
 );
 
@@ -185,6 +188,7 @@ CREATE TABLE project_briefs (
     input_hash    TEXT NOT NULL,
     clusters_json TEXT NOT NULL,
     language      TEXT NOT NULL,
+    engine        TEXT,
     UNIQUE (local_date, project)
 );
 
@@ -325,6 +329,14 @@ const MIGRATION_10_TO_11: &str = r#"
 ALTER TABLE human_nodes ADD COLUMN position TEXT NOT NULL DEFAULT 'bottom';
 "#;
 
+/// 11 -> 12: digests, digest parts and project briefs record the engine that wrote them. Earlier
+/// rows have none (shown as unknown).
+const MIGRATION_11_TO_12: &str = r#"
+ALTER TABLE session_daily_slices ADD COLUMN digest_engine TEXT;
+ALTER TABLE digest_chunks ADD COLUMN engine TEXT;
+ALTER TABLE project_briefs ADD COLUMN engine TEXT;
+"#;
+
 const MIGRATIONS: &[Migration] = &[
     Migration {
         from: 8,
@@ -337,6 +349,10 @@ const MIGRATIONS: &[Migration] = &[
     Migration {
         from: 10,
         sql: MIGRATION_10_TO_11,
+    },
+    Migration {
+        from: 11,
+        sql: MIGRATION_11_TO_12,
     },
 ];
 
@@ -584,6 +600,14 @@ mod tests {
         );
         assert_eq!(one("SELECT language FROM digest_chunks"), "zh-Hans");
         assert_eq!(one("SELECT language FROM project_briefs"), "zh-Hans");
+        // Caches from before schema 12 do not know their engine.
+        assert_eq!(
+            one(
+                "SELECT ifnull(s.digest_engine, '-') || ifnull(c.engine, '-') || ifnull(b.engine, '-')
+                 FROM session_daily_slices s, digest_chunks c, project_briefs b WHERE s.id = 1"
+            ),
+            "---"
+        );
 
         // Deleting a prompt now clears its default through the foreign key.
         conn.execute("DELETE FROM prompts WHERE id = 2", [])

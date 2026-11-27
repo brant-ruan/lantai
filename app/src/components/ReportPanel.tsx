@@ -11,6 +11,7 @@ import type {
   PromptOption,
   ReportVersion,
 } from "../types";
+import { modelName } from "../modelName";
 import { CopyButton } from "./CopyButton";
 import { MoreMenu } from "./DropdownMenu";
 import { EyeIcon, PencilIcon } from "./icons";
@@ -118,7 +119,13 @@ export function ReportPanel({
   const t = tr.report;
   // A version as listed in the history: number, origin, prompt and the language it is in.
   const versionLabel = (v: ReportVersion) =>
-    `v${v.number} · ${t.origins[v.origin] ?? v.origin} · ${v.promptName ?? "-"} · ${v.language}`;
+    [
+      `v${v.number}`,
+      t.origins[v.origin] ?? v.origin,
+      v.promptName ?? "-",
+      v.language,
+      ...(v.engine ? [modelName(v.engine, v.models)] : []),
+    ].join(" · ");
   const [mode, setMode] = useState<"preview" | "edit" | "compare">("preview");
   const [editorText, setEditorText] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
@@ -271,7 +278,12 @@ export function ReportPanel({
     ? genStage === "stage2"
       ? t.writingStage
       : t.digestingStage
-    : t.statusTitle(currentStatus, estimateSummary);
+    : [
+        t.statusTitle(currentStatus, estimateSummary),
+        ...(currentVersion?.engine
+          ? [t.versionModel(modelName(currentVersion.engine, currentVersion.models))]
+          : []),
+      ].join(" · ");
 
   // Draft / final and the version, or the generation stage; shown beside the report title.
   const statusBadge = generating ? (
@@ -661,7 +673,8 @@ export function ReportPanel({
                       <div key={`${v.id}-${idx}`} className="compare-col">
                         <div className="compare-col-head">
                           <span>
-                            {versionLabel(v)} · {v.engine ?? t.manual}
+                            {versionLabel(v)}
+                            {v.engine ? "" : ` · ${t.manual}`}
                           </span>
                           <div className="toolbar-actions">
                             {v.promptSnapshot && (

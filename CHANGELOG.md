@@ -14,8 +14,21 @@ stored data or exported IR is affected:
 
 ## [Unreleased]
 
+IR 0.3.0 · Schema 12.
+
+### Breaking
+
+- **The database moves to schema 12** (digests, digest parts and project briefs record which model
+  wrote them). On first start, Lantai asks before upgrading and backs your data up first; on the
+  command line, run `aj migrate`. Nothing is lost: existing digests stay valid and show their model
+  as unknown. An older Lantai cannot open the upgraded database; to go back, restore the backup
+  in it.
+
 ### Added
 
+- **Which model wrote what:** the slice drawer names the model that wrote a digest and says when
+  generating with the selected model would digest the slice again; the report panel names the
+  model of each version (status tooltip, version lists, compare). `aj digest` prints it too.
 - Codex CLI can write reports. **Find tools** (or `aj models --add codex`) adds it; it runs
   `codex exec` without saving a session, with every feature that adds a tool turned off, a
   read-only sandbox and nothing approved. The README lists the few declarations Codex still sends.

@@ -4,6 +4,8 @@ import { CopyButton } from "./CopyButton";
 import type { ProjectOption, SliceDetail, TurnDetail } from "../types";
 import { SplitHandle } from "./Resizable";
 import { useT } from "../i18n";
+import type { Messages } from "../locales/en";
+import { modelName } from "../modelName";
 import { assignableProjects } from "../projectOptions";
 
 interface SliceDrawerProps {
@@ -14,6 +16,8 @@ interface SliceDrawerProps {
   projects: ProjectOption[];
   highlightTurn: number | null;
   digesting: boolean;
+  /** The model alias reports are generated with now (null when none is configured). */
+  currentModel: string | null;
   onClose: () => void;
   onJumpToTurn: (turnIndex: number) => void;
   onSaveNote: (sessionId: number, note: string | null) => Promise<void>;
@@ -113,6 +117,30 @@ function TurnItemCard({
   );
 }
 
+/** Which model wrote the digest, and whether generating now would digest the slice again. */
+function DigestModel({
+  detail,
+  currentModel,
+  texts,
+}: {
+  detail: SliceDetail;
+  currentModel: string | null;
+  texts: Messages["drawer"];
+}) {
+  if (detail.digest?.kind === "raw") {
+    return <div className="muted-line digest-model">{texts.digestNoModel}</div>;
+  }
+  const m = detail.digestModel;
+  // Unknown: the digest may well be the current model's, so promise nothing.
+  const other = currentModel !== null && m !== null && !m.aliases.includes(currentModel);
+  return (
+    <div className="muted-line digest-model">
+      {m ? texts.digestModel(modelName(m.engine, m.aliases)) : texts.digestModelUnknown}
+      {other && <> · {texts.digestOtherModel(currentModel)}</>}
+    </div>
+  );
+}
+
 export function SliceDrawer({
   width,
   onResizeStart,
@@ -121,6 +149,7 @@ export function SliceDrawer({
   projects,
   highlightTurn,
   digesting,
+  currentModel,
   onClose,
   onJumpToTurn,
   onSaveNote,
@@ -310,6 +339,13 @@ export function SliceDrawer({
                         : td.generateDigest}
                   </button>
                 </div>
+                {detail.digest && (
+                  <DigestModel
+                    detail={detail}
+                    currentModel={currentModel}
+                    texts={td}
+                  />
+                )}
                 {!detail.digest ? (
                   <div className="muted-line">{td.noDigest}</div>
                 ) : detail.digest.kind === "raw" ? (

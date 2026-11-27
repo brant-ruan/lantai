@@ -236,7 +236,16 @@ pub(crate) fn cmd_digest(app: &App, reference: &str) -> Result<()> {
         .as_deref()
         .map(serde_json::from_str::<StoredDigest>)
     {
-        Some(Ok(StoredDigest::Summary(s))) => println!("{}", serde_json::to_string_pretty(&s)?),
+        Some(Ok(StoredDigest::Summary(s))) => {
+            println!(
+                "Written by: {}",
+                slice
+                    .digest_engine
+                    .as_deref()
+                    .unwrap_or("unknown (before this was recorded)")
+            );
+            println!("{}", serde_json::to_string_pretty(&s)?)
+        }
         Some(Ok(StoredDigest::Raw { .. })) => {
             println!("(short slice; the text goes into the report as is)")
         }

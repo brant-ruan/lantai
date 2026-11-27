@@ -19,6 +19,7 @@ use aj_report::period::{Month, Week};
 use aj_report::progress::Progress;
 use aj_report::prompt_library::{KIND_DAILY, KIND_MONTHLY, KIND_WEEKLY};
 use aj_report::structure::{report_title, validate_user_edit};
+use aj_report::AppConfig;
 use aj_report::{
     daily::{estimate_daily, DailyEstimate},
     generate_daily,
@@ -75,6 +76,8 @@ pub struct ReportVersionDto {
     pub origin: String,
     pub markdown: String,
     pub engine: Option<String>,
+    /// The model aliases that produce `engine` now (empty when none does).
+    pub models: Vec<String>,
     pub prompt_name: Option<String>,
     pub prompt_snapshot: Option<String>,
     /// The language the version is written in.
@@ -256,6 +259,7 @@ fn daily_estimate_dto(est: DailyEstimate) -> DailyEstimateDto {
 
 fn build_report_state(
     store: &Store,
+    cfg: &AppConfig,
     report_type: &str,
     period_key: &str,
     project_id: Option<i64>,
@@ -309,6 +313,11 @@ fn build_report_state(
                 origin: v.origin.clone(),
                 markdown,
                 engine: v.engine.clone(),
+                models: v
+                    .engine
+                    .as_deref()
+                    .map(|e| cfg.aliases_for_engine(e))
+                    .unwrap_or_default(),
                 prompt_name: v.prompt_name.clone(),
                 prompt_snapshot: v.prompt_snapshot.clone(),
                 language: v.language.clone(),
@@ -423,6 +432,7 @@ pub fn get_daily_report_state(
     let project_id = resolve_project_id(&store, None, project.as_deref())?;
     build_report_state(
         &store,
+        &cfg,
         KIND_DAILY,
         &date,
         project_id,
@@ -463,6 +473,7 @@ pub fn get_weekly_report_state(
     let key = week.key();
     build_report_state(
         &store,
+        &cfg,
         KIND_WEEKLY,
         &key,
         None,
@@ -512,6 +523,7 @@ pub fn get_monthly_report_state(
     let key = month.key();
     build_report_state(
         &store,
+        &cfg,
         KIND_MONTHLY,
         &key,
         None,

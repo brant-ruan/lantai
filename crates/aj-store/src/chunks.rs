@@ -19,6 +19,8 @@ pub struct ChunkDigestRow {
     pub digest_json: String,
     /// Report language the part digest is written in.
     pub language: String,
+    /// Engine that wrote the part digest (`None` before schema 12).
+    pub engine: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,12 +31,14 @@ pub struct ProjectBriefRow {
     pub clusters_json: String,
     /// Report language the clusters are written in.
     pub language: String,
+    /// Engine that wrote the clusters (`None` before schema 12).
+    pub engine: Option<String>,
 }
 
 impl Store {
     pub fn chunk_digests(&self, slice_id: i64) -> Result<Vec<ChunkDigestRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT start_turn_index, end_turn_index, input_hash, digest_json, language
+            "SELECT start_turn_index, end_turn_index, input_hash, digest_json, language, engine
              FROM digest_chunks WHERE slice_id = ?1 ORDER BY start_turn_index",
         )?;
         let rows = stmt
@@ -45,6 +49,7 @@ impl Store {
                     input_hash: r.get(2)?,
                     digest_json: r.get(3)?,
                     language: r.get(4)?,
+                    engine: r.get(5)?,
                 })
             })?
             .collect::<rusqlite::Result<_>>()?;
@@ -62,15 +67,17 @@ impl Store {
         for c in chunks {
             tx.execute(
                 "INSERT INTO digest_chunks
-                   (slice_id, start_turn_index, end_turn_index, input_hash, digest_json, language)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                   (slice_id, start_turn_index, end_turn_index, input_hash, digest_json, language,
+                    engine)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![
                     slice_id,
                     c.start_turn_index,
                     c.end_turn_index,
                     c.input_hash,
                     c.digest_json,
-                    c.language
+                    c.language,
+                    c.engine
                 ],
             )?;
         }
@@ -80,7 +87,7 @@ impl Store {
 
     pub fn project_briefs(&self, local_date: &str) -> Result<Vec<ProjectBriefRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT project, input_hash, clusters_json, language
+            "SELECT project, input_hash, clusters_json, language, engine
              FROM project_briefs WHERE local_date = ?1 ORDER BY project",
         )?;
         let rows = stmt
@@ -90,6 +97,7 @@ impl Store {
                     input_hash: r.get(1)?,
                     clusters_json: r.get(2)?,
                     language: r.get(3)?,
+                    engine: r.get(4)?,
                 })
             })?
             .collect::<rusqlite::Result<_>>()?;
@@ -109,18 +117,21 @@ impl Store {
 
     pub fn save_project_brief(&self, local_date: &str, brief: &ProjectBriefRow) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO project_briefs (local_date, project, input_hash, clusters_json, language)
-             VALUES (?1, ?2, ?3, ?4, ?5)
+            "INSERT INTO project_briefs
+               (local_date, project, input_hash, clusters_json, language, engine)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
              ON CONFLICT(local_date, project) DO UPDATE SET
                input_hash = excluded.input_hash,
                clusters_json = excluded.clusters_json,
-               language = excluded.language",
+               language = excluded.language,
+               engine = excluded.engine",
             params![
                 local_date,
                 brief.project,
                 brief.input_hash,
                 brief.clusters_json,
-                brief.language
+                brief.language,
+                brief.engine
             ],
         )?;
         Ok(())
@@ -165,6 +176,7 @@ mod tests {
             input_hash: hash.into(),
             digest_json: "{}".into(),
             language: "en".into(),
+            engine: Some("mock".into()),
         };
         store
             .replace_chunk_digests(slice_id, &[chunk(0, 4, "a"), chunk(5, 9, "b")])
@@ -188,6 +200,7 @@ mod tests {
             input_hash: hash.into(),
             clusters_json: text.into(),
             language: "en".into(),
+            engine: Some(format!("engine-{hash}")),
         };
         store
             .save_project_brief("2026-11-16", &brief("alpha", "h1", "- old"))

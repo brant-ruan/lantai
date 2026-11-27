@@ -367,7 +367,7 @@ fn condense(
         opts.budgets.stage2_chars,
     );
     for (_, b) in &condensed.to_save {
-        store.save_project_brief(&opts.date, &b.to_row(opts.language))?;
+        store.save_project_brief(&opts.date, &b.to_row(opts.language, engine_name))?;
     }
     result.projects_condensed = condensed.projects;
     result.briefs_cached = condensed.cached;
@@ -706,7 +706,12 @@ mod tests {
         // Four parts, one merge, one report.
         assert_eq!(engine.call_count(), 6);
         let slice_id = store.slices_for_date("2026-11-16").unwrap()[0].id;
-        assert_eq!(store.chunk_digests(slice_id).unwrap().len(), 4);
+        let parts = store.chunk_digests(slice_id).unwrap();
+        assert_eq!(parts.len(), 4);
+        // The digest and its parts record the engine that wrote them.
+        assert!(parts.iter().all(|p| p.engine.as_deref() == Some("mock")));
+        let slice = store.slice(slice_id).unwrap().unwrap();
+        assert_eq!(slice.digest_engine.as_deref(), Some("mock"));
 
         // Unchanged: the slice digest itself is cached, so only the report is regenerated.
         let r = run(&mut store, &engine, &tz, &options);
@@ -767,6 +772,9 @@ mod tests {
         };
         let r = run(&mut store, &engine, &tz, &options);
         assert_eq!((r.projects_condensed, r.briefs_cached), (1, 0));
+        let briefs = store.project_briefs("2026-11-16").unwrap();
+        assert!(!briefs.is_empty());
+        assert!(briefs.iter().all(|b| b.engine.as_deref() == Some("mock")));
 
         let prompts = engine.prompts.lock().unwrap();
         let final_prompt = prompts.last().unwrap();

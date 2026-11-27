@@ -546,6 +546,11 @@ export const en = {
     refreshDigest: "Refresh digest",
     generateDigest: "Generate digest",
     noDigest: "No digest yet.",
+    digestModel: (name: string) => `Written by ${name}`,
+    digestModelUnknown: "Written by an unknown model (before Lantai recorded it)",
+    digestNoModel: "Short enough to be used as it is; no model was involved",
+    digestOtherModel: (current: string) =>
+      `Generating with ${current} will digest this slice again.`,
     goal: "Goal:",
     keyChanges: "Key changes:",
     decisions: "Decisions & pitfalls:",
@@ -838,6 +843,7 @@ export const en = {
     openWeek: (w: string) => `Open weekly workbench for ${w}`,
     writingStage: "Writing report (stage 2)",
     digestingStage: "Digesting sessions (stage 1)",
+    versionModel: (name: string) => `written by ${name}`,
     statusTitle: (status: string, estimate: string) =>
       `Report status: ${status}${estimate ? ` \u00b7 ${estimate}` : ""}`,
     mode: "Reading or editing",

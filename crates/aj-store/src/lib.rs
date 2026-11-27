@@ -171,6 +171,8 @@ pub struct SliceRow {
     pub digest_covered_turn: Option<i64>,
     /// Incremental updates applied to the cached digest since its last full digest.
     pub digest_update_count: u32,
+    /// Engine that wrote the cached digest (`None` before schema 12).
+    pub digest_engine: Option<String>,
 }
 
 /// A slice digest to be cached, with what it covers.
@@ -182,6 +184,8 @@ pub struct SliceDigestRow<'a> {
     pub language: &'a str,
     pub covered_turn: i64,
     pub update_count: u32,
+    /// Engine that wrote the digest.
+    pub engine: &'a str,
 }
 
 #[derive(Debug, Clone)]
@@ -285,7 +289,8 @@ pub(crate) fn session_from_row(r: &Row) -> rusqlite::Result<SessionRow> {
 
 const SLICE_COLS: &str = "id, session_id, local_date, start_turn_index, end_turn_index, slice_start_at, \
      slice_end_at, active_minutes, files_modified_json, ignore_state, digest_json, digest_input_hash, \
-     project_id_override, digest_covered_turn, digest_update_count, active_intervals_json, digest_language";
+     project_id_override, digest_covered_turn, digest_update_count, active_intervals_json, digest_language, \
+     digest_engine";
 
 /// [`SLICE_COLS`] qualified with a table alias, for queries that join other tables.
 fn slice_cols_of(alias: &str) -> String {
@@ -316,6 +321,7 @@ fn slice_from_row(r: &Row) -> rusqlite::Result<SliceRow> {
         digest_covered_turn: r.get(13)?,
         digest_update_count: r.get(14)?,
         digest_language: r.get(16)?,
+        digest_engine: r.get(17)?,
     })
 }
 
@@ -777,7 +783,8 @@ impl Store {
     pub fn save_digest(&self, slice_id: i64, digest: &SliceDigestRow) -> Result<()> {
         self.conn.execute(
             "UPDATE session_daily_slices SET digest_json = ?2, digest_input_hash = ?3,
-                 digest_covered_turn = ?4, digest_update_count = ?5, digest_language = ?6
+                 digest_covered_turn = ?4, digest_update_count = ?5, digest_language = ?6,
+                 digest_engine = ?7
              WHERE id = ?1",
             params![
                 slice_id,
@@ -785,7 +792,8 @@ impl Store {
                 digest.input_hash,
                 digest.covered_turn,
                 digest.update_count,
-                digest.language
+                digest.language,
+                digest.engine
             ],
         )?;
         Ok(())
@@ -1297,6 +1305,7 @@ mod tests {
                     language: "en",
                     covered_turn: 0,
                     update_count: 1,
+                    engine: "mock",
                 },
             )
             .unwrap();
@@ -1306,6 +1315,7 @@ mod tests {
         let row = store.slice(id).unwrap().unwrap();
         assert_eq!(row.end_turn_index, 3);
         assert_eq!(row.digest_input_hash.as_deref(), Some("h"));
+        assert_eq!(row.digest_engine.as_deref(), Some("mock"));
         assert_eq!(
             (row.digest_covered_turn, row.digest_update_count),
             (Some(0), 1)

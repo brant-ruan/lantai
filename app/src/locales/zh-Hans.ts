@@ -527,6 +527,10 @@ export const zhHans = {
     refreshDigest: "重新摘要",
     generateDigest: "生成摘要",
     noDigest: "还没有摘要。",
+    digestModel: (name: string) => `由 ${name} 生成`,
+    digestModelUnknown: "生成模型未知（兰台记录模型之前生成）",
+    digestNoModel: "内容较短，直接使用原文，没有经过模型",
+    digestOtherModel: (current: string) => `用 ${current} 生成报告时会重新摘要这一段。`,
     goal: "目标：",
     keyChanges: "关键改动：",
     decisions: "决策与踩坑：",
@@ -812,6 +816,7 @@ export const zhHans = {
     openWeek: (w: string) => `打开 ${w} 的周报工作台`,
     writingStage: "正在撰写报告（第二阶段）",
     digestingStage: "正在摘要会话（第一阶段）",
+    versionModel: (name: string) => `由 ${name} 生成`,
     statusTitle: (status: string, estimate: string) =>
       `报告状态：${status === "final" ? "定稿" : "草稿"}${estimate ? ` · ${estimate}` : ""}`,
     mode: "阅读或编辑",

@@ -67,13 +67,14 @@ impl CachedBrief {
             .collect()
     }
 
-    /// The row that stores this brief, written in `lang`.
-    pub fn to_row(&self, lang: &Language) -> ProjectBriefRow {
+    /// The row that stores this brief, written in `lang` by the engine named `engine_name`.
+    pub fn to_row(&self, lang: &Language, engine_name: &str) -> ProjectBriefRow {
         ProjectBriefRow {
             project: self.project.clone(),
             input_hash: self.input_hash.clone(),
             clusters_json: self.clusters_json.clone(),
             language: lang.tag.to_string(),
+            engine: Some(engine_name.to_string()),
         }
     }
 }

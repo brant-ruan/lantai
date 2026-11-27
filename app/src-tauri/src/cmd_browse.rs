@@ -182,7 +182,18 @@ pub struct SliceDetailDto {
     pub files_modified: Vec<String>,
     pub dehydrated_chars: usize,
     pub digest: Option<StoredDigest>,
+    /// Which model wrote `digest`; `None` when unknown (written before this was recorded).
+    pub digest_model: Option<ModelRefDto>,
     pub turns: Vec<TurnDetailDto>,
+}
+
+/// An engine name as stored with a digest, and the model aliases that produce it now.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelRefDto {
+    pub engine: String,
+    /// Empty when no alias produces this engine any more.
+    pub aliases: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -710,6 +721,7 @@ pub fn slice_detail(
         .collect();
     let rules = store.rules().map_err(cmd_err)?;
     let lang = state.report_language(&[]).map_err(cmd_err)?;
+    let cfg = state.load_config().map_err(cmd_err)?;
     let card = build_slice_card(&slice, &session, &project_names, &rules, lang);
 
     let dehydrated_chars = dehydrate_slice(&store, &session, &slice, &Local)
@@ -718,6 +730,13 @@ pub fn slice_detail(
         .chars()
         .count();
     let digest = digest_in(&slice, lang).and_then(|j| serde_json::from_str::<StoredDigest>(j).ok());
+    let digest_model = digest
+        .as_ref()
+        .and(slice.digest_engine.as_deref())
+        .map(|engine| ModelRefDto {
+            engine: engine.to_string(),
+            aliases: cfg.aliases_for_engine(engine),
+        });
 
     let mut turns = Vec::new();
     for turn in store
@@ -780,6 +799,7 @@ pub fn slice_detail(
         files_modified: slice.files_modified,
         dehydrated_chars,
         digest,
+        digest_model,
         turns,
     })
 }

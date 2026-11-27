@@ -429,7 +429,7 @@ where
     });
     for (pw, c) in weeks.iter().zip(clustered) {
         for (i, b) in &c.to_save {
-            store.save_project_brief(&pw.days[*i].0.to_string(), &b.to_row(lang))?;
+            store.save_project_brief(&pw.days[*i].0.to_string(), &b.to_row(lang, &engine_name))?;
         }
         result.days_condensed += c.projects;
         result.briefs_cached += c.cached;

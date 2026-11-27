@@ -1147,7 +1147,7 @@
     var html = '<div class="dm-backdrop" data-act="close-drawer"></div><aside class="dm-drawer" aria-label="Session details"><div class="dm-drawer-head"><div><h4>S' + s.id + " · " + esc(s.title) + '</h4><div class="dm-muted">' + agentBadge(s.agent) + " " + s.date + " · " + hhmm(s.start) + "-" + hhmm(s.end) + " · " + s.turns + ' turns</div></div><button type="button" class="dm-btn dm-btn-ghost dm-btn-sm" data-act="close-drawer">Close</button></div>';
     html += '<div class="dm-drawer-body" data-scroll="drawer">';
     html += '<div class="dm-meta"><div><span>Directory:</span> <code>' + esc(s.dir) + "</code></div>" + (s.branch ? "<div><span>Branch:</span> <code>" + esc(s.branch) + "</code></div>" : "") + "<div><span>Project:</span> " + (p ? esc(p.name) : "Unassigned") + "</div></div>";
-    html += '<div class="dm-digest"><h5>Slice Digest</h5><div><strong>Goal:</strong> ' + esc(s.item.s) + "</div><div><strong>Key changes:</strong><ul><li>" + esc(s.item.p) + ' <button type="button" class="dm-anchor" data-act="turn" data-turn="' + s.k + '">T' + s.k + "</button></li>";
+    html += '<div class="dm-digest"><h5>Slice Digest</h5><div class="dm-muted">Written by opus</div><div><strong>Goal:</strong> ' + esc(s.item.s) + "</div><div><strong>Key changes:</strong><ul><li>" + esc(s.item.p) + ' <button type="button" class="dm-anchor" data-act="turn" data-turn="' + s.k + '">T' + s.k + "</button></li>";
     s.item.d.forEach(function (x, j) { html += "<li>" + esc(x) + ' <button type="button" class="dm-anchor" data-act="turn" data-turn="' + (s.k + 1 + j) + '">T' + (s.k + 1 + j) + "</button></li>"; });
     html += "</ul></div></div><h5>Turns</h5>";
     turns.forEach(function (t) {

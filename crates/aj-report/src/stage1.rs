@@ -85,7 +85,7 @@ where
     }
     let outcome = summarize::summarize_slice(engine, &engine_name, &m.input(), budgets);
     let err = outcome.error.clone();
-    let stored = record_outcome(store, &m, outcome, &mut dummy, &mut |_| {})?;
+    let stored = record_outcome(store, &engine_name, &m, outcome, &mut dummy, &mut |_| {})?;
     if let Some(e) = err {
         bail!("{e}");
     }
@@ -152,7 +152,7 @@ pub fn run(
         }
         drop(tx);
         for (i, outcome) in rx {
-            let stored = record_outcome(store, &shared[i], outcome, result, progress)?;
+            let stored = record_outcome(store, engine_name, &shared[i], outcome, result, progress)?;
             done.push((i, stored));
         }
         Ok(())
@@ -166,9 +166,11 @@ pub fn run(
     Ok(())
 }
 
-/// Persist what stage 1 produced for one slice and fold it into the counters.
+/// Persist what stage 1 produced for one slice (written by the engine named `engine_name`) and
+/// fold it into the counters.
 pub(crate) fn record_outcome(
     store: &mut Store,
+    engine_name: &str,
     m: &Material,
     outcome: SliceOutcome,
     result: &mut Stage1Stats,
@@ -197,6 +199,7 @@ pub(crate) fn record_outcome(
             input_hash: p.input_hash.clone(),
             digest_json: p.digest_json.clone(),
             language: m.language.tag.to_string(),
+            engine: Some(engine_name.to_string()),
         })
         .collect();
     store.replace_chunk_digests(m.slice.id, &rows)?;
@@ -209,6 +212,7 @@ pub(crate) fn record_outcome(
                 language: m.language.tag,
                 covered_turn: m.last_turn(),
                 update_count: outcome.update_count,
+                engine: engine_name,
             },
         )?;
     }

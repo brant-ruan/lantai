@@ -221,7 +221,16 @@ export interface SliceDetail {
   filesModified: string[];
   dehydratedChars: number;
   digest: StoredDigest | null;
+  /** Which model wrote `digest`; null when unknown (written before Lantai recorded it). */
+  digestModel: ModelRef | null;
   turns: TurnDetail[];
+}
+
+/** An engine name as stored with a digest, and the model aliases that produce it now. */
+export interface ModelRef {
+  engine: string;
+  /** Empty when no alias produces this engine any more. */
+  aliases: string[];
 }
 
 export interface ProjectSummary {
@@ -302,6 +311,8 @@ export interface ReportVersion {
   origin: "generated" | "user_edit";
   markdown: string;
   engine: string | null;
+  /** The model aliases that produce `engine` now (empty when none does). */
+  models: string[];
   promptName: string | null;
   promptSnapshot: string | null;
   /** The language the version is written in. */

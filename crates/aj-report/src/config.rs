@@ -813,6 +813,30 @@ impl AppConfig {
 
     /// Build the engine for a model alias (the default alias when `None`).
     pub fn build_engine(&self, alias: Option<&str>, runner_dir: &Path) -> Result<Box<dyn Engine>> {
+        self.engine_for(alias, runner_dir, |provider| self.api_key(provider))
+    }
+
+    /// The aliases whose engine is named `engine_name` (as stored with digests, briefs and report
+    /// versions), in alias order. Keys are not read. Empty when no alias produces that name any
+    /// more.
+    pub fn aliases_for_engine(&self, engine_name: &str) -> Vec<String> {
+        self.models
+            .keys()
+            .filter(|alias| {
+                self.engine_for(Some(alias), Path::new(""), |_| ApiKey::None)
+                    .is_ok_and(|e| e.name() == engine_name)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// The engine of `alias` (else the default), with its key from `api_key`.
+    fn engine_for(
+        &self,
+        alias: Option<&str>,
+        runner_dir: &Path,
+        api_key: impl Fn(&str) -> ApiKey,
+    ) -> Result<Box<dyn Engine>> {
         let Some(alias) = alias.or_else(|| self.default_model_name()) else {
             bail!(
                 "{}; add one in Settings → Models (or run `aj models --find`)",
@@ -847,7 +871,7 @@ impl AppConfig {
                 ..
             } => Box::new(OpenAiCompatEngine {
                 base_url: base_url.clone(),
-                api_key: self.api_key(&m.provider),
+                api_key: api_key(&m.provider),
                 model: m.model.clone().unwrap_or_default(),
                 reasoning_effort: m.reasoning_effort.clone(),
                 temperature: m.temperature,
@@ -1080,6 +1104,24 @@ batch_concurrency = 4
         assert_eq!(cfg.default_model_name(), Some("b"));
         cfg.remove_model("b").unwrap();
         assert_eq!(cfg.default_model_name(), Some("a"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn engine_names_map_back_to_aliases_without_keys() {
+        let dir = temp_dir("aliases");
+        let mut cfg = AppConfig::load(&dir.join("none.toml"), file_store(&dir)).unwrap();
+        cfg.upsert_provider(None, "p", openai(), KeyUpdate::Keep)
+            .unwrap();
+        cfg.upsert_model(None, "b", model("p", "m")).unwrap();
+        cfg.upsert_model(None, "a", model("p", "m")).unwrap();
+        cfg.upsert_model(None, "other", model("p", "n")).unwrap();
+        let name = cfg
+            .build_engine(Some("a"), Path::new("/tmp/runner"))
+            .unwrap()
+            .name();
+        assert_eq!(cfg.aliases_for_engine(&name), vec!["a", "b"]);
+        assert!(cfg.aliases_for_engine("openai:gone:high").is_empty());
         std::fs::remove_dir_all(&dir).ok();
     }
 

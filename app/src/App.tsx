@@ -811,6 +811,11 @@ export function App() {
         }
         highlightTurn={drawer.highlightTurn}
         digesting={preDigest.digesting}
+        currentModel={
+          selectedEngine ||
+          (daily.workbench ?? weekly.workbench ?? monthly.workbench)?.defaultEngine ||
+          null
+        }
         onClose={drawer.close}
         onJumpToTurn={drawer.setHighlightTurn}
         onSaveNote={(sessionId, note) => mutate(() => api.setSessionNote(sessionId, note), true)}

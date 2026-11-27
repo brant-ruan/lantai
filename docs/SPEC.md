@@ -203,14 +203,14 @@ SQLite, in the app data directory. Main tables (`crates/aj-store/src/schema.rs`,
 | `turns` | session, index, source ID, start and end, user prompt |
 | `turn_items` | ordered items in a turn (messages and tool calls in one table to keep order): type, text, tool kind and name, target, summary, error flag, lines added and removed, output summary |
 | `token_usage` | per model call: session, turn, source ID, time, model, four counts. Usage before any turn is not stored |
-| `session_daily_slices` | session × local date: turn range, active intervals, changed files, ignore state, per-day project override, cached digest with its input hash, covered turn and incremental update count |
+| `session_daily_slices` | session × local date: turn range, active intervals, changed files, ignore state, per-day project override, cached digest with its input hash, engine, covered turn and incremental update count |
 | `logical_projects` | name, description, color, archived flag, privacy mode (stored; not enforced yet), sort order |
 | `project_match_rules` | project, type (`path_prefix` / `git_remote` / `regex`), regex field (`title` / `first_prompt` / `cwd` / `any`), pattern, `auto_apply` |
 | `source_files` | scan cursors: agent, session ID, current path, size, mtime, byte offset, head hash (or revision), unknown type counts, last error |
 | `reports` / `report_versions` | a report per type, period and (optional) project, with draft / final status and current version; each version stores origin (`generated` / `user_edit`), Markdown, prompt name and full text, engine, language, input hash and input manifest |
 | `prompts` | kind, language, name (unique per kind and language), body, default flag, built-in flag |
-| `digest_chunks` | cached digests of parts of long slices |
-| `project_briefs` | cached per-project, per-day clusters |
+| `digest_chunks` | cached digests of parts of long slices, with their engine |
+| `project_briefs` | cached per-project, per-day clusters, with their engine |
 | `human_nodes` | the human journal (see [Human journal](#human-journal)) |
 
 Notes:
@@ -758,6 +758,19 @@ creates a new draft version.
 - `draft` → `final` is set by the user.
 - **Edit marks:** the reading view marks lines a person changed (see
   [Human journal](#human-journal)).
+- **Which model wrote what:** report versions, slice digests, digest parts and project briefs
+  store the engine name that wrote them (`claude-cli:opus:high`, `openai:<model>:<effort>`, the
+  same name that keys the caches). Rows written before schema 12 have none and show as unknown.
+  For display, `AppConfig::aliases_for_engine` maps an engine name back to the configured aliases
+  that produce it (without reading keys); a name no alias produces any more (the alias was deleted
+  or its options changed) is shown as it is.
+  - Slice drawer: the digest box says which model wrote the digest. When that is not the model
+    currently selected, it says that generating with the selected model will digest the slice
+    again. A raw record (short slice, passed through) says no model was used.
+  - Report panel: the status badge's tooltip, the version lists and the compare columns name the
+    model of each version. After an Update, sections that were not rewritten keep the text an
+    earlier version's model wrote; the version names the model of this run.
+  - `aj digest <S12>` prints the engine of the cached digest.
 - **Export is one way** (app → Markdown files), with anchors kept, turned into footnotes, or
   stripped. The hash of each exported file is kept in `exports.json`; if the file was edited
   outside Lantai, re-exporting asks first. Layout:

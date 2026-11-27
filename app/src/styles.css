@@ -4304,6 +4304,12 @@ body.is-pointer-dragging .report-content * { pointer-events: none !important; }
   gap: 4px;
 }
 
+/* Which model wrote a slice digest, under the digest box's header. */
+.digest-model {
+  margin: -2px 0 6px;
+  font-size: 12px;
+}
+
 /* The database check before the interface loads (DatabaseGate): the dialog alone in the window. */
 .database-gate {
   position: fixed;
