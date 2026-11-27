@@ -929,12 +929,7 @@ pub fn save_report_edit(
         None => state.report_language(&[]).map_err(cmd_err)?,
     };
     let markdown_to_save = if matches!(kind, KIND_DAILY | KIND_WEEKLY | KIND_MONTHLY) {
-        let known_projects: Vec<String> = store
-            .list_projects()
-            .map_err(cmd_err)?
-            .into_iter()
-            .map(|p| p.project.name)
-            .collect();
+        let known_projects = report_io::project_order(&store).map_err(cmd_err)?;
         validate_user_edit(
             &markdown,
             &report_title(kind, &period_key, language),

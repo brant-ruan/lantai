@@ -307,11 +307,7 @@ pub fn search(store: &Store, req: &SearchRequest) -> Result<SearchResults> {
             Some(id) => Some(store.project(id)?.map(|p| p.name).unwrap_or_default()),
             None => None,
         };
-        let names: HashMap<i64, String> = store
-            .list_projects()?
-            .into_iter()
-            .map(|p| (p.project.id, p.project.name))
-            .collect();
+        let names = store.project_names()?;
         let mut units = report_units(&reports);
         units.extend(note_units(&store.all_human_nodes()?, &|id| {
             names.get(&id).cloned()

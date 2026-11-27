@@ -98,11 +98,7 @@ pub fn load_base(
     let Some(language) = Language::find(&version.language) else {
         return Ok(None);
     };
-    let known: Vec<String> = store
-        .list_projects()?
-        .into_iter()
-        .map(|p| p.project.name)
-        .collect();
+    let known = project_order(store)?;
     let Ok(parsed) = structure::validate_user_edit(
         &version.markdown,
         &structure::report_title(kind, period, language),
@@ -398,11 +394,7 @@ pub fn version_language(tag: &str) -> &'static Language {
 
 /// Project names in the user's order, for ordering report sections.
 pub fn project_order(store: &Store) -> Result<Vec<String>> {
-    Ok(store
-        .list_projects()?
-        .into_iter()
-        .map(|p| p.project.name)
-        .collect())
+    Ok(store.projects()?.into_iter().map(|p| p.name).collect())
 }
 
 /// A stored period report as it is shown: the canonical title in the version's language and

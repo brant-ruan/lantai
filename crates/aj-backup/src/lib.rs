@@ -334,10 +334,10 @@ mod tests {
     fn projects(dir: &Path) -> Vec<String> {
         Store::open(&dir.join("journal.sqlite"))
             .unwrap()
-            .list_projects()
+            .projects()
             .unwrap()
             .into_iter()
-            .map(|p| p.project.name)
+            .map(|p| p.name)
             .collect()
     }
 

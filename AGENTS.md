@@ -263,7 +263,12 @@ What the code does not make obvious. The design behind each is in the spec.
   has a fixed width (584 px); measure in WebKit after changing the text.
 - **Active time** summed across sessions always takes the union of intervals
   (`aj_core::slice::union_minutes`), never the sum of slices' `active_minutes`, or parallel
-  sessions count twice. The sidebar's date list uses `aj_core::overview::day_overviews`.
+  sessions count twice. The sidebar's date list uses `aj_core::overview::day_overviews`; the
+  store's `day_counts` has no active time for that reason.
+- **Slice conditions in SQL** (included in reports, effective project, unassigned) are written
+  once in `aj-store/src/sql.rs` and mirror `SliceRow::is_ignored` and `effective_project`;
+  change both together. `Store::project_summaries` counts over every slice; use
+  `Store::projects` or `project_names` when only names are needed.
 
 ## Conventions
 

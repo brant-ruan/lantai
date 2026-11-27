@@ -10,7 +10,8 @@ use anyhow::{bail, Result};
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension, Row};
 
-use crate::{ts, Store};
+use crate::sql::ts;
+use crate::Store;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PromptRow {

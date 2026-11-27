@@ -41,7 +41,7 @@ where
 {
     // Slices taking part in reports, for every day with any slice (ignored ones included).
     let active_by_day: BTreeMap<NaiveDate, u64> = store
-        .day_overviews(true)?
+        .day_counts(true)?
         .into_iter()
         .filter_map(|d| Some((d.local_date.parse().ok()?, d.slices)))
         .collect();

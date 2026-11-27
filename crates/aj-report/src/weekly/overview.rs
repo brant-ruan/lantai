@@ -1,9 +1,10 @@
-//! Per-week overview rows for browsing: the day overviews of the store grouped into
+//! Per-week overview rows for browsing: the day overviews of `aj_core` grouped into
 //! ISO weeks, with the status of each week's report.
 
 use std::collections::BTreeMap;
 
-use aj_store::{DayOverview, Store};
+use aj_core::overview::DayOverview;
+use aj_store::Store;
 use anyhow::Result;
 use chrono::NaiveDate;
 

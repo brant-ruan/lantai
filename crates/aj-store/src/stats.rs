@@ -7,6 +7,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use rusqlite::params;
 
+use crate::sql::{agent_at, SLICE_INCLUDED, SLICE_PROJECT};
 use crate::Store;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,27 +53,26 @@ impl Store {
         until_date: Option<&str>,
         include_ignored: bool,
     ) -> Result<Vec<StatsSliceRow>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare(&format!(
             "SELECT sds.id, sds.session_id, sds.local_date, s.agent,
-                    COALESCE(sds.project_id_override, s.project_id) AS eff_project_id,
+                    {SLICE_PROJECT} AS eff_project_id,
                     lp.name, s.detected_cwd, s.git_root,
                     sds.start_turn_index, sds.end_turn_index,
                     sds.active_intervals_json, sds.files_modified_json,
-                    CASE WHEN (sds.ignore_state = 'ignored' OR (sds.ignore_state = 'inherit' AND s.ignored != 0))
-                         THEN 1 ELSE 0 END AS is_ignored
+                    CASE WHEN {SLICE_INCLUDED} THEN 0 ELSE 1 END AS is_ignored
              FROM session_daily_slices sds
              JOIN sessions s ON s.id = sds.session_id
-             LEFT JOIN logical_projects lp ON lp.id = COALESCE(sds.project_id_override, s.project_id)
+             LEFT JOIN logical_projects lp ON lp.id = {SLICE_PROJECT}
              WHERE (?1 IS NULL OR sds.local_date >= ?1)
                AND (?2 IS NULL OR sds.local_date <= ?2)
-               AND (?3 != 0 OR (sds.ignore_state = 'included' OR (sds.ignore_state = 'inherit' AND s.ignored = 0)))
+               AND (?3 != 0 OR {SLICE_INCLUDED})
              ORDER BY sds.local_date ASC, sds.slice_start_at ASC",
-        )?;
+        ))?;
         let rows = stmt
             .query_map(
                 params![since_date, until_date, i32::from(include_ignored)],
                 |r| {
-                    let agent = crate::agent_at(r, 3)?;
+                    let agent = agent_at(r, 3)?;
                     let start_turn: i64 = r.get(8)?;
                     let end_turn: i64 = r.get(9)?;
                     let intervals_json: String = r.get(10)?;
@@ -100,13 +100,13 @@ impl Store {
 
     /// Distinct local dates with at least one slice, oldest first, regardless of any range.
     pub fn stats_active_dates(&self, include_ignored: bool) -> Result<Vec<String>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare(&format!(
             "SELECT DISTINCT sds.local_date
              FROM session_daily_slices sds
              JOIN sessions s ON s.id = sds.session_id
-             WHERE ?1 != 0 OR (sds.ignore_state = 'included' OR (sds.ignore_state = 'inherit' AND s.ignored = 0))
+             WHERE ?1 != 0 OR {SLICE_INCLUDED}
              ORDER BY sds.local_date ASC",
-        )?;
+        ))?;
         let rows = stmt
             .query_map([i32::from(include_ignored)], |r| r.get(0))?
             .collect::<rusqlite::Result<Vec<String>>>()?;
@@ -121,7 +121,7 @@ impl Store {
         until_date: Option<&str>,
         include_ignored: bool,
     ) -> Result<Vec<TokenAggregateRow>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare(&format!(
             "SELECT sds.local_date, s.agent, tu.model, COUNT(*),
                     SUM(tu.input_tokens), SUM(tu.output_tokens),
                     SUM(tu.cache_read_tokens), SUM(tu.cache_write_tokens)
@@ -133,16 +133,16 @@ impl Store {
              JOIN sessions s ON s.id = sds.session_id
              WHERE (?1 IS NULL OR sds.local_date >= ?1)
                AND (?2 IS NULL OR sds.local_date <= ?2)
-               AND (?3 != 0 OR (sds.ignore_state = 'included' OR (sds.ignore_state = 'inherit' AND s.ignored = 0)))
+               AND (?3 != 0 OR {SLICE_INCLUDED})
              GROUP BY sds.local_date, s.agent, tu.model
              ORDER BY sds.local_date ASC, s.agent ASC, tu.model ASC",
-        )?;
+        ))?;
         let count = |r: &rusqlite::Row, i: usize| r.get::<_, i64>(i).map(|v| v.max(0) as u64);
         let rows = stmt
             .query_map(
                 params![since_date, until_date, i32::from(include_ignored)],
                 |r| {
-                    let agent = crate::agent_at(r, 1)?;
+                    let agent = agent_at(r, 1)?;
                     Ok(TokenAggregateRow {
                         local_date: r.get(0)?,
                         agent,
@@ -168,7 +168,7 @@ impl Store {
         until_date: Option<&str>,
         include_ignored: bool,
     ) -> Result<Vec<ToolAggregateRow>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare(&format!(
             "SELECT ti.tool_kind,
                     COUNT(*),
                     COALESCE(SUM(CASE WHEN ti.is_error = 1 THEN 1 ELSE 0 END), 0),
@@ -183,9 +183,9 @@ impl Store {
              WHERE ti.item_type = 'tool'
                AND (?1 IS NULL OR sds.local_date >= ?1)
                AND (?2 IS NULL OR sds.local_date <= ?2)
-               AND (?3 != 0 OR (sds.ignore_state = 'included' OR (sds.ignore_state = 'inherit' AND s.ignored = 0)))
+               AND (?3 != 0 OR {SLICE_INCLUDED})
              GROUP BY ti.tool_kind",
-        )?;
+        ))?;
         let rows = stmt
             .query_map(
                 params![since_date, until_date, i32::from(include_ignored)],

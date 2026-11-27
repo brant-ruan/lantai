@@ -7,7 +7,8 @@ use anyhow::{bail, Result};
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 
-use crate::{ts, Store};
+use crate::sql::ts;
+use crate::Store;
 
 /// A report version to be saved.
 #[derive(Debug, Clone)]

@@ -89,7 +89,7 @@ pub(crate) struct AssignArgs {
 pub(crate) fn cmd_project(app: &mut App, cmd: ProjectCmd) -> Result<()> {
     match cmd {
         ProjectCmd::List => {
-            let projects = app.store.list_projects()?;
+            let projects = app.store.project_summaries()?;
             if projects.is_empty() {
                 println!("No projects yet. See what could become one with `aj project candidates`, then create it with `aj project new <name>`.");
             }

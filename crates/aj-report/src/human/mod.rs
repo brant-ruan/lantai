@@ -553,11 +553,7 @@ fn renumber_if_needed(store: &Store, group: Vec<&HumanNodeRow>) -> Result<Vec<Hu
 }
 
 fn project_named(store: &Store, name: &str) -> Result<Option<i64>> {
-    Ok(store
-        .list_projects()?
-        .into_iter()
-        .find(|p| p.project.name.eq_ignore_ascii_case(name))
-        .map(|p| p.project.id))
+    Ok(store.find_project(name)?.map(|p| p.id))
 }
 
 #[cfg(test)]

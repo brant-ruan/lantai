@@ -90,12 +90,12 @@ pub struct Collected {
 /// Projects the model may suggest for a session; archived projects are left out.
 pub fn candidate_projects(store: &Store) -> Result<Vec<CandidateProject>> {
     Ok(store
-        .list_projects()?
+        .projects()?
         .into_iter()
-        .filter(|p| !p.project.archived)
+        .filter(|p| !p.archived)
         .map(|p| CandidateProject {
-            name: p.project.name,
-            description: p.project.description,
+            name: p.name,
+            description: p.description,
         })
         .collect())
 }

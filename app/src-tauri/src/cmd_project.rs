@@ -97,7 +97,7 @@ pub fn list_projects_and_rules(
     state: tauri::State<'_, AppState>,
 ) -> Result<ProjectsOverviewDto, String> {
     let store = state.open_store().map_err(cmd_err)?;
-    let projects = store.list_projects().map_err(cmd_err)?;
+    let projects = store.project_summaries().map_err(cmd_err)?;
     let names: HashMap<i64, String> = projects
         .iter()
         .map(|p| (p.project.id, p.project.name.clone()))

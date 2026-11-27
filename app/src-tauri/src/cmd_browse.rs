@@ -102,13 +102,13 @@ pub struct ProjectOptionDto {
     pub archived: bool,
 }
 
-impl From<aj_store::ProjectSummary> for ProjectOptionDto {
-    fn from(p: aj_store::ProjectSummary) -> Self {
+impl From<aj_store::ProjectRow> for ProjectOptionDto {
+    fn from(p: aj_store::ProjectRow) -> Self {
         Self {
-            id: p.project.id,
-            name: p.project.name,
-            description: p.project.description,
-            archived: p.project.archived,
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            archived: p.archived,
         }
     }
 }
@@ -604,10 +604,10 @@ fn build_workbench(
     prompt_kind: &str,
 ) -> Result<DayWorkbenchDto, String> {
     let cfg = state.load_config().map_err(cmd_err)?;
-    let project_rows = store.list_projects().map_err(cmd_err)?;
+    let project_rows = store.projects().map_err(cmd_err)?;
     let project_names: HashMap<i64, String> = project_rows
         .iter()
-        .map(|p| (p.project.id, p.project.name.clone()))
+        .map(|p| (p.id, p.name.clone()))
         .collect();
     let rules = store.rules().map_err(cmd_err)?;
     let lang = state.report_language(&[]).map_err(cmd_err)?;
@@ -638,7 +638,7 @@ pub fn project_workbench(
     until_date: Option<String>,
 ) -> Result<ProjectWorkbenchDto, String> {
     let store = state.open_store().map_err(cmd_err)?;
-    let project_rows = store.list_projects().map_err(cmd_err)?;
+    let project_rows = store.project_summaries().map_err(cmd_err)?;
     let project_names: HashMap<i64, String> = project_rows
         .iter()
         .map(|p| (p.project.id, p.project.name.clone()))
@@ -685,7 +685,7 @@ pub fn project_workbench(
         .collect();
     let projects = project_rows
         .into_iter()
-        .map(ProjectOptionDto::from)
+        .map(|p| ProjectOptionDto::from(p.project))
         .collect();
 
     Ok(ProjectWorkbenchDto {
@@ -713,12 +713,7 @@ pub fn slice_detail(
         .map_err(cmd_err)?
         .context("the session this slice belongs to does not exist")
         .map_err(cmd_err)?;
-    let project_names: HashMap<i64, String> = store
-        .list_projects()
-        .map_err(cmd_err)?
-        .into_iter()
-        .map(|p| (p.project.id, p.project.name))
-        .collect();
+    let project_names = store.project_names().map_err(cmd_err)?;
     let rules = store.rules().map_err(cmd_err)?;
     let lang = state.report_language(&[]).map_err(cmd_err)?;
     let cfg = state.load_config().map_err(cmd_err)?;

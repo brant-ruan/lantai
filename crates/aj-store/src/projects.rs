@@ -2,11 +2,40 @@
 //!
 //! Projects are created by the user. Rules only produce suggestions unless they are marked auto-apply.
 
+use std::collections::HashMap;
+
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, OptionalExtension, Row};
 
-use crate::{session_from_row, ts, ProjectRow, SessionRow, Store, SESSION_COLS};
+use crate::sessions::{session_from_row, SESSION_COLS};
+use crate::sql::{ts, SLICE_PROJECT, SLICE_UNASSIGNED};
+use crate::{SessionRow, Store};
+
+#[derive(Debug, Clone)]
+pub struct ProjectRow {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    /// Archived projects keep their data, but their rules are paused and they are not offered
+    /// for new assignments.
+    pub archived: bool,
+}
+
+/// The columns [`project_from_row`] reads, in its order (table alias `p`).
+const PROJECT_COLS: &str = "p.id, p.name, p.description, p.is_archived";
+
+/// The user's project order.
+const PROJECT_ORDER: &str = "p.sort_order, p.name COLLATE NOCASE";
+
+fn project_from_row(r: &Row) -> rusqlite::Result<ProjectRow> {
+    Ok(ProjectRow {
+        id: r.get(0)?,
+        name: r.get(1)?,
+        description: r.get(2)?,
+        archived: r.get(3)?,
+    })
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleRow {
@@ -86,16 +115,9 @@ impl Store {
         Ok(self
             .conn
             .query_row(
-                "SELECT id, name, description, is_archived FROM logical_projects WHERE id = ?1",
+                &format!("SELECT {PROJECT_COLS} FROM logical_projects p WHERE p.id = ?1"),
                 [id],
-                |r| {
-                    Ok(ProjectRow {
-                        id: r.get(0)?,
-                        name: r.get(1)?,
-                        description: r.get(2)?,
-                        archived: r.get(3)?,
-                    })
-                },
+                project_from_row,
             )
             .optional()?)
     }
@@ -105,16 +127,11 @@ impl Store {
         Ok(self
             .conn
             .query_row(
-                "SELECT id, name, description, is_archived FROM logical_projects WHERE name = ?1 COLLATE NOCASE",
+                &format!(
+                    "SELECT {PROJECT_COLS} FROM logical_projects p WHERE p.name = ?1 COLLATE NOCASE"
+                ),
                 [name.trim()],
-                |r| {
-                    Ok(ProjectRow {
-                        id: r.get(0)?,
-                        name: r.get(1)?,
-                        description: r.get(2)?,
-                        archived: r.get(3)?,
-                    })
-                },
+                project_from_row,
             )
             .optional()?)
     }
@@ -122,8 +139,8 @@ impl Store {
     pub fn require_project(&self, name: &str) -> Result<ProjectRow> {
         self.find_project(name)?.with_context(|| {
             let names: Vec<String> = self
-                .list_projects()
-                .map(|l| l.into_iter().map(|p| p.project.name).collect())
+                .projects()
+                .map(|l| l.into_iter().map(|p| p.name).collect())
                 .unwrap_or_default();
             if names.is_empty() {
                 format!("no project named \"{name}\" (there are no projects yet)")
@@ -136,33 +153,47 @@ impl Store {
         })
     }
 
-    pub fn list_projects(&self) -> Result<Vec<ProjectSummary>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT p.id, p.name, p.description,
+    /// Every project, in the user's order.
+    pub fn projects(&self) -> Result<Vec<ProjectRow>> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {PROJECT_COLS} FROM logical_projects p ORDER BY {PROJECT_ORDER}"
+        ))?;
+        let rows = stmt
+            .query_map([], project_from_row)?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
+    }
+
+    /// Every project's name by its ID.
+    pub fn project_names(&self) -> Result<HashMap<i64, String>> {
+        Ok(self
+            .projects()?
+            .into_iter()
+            .map(|p| (p.id, p.name))
+            .collect())
+    }
+
+    /// Every project, in the user's order, with its slice, suggestion and rule counts. Counting
+    /// reads every slice; use [`Store::projects`] when the counts are not needed.
+    pub fn project_summaries(&self) -> Result<Vec<ProjectSummary>> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {PROJECT_COLS},
                     (SELECT COUNT(*) FROM session_daily_slices sds
                        JOIN sessions s ON s.id = sds.session_id
-                      WHERE COALESCE(sds.project_id_override, s.project_id) = p.id),
+                      WHERE {SLICE_PROJECT} = p.id),
                     (SELECT COUNT(*) FROM session_daily_slices sds
                        JOIN sessions s ON s.id = sds.session_id
-                      WHERE COALESCE(sds.project_id_override, s.project_id) IS NULL
-                        AND s.assignment_source != 'manual'
-                        AND s.suggested_project_id = p.id),
-                    (SELECT COUNT(*) FROM project_match_rules r WHERE r.project_id = p.id),
-                    p.is_archived
-             FROM logical_projects p ORDER BY p.sort_order, p.name COLLATE NOCASE",
-        )?;
+                      WHERE {SLICE_UNASSIGNED} AND s.suggested_project_id = p.id),
+                    (SELECT COUNT(*) FROM project_match_rules r WHERE r.project_id = p.id)
+             FROM logical_projects p ORDER BY {PROJECT_ORDER}"
+        ))?;
         let rows = stmt
             .query_map([], |r| {
                 Ok(ProjectSummary {
-                    project: ProjectRow {
-                        id: r.get(0)?,
-                        name: r.get(1)?,
-                        description: r.get(2)?,
-                        archived: r.get(6)?,
-                    },
-                    slices: r.get::<_, i64>(3)? as u64,
-                    suggested: r.get::<_, i64>(4)? as u64,
-                    rules: r.get::<_, i64>(5)? as u64,
+                    project: project_from_row(r)?,
+                    slices: r.get::<_, i64>(4)? as u64,
+                    suggested: r.get::<_, i64>(5)? as u64,
+                    rules: r.get::<_, i64>(6)? as u64,
                 })
             })?
             .collect::<rusqlite::Result<_>>()?;
@@ -178,9 +209,9 @@ impl Store {
                 order.push(*id);
             }
         }
-        for p in self.list_projects()? {
-            if !order.contains(&p.project.id) {
-                order.push(p.project.id);
+        for p in self.projects()? {
+            if !order.contains(&p.id) {
+                order.push(p.id);
             }
         }
         let tx = self.conn.transaction()?;
@@ -573,11 +604,7 @@ mod tests {
         let a = store.create_project("alpha", None).unwrap();
         let c = store.create_project("Gamma", None).unwrap();
         let names = |s: &Store| -> Vec<String> {
-            s.list_projects()
-                .unwrap()
-                .into_iter()
-                .map(|p| p.project.name)
-                .collect()
+            s.projects().unwrap().into_iter().map(|p| p.name).collect()
         };
         assert_eq!(names(&store), ["Beta", "alpha", "Gamma"]);
         // Unlisted projects follow the listed ones; duplicates are ignored.
@@ -712,14 +739,14 @@ mod tests {
             .unwrap();
         let s = store.session(sid).unwrap().unwrap();
         assert_eq!((s.project_id, s.suggested_project_id), (None, Some(pid)));
-        assert_eq!(store.list_projects().unwrap()[0].suggested, 2);
-        assert_eq!(store.list_projects().unwrap()[0].slices, 0);
+        assert_eq!(store.project_summaries().unwrap()[0].suggested, 2);
+        assert_eq!(store.project_summaries().unwrap()[0].slices, 0);
 
         assert!(store.accept_suggestion(sid).unwrap());
         let s = store.session(sid).unwrap().unwrap();
         assert_eq!((s.project_id, s.suggested_project_id), (Some(pid), None));
         // Counts are per daily slice: one session across two days is two.
-        let summary = &store.list_projects().unwrap()[0];
+        let summary = &store.project_summaries().unwrap()[0];
         assert_eq!((summary.slices, summary.suggested), (2, 0));
         assert_eq!(s.assignment_source, "manual");
         assert!(!store.accept_suggestion(sid).unwrap());

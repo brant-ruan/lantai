@@ -1,15 +1,43 @@
 //! Per-day overview rows for browsing, with active time deduplicated across parallel sessions
 //! and the number of notes people wrote that day.
 //!
-//! The store sums each slice's own active minutes; this module replaces that sum with the
-//! union of the day's active intervals, matching the statistics dashboard and report stat lines.
+//! The store counts each day's slices; this module adds the day's active time as the union of
+//! its active intervals, matching the statistics dashboard and report stat lines.
 
 use std::collections::HashMap;
 
-use aj_store::{DayOverview, HumanCountRow, Store};
+use aj_store::{DayCounts, HumanCountRow, Store};
 use anyhow::Result;
 
 use crate::slice::union_minutes;
+
+/// One active day: the store's counts, and active time that counts overlapping sessions once.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DayOverview {
+    pub local_date: String,
+    /// Slices taking part in reports.
+    pub slices: u64,
+    pub ignored_slices: u64,
+    /// Union of the active intervals of the slices taking part in reports.
+    pub active_minutes: i64,
+    /// Slices taking part in reports that have no project and whose session was not assigned
+    /// to none.
+    pub unassigned_slices: u64,
+    pub report_status: Option<String>,
+}
+
+impl DayOverview {
+    fn new(counts: DayCounts, active_minutes: i64) -> Self {
+        Self {
+            local_date: counts.local_date,
+            slices: counts.slices,
+            ignored_slices: counts.ignored_slices,
+            active_minutes,
+            unassigned_slices: counts.unassigned_slices,
+            report_status: counts.report_status,
+        }
+    }
+}
 
 /// One day of the browsing list.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,10 +86,10 @@ fn with_notes(days: Vec<DayOverview>, counts: Vec<HumanCountRow>) -> Vec<DayRow>
 
 /// Every active day, newest first. `active_minutes` counts overlapping time once.
 pub fn day_overviews(store: &Store, include_ignored: bool) -> Result<Vec<DayOverview>> {
-    let mut days = store.day_overviews(include_ignored)?;
+    let days = store.day_counts(include_ignored)?;
     // Days are ordered newest first.
     let (Some(newest), Some(oldest)) = (days.first(), days.last()) else {
-        return Ok(days);
+        return Ok(Vec::new());
     };
     let mut by_day: HashMap<String, Vec<_>> = HashMap::new();
     for s in store.stats_slices(Some(&oldest.local_date), Some(&newest.local_date), false)? {
@@ -70,10 +98,13 @@ pub fn day_overviews(store: &Store, include_ignored: bool) -> Result<Vec<DayOver
             .or_default()
             .extend(s.active_intervals);
     }
-    for d in &mut days {
-        d.active_minutes = by_day.remove(&d.local_date).map_or(0, union_minutes);
-    }
-    Ok(days)
+    Ok(days
+        .into_iter()
+        .map(|d| {
+            let minutes = by_day.remove(&d.local_date).map_or(0, union_minutes);
+            DayOverview::new(d, minutes)
+        })
+        .collect())
 }
 
 #[cfg(test)]

@@ -8,14 +8,8 @@ use aj_ir::AgentId;
 use anyhow::Result;
 use rusqlite::{named_params, params_from_iter};
 
-use crate::{agent_at, Store};
-
-/// SQL condition true when a slice (`sds`) of a session (`s`) is included in reports.
-const SLICE_INCLUDED: &str =
-    "(sds.ignore_state = 'included' OR (sds.ignore_state = 'inherit' AND s.ignored = 0))";
-
-/// Effective project of a slice.
-const SLICE_PROJECT: &str = "COALESCE(sds.project_id_override, s.project_id)";
+use crate::sql::{agent_at, SLICE_INCLUDED, SLICE_PROJECT};
+use crate::Store;
 
 /// Which slices a search covers. Dates are inclusive local dates (`YYYY-MM-DD`).
 #[derive(Debug, Clone, Default)]

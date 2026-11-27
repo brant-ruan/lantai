@@ -13,7 +13,8 @@ use chrono::Utc;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef};
 use rusqlite::{params, OptionalExtension, Row, ToSql, Transaction};
 
-use crate::{ts, Store};
+use crate::sql::ts;
+use crate::Store;
 
 /// Where a project note shows in its project's section: before or after the generated points.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

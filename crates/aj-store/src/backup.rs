@@ -117,11 +117,7 @@ mod tests {
         live.replace_with(&snapshot).unwrap();
         live.check_integrity().unwrap();
         let names = |s: &Store| -> Vec<String> {
-            s.list_projects()
-                .unwrap()
-                .into_iter()
-                .map(|p| p.project.name)
-                .collect()
+            s.projects().unwrap().into_iter().map(|p| p.name).collect()
         };
         assert_eq!(names(&live), vec!["kept".to_string()]);
         assert_eq!(names(&other), vec!["kept".to_string()]);

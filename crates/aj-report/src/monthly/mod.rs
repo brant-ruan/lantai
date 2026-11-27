@@ -130,14 +130,11 @@ struct MonthSections {
 }
 
 fn month_sections(store: &Store, month: Month, project: Option<&str>) -> Result<MonthSections> {
-    let project_rows = store.list_projects()?;
-    let known_projects: Vec<String> = project_rows
-        .iter()
-        .map(|p| p.project.name.clone())
-        .collect();
+    let project_rows = store.projects()?;
+    let known_projects: Vec<String> = project_rows.iter().map(|p| p.name.clone()).collect();
     let project_ids: BTreeMap<String, i64> = project_rows
         .iter()
-        .map(|p| (p.project.name.to_lowercase(), p.project.id))
+        .map(|p| (p.name.to_lowercase(), p.id))
         .collect();
 
     let mut by_project: BTreeMap<String, ProjectWeeklySections> = BTreeMap::new();
