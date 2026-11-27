@@ -33,6 +33,12 @@ stored data or exported IR is affected:
   OpenAI-compatible ones.
 - Claude Code's model list adds `fable`.
 
+### Fixed
+
+- **Delete** on models and providers in **Settings → Models** did nothing in the app; it now asks
+  in the app's own dialog. A provider that models still use names them instead of a greyed-out
+  button.
+
 ## [0.2.0] - 2026-11-25
 
 IR 0.3.0 · Schema 11 (unchanged; no action needed when upgrading).

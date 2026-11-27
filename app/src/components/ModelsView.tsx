@@ -3,6 +3,7 @@ import { api } from "../api";
 import { InfoTip } from "./InfoTip";
 import { FailureNote } from "./FailureNote";
 import { LocalToolsCard } from "./LocalToolsCard";
+import { ConfirmModal } from "./ConfirmModal";
 import { isCliKind } from "../types";
 import type {
   EngineTestResult,
@@ -195,6 +196,7 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
     {},
   );
   const [presets, setPresets] = useState<ProviderPreset[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   // The error banner sits at the top; bring it into view when it appears.
   const errorRef = useRef<HTMLDivElement>(null);
@@ -756,11 +758,7 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                     type="button"
                     className="btn btn-ghost-danger btn-xs"
                     disabled={busy}
-                    onClick={() => {
-                      if (window.confirm(tm.deleteModel(m.alias))) {
-                        void apply(() => api.deleteModel(m.alias));
-                      }
-                    }}
+                    onClick={() => setPendingDelete({ kind: "model", name: m.alias })}
                   >
                     {tr.common.delete}
                   </button>
@@ -1033,21 +1031,10 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                 <button
                   type="button"
                   className="btn btn-ghost-danger btn-xs"
-                  disabled={busy || p.usedBy.length > 0}
-                  title={
-                    p.usedBy.length > 0
-                      ? tm.usedBy
-                      : undefined
+                  disabled={busy}
+                  onClick={() =>
+                    setPendingDelete({ kind: "provider", name: p.name, hasKey: p.hasKey, usedBy: p.usedBy })
                   }
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        tm.deleteProvider(p.name),
-                      )
-                    ) {
-                      void apply(() => api.deleteProvider(p.name));
-                    }
-                  }}
                 >
                   {tr.common.delete}
                 </button>
@@ -1116,6 +1103,79 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
           ))}
         </div>
       </div>
+      {pendingDelete && (
+        <DeleteConfirm
+          target={pendingDelete}
+          onClose={() => setPendingDelete(null)}
+          onDelete={() => {
+            const target = pendingDelete;
+            setPendingDelete(null);
+            void apply(() =>
+              target.kind === "model"
+                ? api.deleteModel(target.name)
+                : api.deleteProvider(target.name),
+            );
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** A model alias or provider waiting for the user to confirm its deletion. */
+type PendingDelete =
+  | { kind: "model"; name: string }
+  | { kind: "provider"; name: string; hasKey: boolean; usedBy: string[] };
+
+/** Confirms deleting a model alias or provider. A provider that models still use cannot be
+ * deleted, so the dialog names those models instead. */
+function DeleteConfirm({
+  target,
+  onClose,
+  onDelete,
+}: {
+  target: PendingDelete;
+  onClose: () => void;
+  onDelete: () => void;
+}) {
+  const tr = useT();
+  const tm = tr.models;
+  if (target.kind === "provider" && target.usedBy.length > 0) {
+    return (
+      <ConfirmModal
+        title={tm.providerInUse(target.name)}
+        onClose={onClose}
+        actions={
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
+            {tr.common.close}
+          </button>
+        }
+      >
+        <p>{tm.usedBy}</p>
+        <ul className="confirm-list">
+          {target.usedBy.map((alias) => (
+            <li key={alias}>{alias}</li>
+          ))}
+        </ul>
+      </ConfirmModal>
+    );
+  }
+  return (
+    <ConfirmModal
+      title={
+        target.kind === "model" ? tm.deleteModel(target.name) : tm.deleteProvider(target.name, target.hasKey)
+      }
+      onClose={onClose}
+      actions={
+        <>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
+            {tr.common.cancel}
+          </button>
+          <button type="button" className="btn btn-danger btn-sm" onClick={onDelete}>
+            {tr.common.delete}
+          </button>
+        </>
+      }
+    />
   );
 }

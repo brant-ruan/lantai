@@ -1006,8 +1006,10 @@ export const en = {
     noKey: "No key",
     hideModels: "Hide models",
     browseModels: "Browse models",
-    usedBy: "Delete or repoint the models that use it first",
-    deleteProvider: (name: string) => `Delete provider \u201c${name}\u201d and its stored key?`,
+    providerInUse: (name: string) => `Provider \u201c${name}\u201d is in use`,
+    usedBy: "Delete these models or point them at another provider first:",
+    deleteProvider: (name: string, hasKey: boolean) =>
+      `Delete provider \u201c${name}\u201d${hasKey ? " and its stored key" : ""}?`,
     fetchingFrom: (name: string) => `Fetching models from ${name}\u2026`,
     browseTip: "Click a model to enable it; click again to disable.",
     noModel: "No model yet. Find an agent CLI on this Mac below, or add a provider.",

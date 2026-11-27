@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { ConfirmModal } from "./ConfirmModal";
 import { useT } from "../i18n";
 import type { ProjectDeleteImpact } from "../types";
 
@@ -39,18 +40,6 @@ export function DeleteProjectDialog({
     };
   }, [target.id]);
 
-  // Escape closes this dialog only, not a modal underneath (Settings): listen first and stop it.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      onClose();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
-
   const lines = impact
     ? [
         impact.sessions > 0 && t.deleteSessions(impact.sessions),
@@ -61,29 +50,11 @@ export function DeleteProjectDialog({
     : [];
 
   return (
-    <div className="modal-backdrop confirm-backdrop" onClick={onClose}>
-      <div
-        className="confirm-modal"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="delete-project-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="confirm-modal-body">
-          <h2 id="delete-project-title">{t.deleteTitle(target.name)}</h2>
-          <p className="confirm-lead">{t.deleteLead}</p>
-          {error && <div className="banner banner-err">{error}</div>}
-          {lines.length > 0 && (
-            <ul className="confirm-list">
-              {lines.map((l) => (
-                <li key={l}>{l}</li>
-              ))}
-            </ul>
-          )}
-          <p className="muted-line">{t.deleteKept}</p>
-          {!target.archived && <p className="muted-line">{t.archiveHint}</p>}
-        </div>
-        <div className="export-modal-foot">
+    <ConfirmModal
+      title={t.deleteTitle(target.name)}
+      onClose={onClose}
+      actions={
+        <>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
             {tr.common.cancel}
           </button>
@@ -97,12 +68,23 @@ export function DeleteProjectDialog({
             className="btn btn-danger btn-sm"
             disabled={!impact}
             onClick={onDelete}
-            autoFocus={false}
           >
             {t.confirmDelete}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <p className="confirm-lead">{t.deleteLead}</p>
+      {error && <div className="banner banner-err">{error}</div>}
+      {lines.length > 0 && (
+        <ul className="confirm-list">
+          {lines.map((l) => (
+            <li key={l}>{l}</li>
+          ))}
+        </ul>
+      )}
+      <p className="muted-line">{t.deleteKept}</p>
+      {!target.archived && <p className="muted-line">{t.archiveHint}</p>}
+    </ConfirmModal>
   );
 }

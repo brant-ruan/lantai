@@ -967,8 +967,10 @@ export const zhHans = {
     noKey: "无密钥",
     hideModels: "收起模型",
     browseModels: "浏览模型",
-    usedBy: "请先删除或改指向使用它的模型",
-    deleteProvider: (name: string) => `删除提供方「${name}」及其保存的密钥？`,
+    providerInUse: (name: string) => `提供方「${name}」仍在使用`,
+    usedBy: "请先删除下列模型，或把它们改到别的提供方：",
+    deleteProvider: (name: string, hasKey: boolean) =>
+      `删除提供方「${name}」${hasKey ? "及其保存的密钥" : ""}？`,
     fetchingFrom: (name: string) => `正在从 ${name} 获取模型…`,
     browseTip: "点击模型即可启用，再次点击停用。",
     noModel: "还没有模型。可以在下方查找本机的 Agent 命令行，或者添加一个提供方。",
