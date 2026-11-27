@@ -5,7 +5,7 @@
 //! Only period reports (daily, weekly, monthly) have a display form and edit marks; other
 //! reports are shown and saved as stored.
 
-use aj_store::{NewReportVersion, ReportVersionRow, Store};
+use aj_store::{NewReportVersion, ReportOrigin, ReportVersionRow, Store};
 use anyhow::{anyhow, Result};
 
 use crate::edits::{report_edits, ReportEdits};
@@ -150,7 +150,7 @@ pub fn save_user_edit(
         report_type: kind,
         period_key: period,
         project_id,
-        origin: "user_edit",
+        origin: ReportOrigin::UserEdit,
         markdown: &markdown,
         engine: None,
         input_hash: None,
@@ -173,7 +173,7 @@ mod tests {
                 report_type: KIND_DAILY,
                 period_key: "2026-11-16",
                 project_id: None,
-                origin: "generated",
+                origin: ReportOrigin::Generated,
                 markdown,
                 engine: Some("model-a"),
                 input_hash: None,
@@ -229,7 +229,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(saved.id, id);
-        assert_eq!(saved.origin, "user_edit");
+        assert_eq!(saved.origin, ReportOrigin::UserEdit);
         assert_eq!(saved.prompt_name.as_deref(), Some("standard"));
         assert!(saved.markdown.contains("a better point"));
         assert!(!saved.markdown.contains("Anything"));

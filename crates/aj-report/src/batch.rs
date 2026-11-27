@@ -151,7 +151,7 @@ where
         }
         let meta = store.report_meta(kind, &period, None)?;
         let status = match meta.filter(|m| m.current_version_id.is_some()) {
-            Some(m) if m.status == "final" => ReportStatus::Final,
+            Some(m) if m.status == aj_store::ReportStatus::Final => ReportStatus::Final,
             Some(_) => ReportStatus::Draft,
             None => ReportStatus::None,
         };
@@ -342,7 +342,12 @@ mod tests {
         )
         .unwrap();
         store
-            .set_report_status(KIND_DAILY, "2026-11-19", None, "final")
+            .set_report_status(
+                KIND_DAILY,
+                "2026-11-19",
+                None,
+                aj_store::ReportStatus::Final,
+            )
             .unwrap();
 
         // Add new activity on 18 and 19 to make both stale.
@@ -481,7 +486,7 @@ mod tests {
                     report_type: Granularity::Weekly.report_kind(),
                     period_key,
                     project_id: None,
-                    origin: "generated",
+                    origin: aj_store::ReportOrigin::Generated,
                     markdown,
                     engine: None,
                     input_hash: None,
@@ -531,7 +536,7 @@ mod tests {
         assert_eq!(stale.items[0].action, BatchAction::Update);
 
         let marked = store
-            .set_reports_status("monthly", &keys, None, "final")
+            .set_reports_status("monthly", &keys, None, aj_store::ReportStatus::Final)
             .unwrap();
         assert_eq!(marked.updated, ["2026-11"]);
         assert_eq!(marked.skipped, ["2026-12"]);

@@ -342,7 +342,7 @@ mod tests {
             agent: aj_ir::AgentId::CLAUDE,
             source_session_id: "s1".into(),
             project_id: None,
-            assignment_source: "unassigned".into(),
+            assignment_source: aj_store::AssignmentSource::Unassigned,
             suggested_project_id: None,
             suggestion_source: None,
             suggestion_reason: None,

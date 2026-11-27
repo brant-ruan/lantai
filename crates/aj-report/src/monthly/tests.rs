@@ -32,7 +32,7 @@ fn save_weekly(store: &mut Store, week: &str, markdown: &str) {
             report_type: KIND_WEEKLY,
             period_key: week,
             project_id: None,
-            origin: "generated",
+            origin: aj_store::ReportOrigin::Generated,
             markdown,
             engine: Some("mock"),
             input_hash: None,

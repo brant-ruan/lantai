@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use aj_store::{RuleRow, SessionRow, Store};
+use aj_store::{AssignmentSource, RuleRow, SessionRow, Store, SuggestionSource};
 use anyhow::Result;
 
 use super::git;
@@ -43,10 +43,10 @@ pub fn evaluate_session(
     cwd: Option<String>,
     stats: &mut EvaluateStats,
 ) -> Result<()> {
-    if session.assignment_source == "manual" {
+    if session.assignment_source == AssignmentSource::Manual {
         return Ok(());
     }
-    if session.assignment_source == "rule"
+    if session.assignment_source == AssignmentSource::Rule
         && session
             .project_id
             .is_some_and(|p| active.archived.contains(&p))
@@ -89,13 +89,16 @@ pub fn evaluate_session(
         Some(m) => {
             // Previously assigned by an auto-apply rule, now only a suggestion: back to unassigned.
             store.unassign_rule(session.id)?;
-            store.set_suggestion(session.id, Some((m.project_id, "rule", &m.reason)))?;
+            store.set_suggestion(
+                session.id,
+                Some((m.project_id, SuggestionSource::Rule, &m.reason)),
+            )?;
             stats.suggested += 1;
         }
         None => {
             store.unassign_rule(session.id)?;
             // Clear only suggestions produced by rules; suggestions from the model are unaffected by rule changes.
-            if session.suggestion_source.as_deref() == Some("rule") {
+            if session.suggestion_source == Some(SuggestionSource::Rule) {
                 store.set_suggestion(session.id, None)?;
             }
         }
@@ -188,8 +191,8 @@ mod tests {
         evaluate_all(&store, &info).unwrap();
         let s = store.session(sid).unwrap().unwrap();
         assert_eq!(
-            (s.project_id, s.assignment_source.as_str()),
-            (Some(pid), "rule")
+            (s.project_id, s.assignment_source),
+            (Some(pid), AssignmentSource::Rule)
         );
 
         // Once the rule is deleted, the assignment it caused is undone.
@@ -207,7 +210,10 @@ mod tests {
 
         // With no rule matching, the model's suggestion is kept.
         store
-            .set_suggestion(sid, Some((paper, "llm", "content is a paper review")))
+            .set_suggestion(
+                sid,
+                Some((paper, SuggestionSource::Llm, "content is a paper review")),
+            )
             .unwrap();
         evaluate_all(&store, &info).unwrap();
         assert_eq!(
@@ -236,8 +242,8 @@ mod tests {
         assert_eq!(stats.evaluated, 0);
         let s = store.session(sid).unwrap().unwrap();
         assert_eq!(
-            (s.project_id, s.assignment_source.as_str()),
-            (Some(pid), "rule")
+            (s.project_id, s.assignment_source),
+            (Some(pid), AssignmentSource::Rule)
         );
 
         // A paused rule neither assigns nor suggests.

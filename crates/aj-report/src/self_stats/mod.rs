@@ -204,7 +204,7 @@ fn cell(
         key,
         first_day,
         last_day,
-        status: cell_status(row.map(|r| r.status.as_str()), active_slices),
+        status: cell_status(row.map(|r| r.status), active_slices),
         stale: staleness.is_some(),
         stale_projects: staleness.map(|s| s.projects).unwrap_or_default(),
         versions: row.map_or(0, |r| r.versions),
@@ -276,7 +276,12 @@ mod tests {
         let engine = MockEngine::new(|_| Ok("## app\n- did work [#S1]".into()));
         generate(&mut store, &engine, &tz, "2026-11-18");
         store
-            .set_report_status(KIND_DAILY, "2026-11-18", None, "final")
+            .set_report_status(
+                KIND_DAILY,
+                "2026-11-18",
+                None,
+                aj_store::ReportStatus::Final,
+            )
             .unwrap();
         add_session(&mut store, &tz, "s-late", app, "2026-11-18T04:00:00Z");
 

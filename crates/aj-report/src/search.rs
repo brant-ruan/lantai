@@ -8,7 +8,7 @@ use aj_core::search::{
     count_matches, covers_all, parse_terms, search_sessions, snippet, SessionQuery, SessionSearch,
     SnippetPart,
 };
-use aj_store::{HumanNodeRow, ReportTextRow, SliceFilter, Store};
+use aj_store::{HumanNodeRow, ReportStatus, ReportTextRow, SliceFilter, Store};
 use anyhow::Result;
 use chrono::NaiveDate;
 
@@ -76,8 +76,8 @@ pub struct ReportRef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReportHit {
     pub report: ReportRef,
-    /// The report's status; empty for a note.
-    pub status: String,
+    /// The report's status; `None` for a note.
+    pub status: Option<ReportStatus>,
     /// The section heading or the note's project; `None` for text before the first section
     /// and for notes of no project.
     pub section: Option<String>,
@@ -148,7 +148,7 @@ pub fn sections(markdown: &str) -> Vec<(Option<String>, String)> {
 struct Unit {
     kind: Granularity,
     report: ReportRef,
-    status: String,
+    status: Option<ReportStatus>,
     section: Option<String>,
     text: String,
     human: bool,
@@ -167,7 +167,7 @@ fn report_units(reports: &[ReportTextRow]) -> Vec<Unit> {
                     kind: r.report_type.clone(),
                     period_key: r.period_key.clone(),
                 },
-                status: r.status.clone(),
+                status: Some(r.status),
                 section: heading,
                 text: anchors::strip(&body),
                 human: false,
@@ -198,7 +198,7 @@ fn note_units(nodes: &[HumanNodeRow], project_name: &dyn Fn(i64) -> Option<Strin
                 kind: report_kind.to_string(),
                 period_key: root.period_key.clone(),
             },
-            status: String::new(),
+            status: None,
             section: root.project_id.and_then(project_name),
             text,
             human: true,
@@ -343,7 +343,7 @@ mod tests {
         ReportTextRow {
             report_type: kind.into(),
             period_key: key.into(),
-            status: "draft".into(),
+            status: ReportStatus::Draft,
             markdown: md.into(),
         }
     }

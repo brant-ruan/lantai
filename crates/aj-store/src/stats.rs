@@ -208,6 +208,7 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::IgnoreState;
     use crate::NewSlice;
     use aj_ir::{DiffStat, IrEvent};
 
@@ -306,7 +307,9 @@ mod tests {
             .set_slice_project_override(slice_d2, Some(p_side))
             .unwrap();
         // Ignore the first slice explicitly while keeping session unignored.
-        store.set_slice_ignore_state(slice_d1, "ignored").unwrap();
+        store
+            .set_slice_ignore_state(slice_d1, IgnoreState::Ignored)
+            .unwrap();
 
         // Second session is session-ignored, with one slice explicitly included.
         let mut events2 = turn_events(
@@ -356,7 +359,9 @@ mod tests {
             )
             .unwrap();
         let slice_inc = store.slices_for_date("2026-11-16").unwrap()[0].id;
-        store.set_slice_ignore_state(slice_inc, "included").unwrap();
+        store
+            .set_slice_ignore_state(slice_inc, IgnoreState::Included)
+            .unwrap();
 
         // Active slices across all dates should include s1@11-15 (Side) and s2@11-16 (Unassigned).
         let active = store.stats_slices(None, None, false).unwrap();
@@ -464,7 +469,9 @@ mod tests {
         assert_eq!((rows[1].calls, rows[1].usage), (1, usage(1, 2, 3)));
 
         let slice = store.slices_for_date("2026-11-10").unwrap()[0].id;
-        store.set_slice_ignore_state(slice, "ignored").unwrap();
+        store
+            .set_slice_ignore_state(slice, IgnoreState::Ignored)
+            .unwrap();
         assert!(store
             .stats_token_aggregates(None, None, false)
             .unwrap()

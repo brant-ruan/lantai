@@ -13,7 +13,7 @@ pub use overview::{group_days, week_overviews, WeekOverview};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
-use aj_store::{NewReportVersion, Store};
+use aj_store::{NewReportVersion, ReportOrigin, ReportStatus, Store};
 use anyhow::{bail, Result};
 use chrono::{NaiveDate, TimeZone};
 use sha2::{Digest as _, Sha256};
@@ -526,7 +526,7 @@ where
         report_type: KIND_WEEKLY,
         period_key: &period,
         project_id: report_pid,
-        origin: "generated",
+        origin: ReportOrigin::Generated,
         markdown: &result.markdown,
         engine: Some(&engine_name),
         input_hash: Some(&input_hash),
@@ -537,7 +537,7 @@ where
         language: lang.tag,
     })?);
     if base.as_ref().is_some_and(|b| b.is_final) {
-        store.set_report_status(KIND_WEEKLY, &period, report_pid, "draft")?;
+        store.set_report_status(KIND_WEEKLY, &period, report_pid, ReportStatus::Draft)?;
     }
     Ok(result)
 }

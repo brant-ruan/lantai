@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use aj_core::overview::DayOverview;
-use aj_store::Store;
+use aj_store::{ReportStatus, Store};
 use anyhow::Result;
 use chrono::NaiveDate;
 
@@ -18,7 +18,7 @@ pub struct WeekOverview {
     pub slices: u64,
     pub active_minutes: i64,
     pub unassigned_slices: u64,
-    pub report_status: Option<String>,
+    pub report_status: Option<ReportStatus>,
 }
 
 /// Group day overviews into weeks, newest week first. Days whose date does not parse are

@@ -189,7 +189,7 @@ pub fn search_all(
         .map(|h| ReportHitDto {
             kind: h.report.kind,
             period_key: h.report.period_key,
-            status: h.status,
+            status: crate::cmd_report::status_text(h.status),
             section: h.section,
             snippets: h.snippets.into_iter().map(parts).collect(),
             match_count: h.match_count,

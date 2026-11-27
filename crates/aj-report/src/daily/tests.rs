@@ -458,7 +458,14 @@ fn llm_suggestion_applies_to_unassigned_session_and_respects_existing_state() {
         .unwrap()
         .session_id;
     store
-        .set_suggestion(s_ruled, Some((other, "rule", "directory /work/other")))
+        .set_suggestion(
+            s_ruled,
+            Some((
+                other,
+                aj_store::SuggestionSource::Rule,
+                "directory /work/other",
+            )),
+        )
         .unwrap();
     reslice_session(&mut store, s_ruled, &Config::default(), &tz).unwrap();
 
@@ -481,7 +488,10 @@ fn llm_suggestion_applies_to_unassigned_session_and_respects_existing_state() {
     let free_row = store.session(s_free).unwrap().unwrap();
     assert_eq!(free_row.project_id, None);
     assert_eq!(free_row.suggested_project_id, Some(atlas));
-    assert_eq!(free_row.suggestion_source.as_deref(), Some("llm"));
+    assert_eq!(
+        free_row.suggestion_source,
+        Some(aj_store::SuggestionSource::Llm)
+    );
     assert_eq!(
         free_row.suggestion_reason.as_deref(),
         Some("judged by model")
@@ -492,7 +502,10 @@ fn llm_suggestion_applies_to_unassigned_session_and_respects_existing_state() {
     assert_eq!(none_row.suggested_project_id, None);
     let ruled_row = store.session(s_ruled).unwrap().unwrap();
     assert_eq!(ruled_row.suggested_project_id, Some(other));
-    assert_eq!(ruled_row.suggestion_source.as_deref(), Some("rule"));
+    assert_eq!(
+        ruled_row.suggestion_source,
+        Some(aj_store::SuggestionSource::Rule)
+    );
 }
 
 #[test]
@@ -715,7 +728,7 @@ fn edit_current(store: &mut Store, from: &str, to: &str) {
             report_type: KIND_DAILY,
             period_key: "2026-11-16",
             project_id: None,
-            origin: "user_edit",
+            origin: aj_store::ReportOrigin::UserEdit,
             markdown: &v.markdown.replace(from, to),
             engine: None,
             input_hash: None,
@@ -779,7 +792,12 @@ fn update_rewrites_only_changed_projects_and_keeps_user_edits() {
     // An edit alone does not make the report stale.
     assert_eq!(staleness_now(&store, &tz), None);
     store
-        .set_report_status(KIND_DAILY, "2026-11-16", None, "final")
+        .set_report_status(
+            KIND_DAILY,
+            "2026-11-16",
+            None,
+            aj_store::ReportStatus::Final,
+        )
         .unwrap();
 
     // A new app session arrives.
@@ -814,7 +832,7 @@ fn update_rewrites_only_changed_projects_and_keeps_user_edits() {
             .unwrap()
             .unwrap()
             .status,
-        "draft"
+        aj_store::ReportStatus::Draft
     );
     assert_eq!(staleness_now(&store, &tz), None);
 
@@ -841,7 +859,7 @@ fn update_drops_a_project_whose_slices_were_all_ignored() {
         .find(|s| s.slice_start_at == t("2026-11-16T04:00:00Z"))
         .unwrap();
     store
-        .set_slice_ignore_state(web_slice.id, "ignored")
+        .set_slice_ignore_state(web_slice.id, aj_store::IgnoreState::Ignored)
         .unwrap();
     assert_eq!(staleness_now(&store, &tz).unwrap().projects, vec!["web"]);
 

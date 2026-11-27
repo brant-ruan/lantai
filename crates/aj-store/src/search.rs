@@ -80,7 +80,7 @@ pub struct SliceSearchRow {
 pub struct ReportTextRow {
     pub report_type: String,
     pub period_key: String,
-    pub status: String,
+    pub status: crate::ReportStatus,
     pub markdown: String,
 }
 

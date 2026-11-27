@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use aj_store::{DayCounts, HumanCountRow, Store};
+use aj_store::{DayCounts, HumanCountRow, ReportStatus, Store};
 use anyhow::Result;
 
 use crate::slice::union_minutes;
@@ -23,7 +23,7 @@ pub struct DayOverview {
     /// Slices taking part in reports that have no project and whose session was not assigned
     /// to none.
     pub unassigned_slices: u64,
-    pub report_status: Option<String>,
+    pub report_status: Option<ReportStatus>,
 }
 
 impl DayOverview {

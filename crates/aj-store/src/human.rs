@@ -10,51 +10,11 @@
 
 use anyhow::{bail, Result};
 use chrono::Utc;
-use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef};
-use rusqlite::{params, OptionalExtension, Row, ToSql, Transaction};
+use rusqlite::{params, OptionalExtension, Row, Transaction};
 
 use crate::sql::ts;
+use crate::states::HumanPosition;
 use crate::Store;
-
-/// Where a project note shows in its project's section: before or after the generated points.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum HumanPosition {
-    Top,
-    #[default]
-    Bottom,
-}
-
-impl HumanPosition {
-    /// The stored value.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            HumanPosition::Top => "top",
-            HumanPosition::Bottom => "bottom",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "top" => Some(HumanPosition::Top),
-            "bottom" => Some(HumanPosition::Bottom),
-            _ => None,
-        }
-    }
-}
-
-impl ToSql for HumanPosition {
-    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(self.as_str()))
-    }
-}
-
-impl FromSql for HumanPosition {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        let s = value.as_str()?;
-        HumanPosition::parse(s)
-            .ok_or_else(|| FromSqlError::Other(format!("unknown note position {s:?}").into()))
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HumanNodeRow {

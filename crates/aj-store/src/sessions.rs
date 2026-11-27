@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, OptionalExtension, Row};
 
 use crate::sql::{agent_at, opt_ts, parse_ts};
-use crate::Store;
+use crate::{AssignmentSource, Store, SuggestionSource};
 
 #[derive(Debug, Clone)]
 pub struct SessionRow {
@@ -15,11 +15,9 @@ pub struct SessionRow {
     pub agent: AgentId,
     pub source_session_id: String,
     pub project_id: Option<i64>,
-    /// `manual` | `rule` | `unassigned`
-    pub assignment_source: String,
+    pub assignment_source: AssignmentSource,
     pub suggested_project_id: Option<i64>,
-    /// `rule` | `llm`
-    pub suggestion_source: Option<String>,
+    pub suggestion_source: Option<SuggestionSource>,
     pub suggestion_reason: Option<String>,
     pub git_root: Option<String>,
     pub git_remote: Option<String>,
@@ -37,7 +35,7 @@ impl SessionRow {
     /// it has no project, was not explicitly assigned to "none", and has no suggestion yet.
     pub fn needs_llm_suggestion(&self) -> bool {
         self.project_id.is_none()
-            && self.assignment_source != "manual"
+            && self.assignment_source != AssignmentSource::Manual
             && self.suggested_project_id.is_none()
     }
 }

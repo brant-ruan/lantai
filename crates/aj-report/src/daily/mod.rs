@@ -12,7 +12,7 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use aj_store::{NewReportVersion, Store};
+use aj_store::{NewReportVersion, ReportOrigin, ReportStatus, Store};
 use anyhow::{bail, Result};
 use chrono::TimeZone;
 use sha2::{Digest as _, Sha256};
@@ -311,7 +311,7 @@ where
         report_type: KIND_DAILY,
         period_key: &opts.period,
         project_id: report_pid,
-        origin: "generated",
+        origin: ReportOrigin::Generated,
         markdown: &result.markdown,
         engine: Some(&engine_name),
         input_hash: Some(&stage2_hash),
@@ -323,7 +323,7 @@ where
     })?);
     // A finalized report that gained new material needs a fresh review.
     if base.as_ref().is_some_and(|b| b.is_final) {
-        store.set_report_status(KIND_DAILY, &opts.period, report_pid, "draft")?;
+        store.set_report_status(KIND_DAILY, &opts.period, report_pid, ReportStatus::Draft)?;
     }
     Ok(result)
 }

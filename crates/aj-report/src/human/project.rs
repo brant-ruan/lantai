@@ -190,7 +190,7 @@ mod tests {
                 report_type: "daily",
                 period_key: DAY,
                 project_id: None,
-                origin: "generated",
+                origin: aj_store::ReportOrigin::Generated,
                 markdown: "# x\n\n## Other\n- Elsewhere [#S9.T1]\n\n## App\n\
                            - Built the search view [#S1.T2]\n- Fixed the menu [#S2.T1]",
                 engine: None,

@@ -6,7 +6,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use aj_store::{ChunkDigestRow, SliceDigestRow, Store};
+use aj_store::{ChunkDigestRow, SliceDigestRow, Store, SuggestionSource};
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, TimeZone, Utc};
 
@@ -246,7 +246,10 @@ pub(crate) fn apply_llm_suggestion(
         return Ok(());
     }
     if let Some(project_id) = resolve_suggested_project(store, raw)? {
-        store.set_suggestion(session_id, Some((project_id, "llm", "judged by model")))?;
+        store.set_suggestion(
+            session_id,
+            Some((project_id, SuggestionSource::Llm, "judged by model")),
+        )?;
         result.suggestions_made += 1;
     }
     Ok(())

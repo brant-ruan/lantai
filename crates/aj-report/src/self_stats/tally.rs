@@ -1,6 +1,7 @@
 //! Classification and totals for Lantai's own state (report coverage, digest cache). Pure logic.
 
 use aj_ir::AgentId;
+use aj_store::ReportStatus;
 use chrono::NaiveDate;
 
 /// Whether a slice's digest can be reused as is.
@@ -78,10 +79,10 @@ impl CellStatus {
 
 /// A report that exists counts whatever its slices are; otherwise a period whose slices are
 /// all ignored needs none.
-pub fn cell_status(report_status: Option<&str>, active_slices: u64) -> CellStatus {
+pub fn cell_status(report_status: Option<ReportStatus>, active_slices: u64) -> CellStatus {
     match report_status {
-        Some("final") => CellStatus::Final,
-        Some(_) => CellStatus::Draft,
+        Some(ReportStatus::Final) => CellStatus::Final,
+        Some(ReportStatus::Draft) => CellStatus::Draft,
         None if active_slices == 0 => CellStatus::Ignored,
         None => CellStatus::None,
     }
@@ -213,8 +214,8 @@ mod tests {
 
     #[test]
     fn existing_reports_count_even_when_every_slice_is_ignored() {
-        assert_eq!(cell_status(Some("final"), 0), CellStatus::Final);
-        assert_eq!(cell_status(Some("draft"), 3), CellStatus::Draft);
+        assert_eq!(cell_status(Some(ReportStatus::Final), 0), CellStatus::Final);
+        assert_eq!(cell_status(Some(ReportStatus::Draft), 3), CellStatus::Draft);
         assert_eq!(cell_status(None, 0), CellStatus::Ignored);
         assert_eq!(cell_status(None, 2), CellStatus::None);
     }

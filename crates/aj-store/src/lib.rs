@@ -23,13 +23,12 @@ mod sessions;
 mod slices;
 mod sources;
 mod sql;
+mod states;
 mod stats;
 
 pub use backup::{database_state, file_schema_version, snapshot_file, SCHEMA_VERSION};
 pub use chunks::{ChunkDigestRow, ProjectBriefRow};
-pub use human::{
-    HumanCountRow, HumanNodeRow, HumanPosition, HumanRelocation, NewHumanRoot, PROJECT_PERIOD,
-};
+pub use human::{HumanCountRow, HumanNodeRow, HumanRelocation, NewHumanRoot, PROJECT_PERIOD};
 pub use ingest::IngestStats;
 pub use projects::{Candidate, DeleteImpact, NewRule, ProjectRow, ProjectSummary, RuleRow};
 pub use prompts::{BuiltinPrompt, PromptRow};
@@ -43,6 +42,9 @@ pub use search::{
 pub use sessions::{SessionRow, TurnItem, TurnRow};
 pub use slices::{DayCounts, NewSlice, SliceDigestRow, SliceRow};
 pub use sources::{CursorRow, SourceHealth};
+pub use states::{
+    AssignmentSource, HumanPosition, IgnoreState, ReportOrigin, ReportStatus, SuggestionSource,
+};
 pub use stats::{StatsSliceRow, TokenAggregateRow, ToolAggregateRow};
 
 /// The database. Every query is a method on it, defined in the module of what it touches.

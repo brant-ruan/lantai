@@ -5,7 +5,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeSet, HashMap};
 
-use aj_store::Store;
+use aj_store::{ReportStatus, Store};
 use anyhow::{bail, Result};
 use chrono::NaiveDate;
 
@@ -78,8 +78,8 @@ impl Granularity {
 pub struct RollupEntry {
     pub period_key: String,
     pub label: String,
-    /// The report's status; empty when the period has notes but no section of the project.
-    pub status: String,
+    /// The report's status; `None` when the period has notes but no section of the project.
+    pub status: Option<ReportStatus>,
     pub markdown: String,
     pub updated_at: String,
 }
@@ -118,7 +118,7 @@ pub fn project_rollup(
             entries.push(RollupEntry {
                 label: granularity.label(&r.period_key),
                 period_key: r.period_key,
-                status: r.status,
+                status: Some(r.status),
                 markdown: body,
                 updated_at: r.created_at,
             });
@@ -189,7 +189,7 @@ fn add_note_periods(
             entries.push(RollupEntry {
                 period_key: key.to_string(),
                 label: granularity.label(key),
-                status: String::new(),
+                status: None,
                 markdown: String::new(),
                 updated_at: String::new(),
             });
@@ -212,7 +212,7 @@ mod tests {
                 report_type: kind,
                 period_key: key,
                 project_id: None,
-                origin: "generated",
+                origin: aj_store::ReportOrigin::Generated,
                 markdown,
                 engine: None,
                 input_hash: None,
@@ -322,9 +322,15 @@ mod tests {
         let got: Vec<_> = r
             .entries
             .iter()
-            .map(|e| (e.period_key.as_str(), e.status.as_str()))
+            .map(|e| (e.period_key.as_str(), e.status))
             .collect();
-        assert_eq!(got, vec![("2026-11-12", ""), ("2026-11-10", "draft")]);
+        assert_eq!(
+            got,
+            vec![
+                ("2026-11-12", None),
+                ("2026-11-10", Some(ReportStatus::Draft))
+            ]
+        );
         assert!(!r.combined_markdown.contains("vendor"));
     }
 

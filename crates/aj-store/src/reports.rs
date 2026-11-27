@@ -3,12 +3,12 @@
 
 use std::collections::HashSet;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 
 use crate::sql::ts;
-use crate::Store;
+use crate::{ReportOrigin, ReportStatus, Store};
 
 /// A report version to be saved.
 #[derive(Debug, Clone)]
@@ -19,8 +19,7 @@ pub struct NewReportVersion<'a> {
     pub period_key: &'a str,
     /// `None` for a report covering every project.
     pub project_id: Option<i64>,
-    /// `generated` | `user_edit`
-    pub origin: &'a str,
+    pub origin: ReportOrigin,
     pub markdown: &'a str,
     pub engine: Option<&'a str>,
     pub input_hash: Option<&'a str>,
@@ -41,7 +40,7 @@ pub struct ReportVersionRow {
     pub id: i64,
     /// 1-based position among the versions of the same report.
     pub number: u64,
-    pub origin: String,
+    pub origin: ReportOrigin,
     pub markdown: String,
     pub engine: Option<String>,
     pub prompt_name: Option<String>,
@@ -55,8 +54,7 @@ pub struct ReportVersionRow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReportMeta {
     pub id: i64,
-    /// `draft` | `final`
-    pub status: String,
+    pub status: ReportStatus,
     pub current_version_id: Option<i64>,
 }
 
@@ -64,7 +62,7 @@ pub struct ReportMeta {
 pub struct PeriodReportRow {
     /// The period key: a date for daily reports, a week key for weekly ones.
     pub period_key: String,
-    pub status: String,
+    pub status: ReportStatus,
     pub markdown: String,
     pub language: String,
     pub created_at: String,
@@ -74,8 +72,7 @@ pub struct PeriodReportRow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReportSummaryRow {
     pub period_key: String,
-    /// `draft` | `final`
-    pub status: String,
+    pub status: ReportStatus,
     pub versions: u64,
     /// Whether any version was saved by hand.
     pub edited: bool,
@@ -225,11 +222,8 @@ impl Store {
         report_type: &str,
         period_key: &str,
         project_id: Option<i64>,
-        status: &str,
+        status: ReportStatus,
     ) -> Result<bool> {
-        if status != "draft" && status != "final" {
-            bail!("report status must be 'draft' or 'final', got {status}");
-        }
         let changed = self.conn.execute(
             "UPDATE reports SET status = ?4
              WHERE report_type = ?1 AND period_key = ?2 AND project_id IS ?3",
@@ -245,11 +239,8 @@ impl Store {
         report_type: &str,
         period_keys: &[String],
         project_id: Option<i64>,
-        status: &str,
+        status: ReportStatus,
     ) -> Result<BatchStatusResult> {
-        if status != "draft" && status != "final" {
-            bail!("report status must be 'draft' or 'final', got {status}");
-        }
         let tx = self.conn.transaction()?;
         let mut seen = HashSet::with_capacity(period_keys.len());
         let mut result = BatchStatusResult::default();
@@ -370,7 +361,7 @@ mod tests {
             report_type: "daily",
             period_key: "2026-11-16",
             project_id,
-            origin: "generated",
+            origin: ReportOrigin::Generated,
             markdown,
             engine: Some("mock"),
             input_hash: None,
@@ -429,7 +420,7 @@ mod tests {
         store.save_report_version(&version("v1", None)).unwrap();
         store
             .save_report_version(&NewReportVersion {
-                origin: "user_edit",
+                origin: ReportOrigin::UserEdit,
                 input_manifest: None,
                 ..version("v2", None)
             })
@@ -450,7 +441,7 @@ mod tests {
             rows[0],
             ReportSummaryRow {
                 period_key: "2026-11-16".into(),
-                status: "draft".into(),
+                status: ReportStatus::Draft,
                 versions: 2,
                 edited: true,
                 has_manifest: false,
@@ -477,15 +468,12 @@ mod tests {
             .report_meta("daily", "2026-11-16", None)
             .unwrap()
             .unwrap();
-        assert_eq!(meta.status, "draft");
+        assert_eq!(meta.status, ReportStatus::Draft);
         assert_eq!(meta.current_version_id, Some(v2));
 
         assert!(store
-            .set_report_status("daily", "2026-11-16", None, "final")
+            .set_report_status("daily", "2026-11-16", None, ReportStatus::Final)
             .unwrap());
-        assert!(store
-            .set_report_status("daily", "2026-11-16", None, "bogus")
-            .is_err());
         assert!(store
             .set_current_report_version("daily", "2026-11-16", None, v1)
             .unwrap());
@@ -494,7 +482,7 @@ mod tests {
             .report_meta("daily", "2026-11-16", None)
             .unwrap()
             .unwrap();
-        assert_eq!(meta.status, "final");
+        assert_eq!(meta.status, ReportStatus::Final);
         assert_eq!(meta.current_version_id, Some(v1));
 
         // Setting a non-existent version ID does not alter current_version_id.
@@ -519,7 +507,7 @@ mod tests {
         v_day2_b.period_key = "2026-11-15";
         store.save_report_version(&v_day2_b).unwrap();
         store
-            .set_report_status("daily", "2026-11-15", None, "final")
+            .set_report_status("daily", "2026-11-15", None, ReportStatus::Final)
             .unwrap();
 
         let mut v_day3 = version("d3-v1", None);
@@ -544,10 +532,10 @@ mod tests {
         assert_eq!(
             (
                 all[1].period_key.as_str(),
-                all[1].status.as_str(),
+                all[1].status,
                 all[1].markdown.as_str()
             ),
-            ("2026-11-15", "final", "d2-v2")
+            ("2026-11-15", ReportStatus::Final, "d2-v2")
         );
         assert_eq!(
             (all[2].period_key.as_str(), all[2].markdown.as_str()),
@@ -577,12 +565,8 @@ mod tests {
             "2026-11-17".to_string(),
             "2026-11-16".to_string(),
         ];
-        assert!(store
-            .set_reports_status("daily", &keys, None, "invalid")
-            .is_err());
-
         let res = store
-            .set_reports_status("daily", &keys, None, "final")
+            .set_reports_status("daily", &keys, None, ReportStatus::Final)
             .unwrap();
         assert_eq!(res.updated, vec!["2026-11-16", "2026-11-17"]);
         assert_eq!(res.skipped, vec!["2026-11-18"]);
@@ -592,7 +576,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .status,
-            "final"
+            ReportStatus::Final
         );
         assert_eq!(
             store
@@ -600,11 +584,16 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .status,
-            "final"
+            ReportStatus::Final
         );
 
         let res_draft = store
-            .set_reports_status("daily", &["2026-11-16".to_string()], None, "draft")
+            .set_reports_status(
+                "daily",
+                &["2026-11-16".to_string()],
+                None,
+                ReportStatus::Draft,
+            )
             .unwrap();
         assert_eq!(res_draft.updated, vec!["2026-11-16"]);
         assert_eq!(
@@ -613,7 +602,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .status,
-            "draft"
+            ReportStatus::Draft
         );
     }
 }

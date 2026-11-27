@@ -275,6 +275,12 @@ What the code does not make obvious. The design behind each is in the spec.
   once in `aj-store/src/sql.rs` and mirror `SliceRow::is_ignored` and `effective_project`;
   change both together. `Store::project_summaries` counts over every slice; use
   `Store::projects` or `project_names` when only names are needed.
+- **Stored states** (slice ignore state, assignment and suggestion source, report status and
+  origin, note position) are enums made by `stored_enum!` in `aj-store/src/states.rs`; they
+  read and write their text through `ToSql` / `FromSql`, and text a build does not know fails
+  to read. A new value is therefore a user-facing schema change (older builds cannot read it):
+  raise it with the owner first. SQL that compares against a value spells the text out; the test
+  in `states.rs` keeps the fragments in `sql.rs` in step. The front end still receives the text.
 
 ## Conventions
 

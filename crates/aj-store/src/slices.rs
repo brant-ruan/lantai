@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, OptionalExtension, Row};
 
 use crate::sql::{parse_ts, ts, SLICE_INCLUDED, SLICE_PROJECT, SLICE_UNASSIGNED};
-use crate::{SessionRow, Store};
+use crate::{IgnoreState, ReportStatus, SessionRow, Store};
 
 /// A slice to be written (computed by the core layer).
 #[derive(Debug, Clone, PartialEq)]
@@ -37,8 +37,7 @@ pub struct SliceRow {
     /// Active intervals (UTC), as computed by slicing.
     pub active_intervals: Vec<(DateTime<Utc>, DateTime<Utc>)>,
     pub files_modified: Vec<String>,
-    /// `inherit` | `ignored` | `included`
-    pub ignore_state: String,
+    pub ignore_state: IgnoreState,
     /// Project assignment for this day only; takes precedence over the session's project.
     pub project_id_override: Option<i64>,
     pub digest_json: Option<String>,
@@ -61,10 +60,10 @@ impl SliceRow {
 
     /// Whether this slice is excluded from reports: its own setting first, otherwise the session's.
     pub fn is_ignored(&self, session: &SessionRow) -> bool {
-        match self.ignore_state.as_str() {
-            "ignored" => true,
-            "included" => false,
-            _ => session.ignored,
+        match self.ignore_state {
+            IgnoreState::Ignored => true,
+            IgnoreState::Included => false,
+            IgnoreState::Inherit => session.ignored,
         }
     }
 }
@@ -93,7 +92,7 @@ pub struct DayCounts {
     /// Slices taking part in reports that have no project and whose session was not assigned
     /// to none.
     pub unassigned_slices: u64,
-    pub report_status: Option<String>,
+    pub report_status: Option<ReportStatus>,
 }
 
 const SLICE_COLS: &str = "id, session_id, local_date, start_turn_index, end_turn_index, slice_start_at, \
@@ -142,7 +141,7 @@ impl Store {
     pub fn replace_slices(&mut self, session_id: i64, slices: &[NewSlice]) -> Result<()> {
         let tx = self.conn.transaction()?;
         // (local_date, start_turn, end_turn, ignore_state, project_id_override) before the change.
-        let before: Vec<(String, i64, i64, String, Option<i64>)> = {
+        let before: Vec<(String, i64, i64, IgnoreState, Option<i64>)> = {
             let mut stmt = tx.prepare(
                 "SELECT local_date, start_turn_index, end_turn_index, ignore_state, project_id_override
                  FROM session_daily_slices WHERE session_id = ?1",
@@ -186,7 +185,7 @@ impl Store {
             if before.iter().any(|b| b.0 == s.local_date) {
                 continue;
             }
-            let overlap = |b: &&(String, i64, i64, String, Option<i64>)| {
+            let overlap = |b: &&(String, i64, i64, IgnoreState, Option<i64>)| {
                 (s.end_turn_index.min(b.2) - s.start_turn_index.max(b.1) + 1).max(0)
             };
             if let Some(src) = before
@@ -300,7 +299,7 @@ impl Store {
             .optional()?)
     }
 
-    pub fn set_slice_ignore_state(&self, slice_id: i64, state: &str) -> Result<()> {
+    pub fn set_slice_ignore_state(&self, slice_id: i64, state: IgnoreState) -> Result<()> {
         self.conn.execute(
             "UPDATE session_daily_slices SET ignore_state = ?2 WHERE id = ?1",
             params![slice_id, state],
@@ -374,7 +373,9 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use crate::test_events::{sample_events, t};
-    use crate::{DayCounts, NewReportVersion, NewSlice, SliceDigestRow, Store};
+    use crate::{
+        DayCounts, IgnoreState, NewReportVersion, NewSlice, ReportStatus, SliceDigestRow, Store,
+    };
     use aj_ir::{AgentId, IrEvent};
 
     #[test]
@@ -446,7 +447,9 @@ mod tests {
             .replace_slices(sid, &[slice("2026-11-15", 0, 2)])
             .unwrap();
         let old = store.slices_for_session(sid).unwrap()[0].id;
-        store.set_slice_ignore_state(old, "ignored").unwrap();
+        store
+            .set_slice_ignore_state(old, IgnoreState::Ignored)
+            .unwrap();
 
         // Turns 1-2 move to the next day; both resulting slices came from the ignored one,
         // the new day inherits it and the kept day keeps its own state.
@@ -455,16 +458,18 @@ mod tests {
             .unwrap();
         let rows = store.slices_for_session(sid).unwrap();
         assert_eq!(rows.len(), 2);
-        assert!(rows.iter().all(|r| r.ignore_state == "ignored"));
+        assert!(rows.iter().all(|r| r.ignore_state == IgnoreState::Ignored));
 
         // The whole slice moves to a new day: the old day's state carries over.
-        store.set_slice_ignore_state(rows[0].id, "inherit").unwrap();
+        store
+            .set_slice_ignore_state(rows[0].id, IgnoreState::Inherit)
+            .unwrap();
         store
             .replace_slices(sid, &[slice("2026-11-17", 0, 2)])
             .unwrap();
         let rows = store.slices_for_session(sid).unwrap();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].ignore_state, "ignored");
+        assert_eq!(rows[0].ignore_state, IgnoreState::Ignored);
     }
 
     #[test]
@@ -518,7 +523,7 @@ mod tests {
                 report_type: "daily",
                 period_key: "2026-11-16",
                 project_id: None,
-                origin: "generated",
+                origin: crate::ReportOrigin::Generated,
                 markdown: "# Report",
                 engine: None,
                 input_hash: None,
@@ -530,7 +535,7 @@ mod tests {
             })
             .unwrap();
         store
-            .set_report_status("daily", "2026-11-16", None, "final")
+            .set_report_status("daily", "2026-11-16", None, ReportStatus::Final)
             .unwrap();
 
         let busy_day = DayCounts {
@@ -538,7 +543,7 @@ mod tests {
             slices: 3,
             ignored_slices: 1,
             unassigned_slices: 1,
-            report_status: Some("final".into()),
+            report_status: Some(ReportStatus::Final),
         };
         assert_eq!(store.day_counts(false).unwrap(), vec![busy_day.clone()]);
         assert_eq!(
@@ -608,7 +613,7 @@ mod tests {
         // Suggested session shows up in suggested_slices_for_project.
         let s3 = add(&mut store, "s3", &["2026-11-16"]);
         store
-            .set_suggestion(s3, Some((app, "llm", "matched app")))
+            .set_suggestion(s3, Some((app, crate::SuggestionSource::Llm, "matched app")))
             .unwrap();
 
         let all = store.slices_for_project(app, None, None).unwrap();

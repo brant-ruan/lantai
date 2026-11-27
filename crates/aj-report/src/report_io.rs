@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use aj_core::slice::union_minutes;
 use aj_core::INTERNAL_TASK_FINGERPRINT;
-use aj_store::Store;
+use aj_store::{ReportStatus, Store};
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 
@@ -148,7 +148,7 @@ pub fn load_base(
     };
     let is_final = store
         .report_meta(kind, period, project_id)?
-        .is_some_and(|m| m.status == "final");
+        .is_some_and(|m| m.status == ReportStatus::Final);
     Ok(Some(Base {
         sections: parsed.sections,
         manifest,

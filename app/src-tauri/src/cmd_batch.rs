@@ -1,7 +1,7 @@
 //! Sidebar batch commands for planning report work and setting report status.
 
 use aj_report::{batch, rollup::Granularity};
-use aj_store::Store;
+use aj_store::{ReportStatus, Store};
 use chrono::Local;
 use serde::Serialize;
 
@@ -93,7 +93,8 @@ pub fn set_reports_status(
 ) -> CmdResult<BatchStatusResultDto> {
     let kind = Granularity::parse(&report_type)?.report_kind();
     let mut store = state.open_store()?;
-    let res = store.set_reports_status(kind, &period_keys, None, &status)?;
+    let status = ReportStatus::parse_or_err(&status)?;
+    let res = store.set_reports_status(kind, &period_keys, None, status)?;
     Ok(BatchStatusResultDto {
         updated: res.updated,
         skipped: res.skipped,

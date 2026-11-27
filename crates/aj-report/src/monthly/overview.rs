@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use aj_store::Store;
+use aj_store::{ReportStatus, Store};
 use anyhow::Result;
 
 use crate::period::Month;
@@ -19,7 +19,7 @@ pub struct MonthOverview {
     pub slices: u64,
     pub active_minutes: i64,
     pub unassigned_slices: u64,
-    pub report_status: Option<String>,
+    pub report_status: Option<ReportStatus>,
 }
 
 /// Group week overviews into calendar months, newest month first. Pure logic; the
@@ -73,7 +73,7 @@ mod tests {
             slices,
             active_minutes: minutes,
             unassigned_slices: 1,
-            report_status: reported.then(|| "draft".into()),
+            report_status: reported.then_some(aj_store::ReportStatus::Draft),
         }
     }
 

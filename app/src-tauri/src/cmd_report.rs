@@ -30,7 +30,7 @@ use aj_report::{
     weekly::{estimate_weekly, generate_weekly},
     DailyResult, Engine, ReportMode, ReportOptions, StoredDigest, DEFAULT_CONCURRENCY,
 };
-use aj_store::Store;
+use aj_store::{ReportStatus, Store};
 use anyhow::Context;
 use chrono::{Local, Utc};
 use serde::Serialize;
@@ -284,7 +284,7 @@ fn build_report_state(
     let meta = store
         .report_meta(report_type, period_key, project_id)?
         .map(|m| ReportMetaDto {
-            status: m.status,
+            status: m.status.to_string(),
             current_version_id: m.current_version_id,
         });
     let versions = versions::shown_versions(store, report_type, period_key, project_id)?
@@ -292,7 +292,7 @@ fn build_report_state(
         .map(|s| ReportVersionDto {
             id: s.version.id,
             number: s.version.number,
-            origin: s.version.origin,
+            origin: s.version.origin.to_string(),
             markdown: s.markdown,
             engine: s.version.engine,
             writers: s
@@ -565,7 +565,7 @@ pub fn get_project_rollup(
             .map(|e| ProjectRollupEntryDto {
                 period: e.period_key,
                 label: e.label,
-                status: e.status,
+                status: status_text(e.status),
                 markdown: e.markdown,
                 updated_at: e.updated_at,
             })
@@ -662,6 +662,11 @@ where
     finish_job(state, &key);
     let _ = window.emit("report-job-finished", key);
     res
+}
+
+/// A report's status as the front end shows it; empty for a period with only notes.
+pub(crate) fn status_text(status: Option<ReportStatus>) -> String {
+    status.map(|s| s.to_string()).unwrap_or_default()
 }
 
 /// What the front end asks for when generating a report of any kind.
@@ -869,8 +874,9 @@ pub fn set_report_status(
     let store = state.open_store()?;
     let kind = report_type.as_deref().unwrap_or(KIND_DAILY);
     let pid = resolve_project_id(&store, project_id, project.as_deref())?;
+    let status = ReportStatus::parse_or_err(&status)?;
     store
-        .set_report_status(kind, &period_key, pid, &status)
+        .set_report_status(kind, &period_key, pid, status)
         .map_err(CmdError::from)
 }
 

@@ -10,7 +10,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::sessions::{session_from_row, SESSION_COLS};
 use crate::sql::{ts, SLICE_PROJECT, SLICE_UNASSIGNED};
-use crate::{SessionRow, Store};
+use crate::{SessionRow, Store, SuggestionSource};
 
 #[derive(Debug, Clone)]
 pub struct ProjectRow {
@@ -476,7 +476,7 @@ impl Store {
     pub fn set_suggestion(
         &self,
         session_id: i64,
-        suggestion: Option<(i64, &str, &str)>,
+        suggestion: Option<(i64, SuggestionSource, &str)>,
     ) -> Result<()> {
         let (project_id, source, reason) = match suggestion {
             Some((p, s, r)) => (Some(p), Some(s), Some(r)),
@@ -630,7 +630,7 @@ fn insert_rule(conn: &Connection, project_id: i64, rule: &NewRule) -> Result<i64
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::NewSlice;
+    use crate::{AssignmentSource, NewSlice};
     use aj_ir::{AgentId, IrEvent};
 
     #[test]
@@ -718,7 +718,7 @@ mod tests {
             report_type: "daily",
             period_key: "2026-11-17",
             project_id: None,
-            origin: "generated",
+            origin: crate::ReportOrigin::Generated,
             markdown: md,
             engine: None,
             input_hash: None,
@@ -765,7 +765,7 @@ mod tests {
             )
             .unwrap();
         store
-            .set_suggestion(sid, Some((pid, "llm", "judged by model")))
+            .set_suggestion(sid, Some((pid, SuggestionSource::Llm, "judged by model")))
             .unwrap();
 
         store.set_project_archived(pid, true).unwrap();
@@ -814,7 +814,10 @@ mod tests {
             .unwrap();
         let pid = store.create_project("P", None).unwrap();
         store
-            .set_suggestion(sid, Some((pid, "rule", "directory /work/p")))
+            .set_suggestion(
+                sid,
+                Some((pid, SuggestionSource::Rule, "directory /work/p")),
+            )
             .unwrap();
         let s = store.session(sid).unwrap().unwrap();
         assert_eq!((s.project_id, s.suggested_project_id), (None, Some(pid)));
@@ -827,7 +830,7 @@ mod tests {
         // Counts are per daily slice: one session across two days is two.
         let summary = &store.project_summaries().unwrap()[0];
         assert_eq!((summary.slices, summary.suggested), (2, 0));
-        assert_eq!(s.assignment_source, "manual");
+        assert_eq!(s.assignment_source, AssignmentSource::Manual);
         assert!(!store.accept_suggestion(sid).unwrap());
     }
 
@@ -859,8 +862,8 @@ mod tests {
         store.delete_project(pid, "2026-11-21").unwrap();
         let s = store.session(sid).unwrap().unwrap();
         assert_eq!(
-            (s.project_id, s.assignment_source.as_str()),
-            (None, "unassigned")
+            (s.project_id, s.assignment_source),
+            (None, AssignmentSource::Unassigned)
         );
         assert!(store.rules().unwrap().is_empty());
     }

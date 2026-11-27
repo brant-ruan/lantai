@@ -16,7 +16,7 @@ use aj_report::period::{Month, Week};
 use aj_report::prompt_library::{self, KIND_DAILY, KIND_MONTHLY, KIND_WEEKLY};
 use aj_report::weekly::week_overviews;
 use aj_report::StoredDigest;
-use aj_store::{SessionRow, SliceRow, Store, TurnItem};
+use aj_store::{IgnoreState, SessionRow, SliceRow, Store, TurnItem};
 use anyhow::Context;
 use chrono::{Datelike, Local, Utc};
 use serde::Serialize;
@@ -250,10 +250,10 @@ fn build_slice_card(
         project_id,
         project_name,
         project_override_id: slice.project_id_override,
-        assignment_source: session.assignment_source.clone(),
+        assignment_source: session.assignment_source.to_string(),
         suggested_project_id: session.suggested_project_id,
         suggested_project_name,
-        suggestion_source: session.suggestion_source.clone(),
+        suggestion_source: session.suggestion_source.map(|s| s.to_string()),
         suggestion_reason: session.suggestion_reason.clone(),
         uncovered_path: uncovered,
         slice_date: slice.local_date.clone(),
@@ -273,7 +273,7 @@ fn build_slice_card(
         user_note: session.user_note.clone(),
         ignored: slice.is_ignored(session),
         session_ignored: session.ignored,
-        ignore_state: slice.ignore_state.clone(),
+        ignore_state: slice.ignore_state.to_string(),
         has_digest: digest_in(slice, lang).is_some(),
         ended_at: slice.slice_end_at.to_rfc3339(),
     }
@@ -372,7 +372,7 @@ pub fn list_days(
                 ignored_slices: r.day.ignored_slices,
                 active_minutes: r.day.active_minutes,
                 unassigned_slices: r.day.unassigned_slices,
-                report_status: r.day.report_status,
+                report_status: r.day.report_status.map(|s| s.to_string()),
                 notes: r.notes,
             })
             .collect(),
@@ -417,7 +417,7 @@ pub fn list_weeks(state: tauri::State<'_, AppState>) -> CmdResult<WeeksResponseD
                 slices: w.slices,
                 active_minutes: w.active_minutes,
                 unassigned_slices: w.unassigned_slices,
-                report_status: w.report_status,
+                report_status: w.report_status.map(|s| s.to_string()),
             })
             .collect(),
     })
@@ -475,7 +475,7 @@ pub fn list_months(state: tauri::State<'_, AppState>) -> CmdResult<MonthsRespons
                     slices: m.slices,
                     active_minutes: m.active_minutes,
                     unassigned_slices: m.unassigned_slices,
-                    report_status: m.report_status,
+                    report_status: m.report_status.map(|s| s.to_string()),
                 }
             })
             .collect(),
@@ -796,12 +796,10 @@ pub fn set_slice_ignore_state(
     slice_id: i64,
     ignore_state: String,
 ) -> CmdResult<()> {
-    if !matches!(ignore_state.as_str(), "inherit" | "ignored" | "included") {
-        return Err(format!("invalid slice ignore state: {ignore_state}").into());
-    }
+    let ignore_state = IgnoreState::parse_or_err(&ignore_state)?;
     let store = state.open_store()?;
     store
-        .set_slice_ignore_state(slice_id, &ignore_state)
+        .set_slice_ignore_state(slice_id, ignore_state)
         .map_err(CmdError::from)
 }
 
