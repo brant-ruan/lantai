@@ -120,14 +120,17 @@ layers never read an agent's raw files.
 What the code does not make obvious. The design behind each is in the spec.
 
 - **Report pipeline:** versions, input manifests, staleness and Update for daily, weekly and
-  monthly reports are shared in `aj-report/src/report_io.rs`; `daily.rs`, `weekly/` and
-  `monthly/` only orchestrate. Stage 1's worker pool is `stage1.rs`; only the main thread touches
+  monthly reports are shared in `aj-report/src/report_io.rs`, as are their run options
+  (`ReportOptions<P>`, where only the period type differs); `daily.rs`, `weekly/` and `monthly/`
+  only orchestrate. Showing versions and saving a user's edit are `aj_report::versions`. Stage 1's worker pool is `stage1.rs`; only the main thread touches
   the database. Titles come from `structure::report_title` (rewritten on validation and on read;
   the model's title is dropped); weekly and monthly stats lines (`> `) come from
   `report_io::stats_line`. Daily generation checks each new section's anchors against that
   project's slices before splicing in sections kept by Update.
 - **Prompts:** built-in prompts are synced into the database at startup; once a user edits one it
-  becomes theirs and is no longer overwritten. Changing the digest or cluster prompts or their
+  becomes theirs and is no longer overwritten. Which prompts a language offers (its own plus the
+  built-in language's) and which are defaults are `prompt_library::offered` and `default_ids`.
+  Changing the digest or cluster prompts or their
   structure bumps `DIGEST_PROMPT_VERSION` or `BRIEF_PROMPT_VERSION`.
 - **Edit marks:** `aj_report::edits` finds the model's original text per project section (the
   manifest's `section_hash` carries through edits and through Update for sections not rewritten).
@@ -192,6 +195,9 @@ What the code does not make obvious. The design behind each is in the spec.
   `aj_core::project::ActiveRules`; sessions already assigned by a rule stay; `candidate_projects`
   and model suggestion parsing skip archived projects; front-end assignment menus filter through
   `assignableProjects` in `projectOptions.ts`.
+- **Creating projects and rules:** shells validate the whole rule set first
+  (`aj_core::project::validate_rules`, pure), then write it in one transaction
+  (`Store::create_project_with_rules`, `Store::add_rules`), so a bad rule creates nothing.
 - **Renaming a project:** `aj_store::rename_project` rewrites `## <old name>` in every report
   version in one transaction (callers pass `structure::rename_project_heading`), so per-project
   roll-ups keep working.

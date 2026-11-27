@@ -3,11 +3,11 @@
 use std::path::PathBuf;
 
 use aj_report::local_tools;
-use aj_report::monthly::{generate_monthly, MonthlyOptions};
+use aj_report::monthly::generate_monthly;
 use aj_report::period::{Month, Week};
 use aj_report::prompt_library::{KIND_DAILY, KIND_MONTHLY, KIND_WEEKLY};
-use aj_report::weekly::{generate_weekly, WeeklyOptions};
-use aj_report::{generate_daily, DailyOptions, ReportMode};
+use aj_report::weekly::generate_weekly;
+use aj_report::{generate_daily, ReportMode, ReportOptions, DEFAULT_CONCURRENCY};
 use aj_store::ReportVersionRow;
 use anyhow::{bail, Context, Result};
 use chrono::Local;
@@ -42,7 +42,7 @@ pub(crate) enum ReportKind {
         #[arg(long, env = "AJ_MODEL")]
         model: Option<String>,
         /// Number of concurrent model calls in the digest stage
-        #[arg(long, default_value_t = 3)]
+        #[arg(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
         /// Write the report to a file
         #[arg(long)]
@@ -75,7 +75,7 @@ pub(crate) enum ReportKind {
         #[arg(long, env = "AJ_MODEL")]
         model: Option<String>,
         /// Number of concurrent model calls (digests, then project sections)
-        #[arg(long, default_value_t = 3)]
+        #[arg(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
         /// Write the report to a file
         #[arg(long)]
@@ -108,7 +108,7 @@ pub(crate) enum ReportKind {
         #[arg(long, env = "AJ_MODEL")]
         model: Option<String>,
         /// Number of concurrent model calls for project sections
-        #[arg(long, default_value_t = 3)]
+        #[arg(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
         /// Write the report to a file
         #[arg(long)]
@@ -167,8 +167,8 @@ pub(crate) fn cmd_report(app: &mut App, kind: ReportKind) -> Result<()> {
             let date = resolve_date(app, date);
             cmd_report_daily(
                 app,
-                DailyArgs {
-                    date,
+                RunArgs {
+                    period: date,
                     project,
                     prompt,
                     lang,
@@ -195,8 +195,8 @@ pub(crate) fn cmd_report(app: &mut App, kind: ReportKind) -> Result<()> {
             let week = resolve_week(app, week, date)?;
             cmd_report_weekly(
                 app,
-                WeeklyArgs {
-                    week,
+                RunArgs {
+                    period: week,
                     project,
                     prompt,
                     lang,
@@ -223,8 +223,8 @@ pub(crate) fn cmd_report(app: &mut App, kind: ReportKind) -> Result<()> {
             let month = resolve_month(app, month, date)?;
             cmd_report_monthly(
                 app,
-                MonthlyArgs {
-                    month,
+                RunArgs {
+                    period: month,
                     project,
                     prompt,
                     lang,
@@ -350,43 +350,13 @@ fn resolve_period(
     Ok((KIND_DAILY, resolve_date(app, date)))
 }
 
-struct MonthlyArgs {
-    month: Month,
-    project: Option<String>,
-    prompt: Option<String>,
-    lang: Option<String>,
-    concurrency: usize,
-    dry_run: bool,
-    update: bool,
-}
-
 fn cmd_report_monthly(
     app: &mut App,
-    args: MonthlyArgs,
+    args: RunArgs<Month>,
     model: Option<String>,
     out: Option<PathBuf>,
 ) -> Result<()> {
-    let config = app.load_config()?;
-    let engine = report_engine(&config, model.as_deref(), args.dry_run, app)?;
-    let opts = MonthlyOptions {
-        language: app.report_language(args.lang.as_deref())?,
-        month: args.month,
-        project: args.project,
-        prompt: args.prompt,
-        concurrency: args.concurrency,
-        dry_run: args.dry_run,
-        budgets: config.budgets(),
-        cancel: None,
-        mode: if args.update {
-            ReportMode::Update
-        } else {
-            ReportMode::Regenerate
-        },
-        now: chrono::Utc::now(),
-    };
-    if !opts.dry_run {
-        eprintln!("Engine: {}", engine.name());
-    }
+    let (engine, opts) = prepare(app, args, model.as_deref())?;
     let started = std::time::Instant::now();
     let r = generate_monthly(&mut app.store, engine.as_ref(), &Local, &opts, &mut |msg| {
         eprintln!("{msg}")
@@ -421,51 +391,16 @@ fn cmd_report_monthly(
     for w in &r.warnings {
         eprintln!("  warning: {w}");
     }
-    if let Some(path) = out {
-        std::fs::write(&path, &r.markdown)
-            .with_context(|| format!("failed to write {}", path.display()))?;
-        eprintln!("Written to {}", path.display());
-    }
-    Ok(())
-}
-
-struct WeeklyArgs {
-    week: Week,
-    project: Option<String>,
-    prompt: Option<String>,
-    lang: Option<String>,
-    concurrency: usize,
-    dry_run: bool,
-    update: bool,
+    write_out(out, &r.markdown)
 }
 
 fn cmd_report_weekly(
     app: &mut App,
-    args: WeeklyArgs,
+    args: RunArgs<Week>,
     model: Option<String>,
     out: Option<PathBuf>,
 ) -> Result<()> {
-    let config = app.load_config()?;
-    let engine = report_engine(&config, model.as_deref(), args.dry_run, app)?;
-    let opts = WeeklyOptions {
-        language: app.report_language(args.lang.as_deref())?,
-        week: args.week,
-        project: args.project,
-        prompt: args.prompt,
-        concurrency: args.concurrency,
-        dry_run: args.dry_run,
-        budgets: config.budgets(),
-        cancel: None,
-        mode: if args.update {
-            ReportMode::Update
-        } else {
-            ReportMode::Regenerate
-        },
-        now: chrono::Utc::now(),
-    };
-    if !opts.dry_run {
-        eprintln!("Engine: {}", engine.name());
-    }
+    let (engine, opts) = prepare(app, args, model.as_deref())?;
     let started = std::time::Instant::now();
     let r = generate_weekly(&mut app.store, engine.as_ref(), &Local, &opts, &mut |msg| {
         eprintln!("{msg}")
@@ -503,52 +438,16 @@ fn cmd_report_weekly(
     for w in &r.warnings {
         eprintln!("  warning: {w}");
     }
-    if let Some(path) = out {
-        std::fs::write(&path, &r.markdown)
-            .with_context(|| format!("failed to write {}", path.display()))?;
-        eprintln!("Written to {}", path.display());
-    }
-    Ok(())
-}
-
-/// What the user asked for on the command line; budgets and the engine come from the config file.
-struct DailyArgs {
-    date: String,
-    project: Option<String>,
-    prompt: Option<String>,
-    lang: Option<String>,
-    concurrency: usize,
-    dry_run: bool,
-    update: bool,
+    write_out(out, &r.markdown)
 }
 
 fn cmd_report_daily(
     app: &mut App,
-    args: DailyArgs,
+    args: RunArgs<String>,
     model: Option<String>,
     out: Option<PathBuf>,
 ) -> Result<()> {
-    let config = app.load_config()?;
-    let engine = report_engine(&config, model.as_deref(), args.dry_run, app)?;
-    let opts = DailyOptions {
-        language: app.report_language(args.lang.as_deref())?,
-        date: args.date,
-        project: args.project,
-        prompt: args.prompt,
-        concurrency: args.concurrency,
-        dry_run: args.dry_run,
-        budgets: config.budgets(),
-        cancel: None,
-        mode: if args.update {
-            ReportMode::Update
-        } else {
-            ReportMode::Regenerate
-        },
-        now: chrono::Utc::now(),
-    };
-    if !opts.dry_run {
-        eprintln!("Engine: {}", engine.name());
-    }
+    let (engine, opts) = prepare(app, args, model.as_deref())?;
     let r = generate_daily(&mut app.store, engine.as_ref(), &Local, &opts, &mut |msg| {
         eprintln!("{msg}")
     })?;
@@ -602,8 +501,50 @@ fn cmd_report_daily(
     for w in &r.warnings {
         eprintln!("  warning: {w}");
     }
+    write_out(out, &r.markdown)
+}
+
+/// What the user asked for on the command line; budgets and the engine come from the config file.
+struct RunArgs<P> {
+    period: P,
+    project: Option<String>,
+    prompt: Option<String>,
+    lang: Option<String>,
+    concurrency: usize,
+    dry_run: bool,
+    update: bool,
+}
+
+/// The engine and options a report command runs with; names the engine unless it is a dry run.
+fn prepare<P>(
+    app: &App,
+    args: RunArgs<P>,
+    model: Option<&str>,
+) -> Result<(Box<dyn aj_report::Engine>, ReportOptions<P>)> {
+    let config = app.load_config()?;
+    let engine = report_engine(&config, model, args.dry_run, app)?;
+    let opts = ReportOptions {
+        language: app.report_language(args.lang.as_deref())?,
+        period: args.period,
+        project: args.project,
+        prompt: args.prompt,
+        concurrency: args.concurrency,
+        dry_run: args.dry_run,
+        budgets: config.budgets(),
+        cancel: None,
+        mode: ReportMode::from_update(args.update),
+        now: chrono::Utc::now(),
+    };
+    if !opts.dry_run {
+        eprintln!("Engine: {}", engine.name());
+    }
+    Ok((engine, opts))
+}
+
+/// Writes the report to `--out` when given.
+fn write_out(out: Option<PathBuf>, markdown: &str) -> Result<()> {
     if let Some(path) = out {
-        std::fs::write(&path, &r.markdown)
+        std::fs::write(&path, markdown)
             .with_context(|| format!("failed to write {}", path.display()))?;
         eprintln!("Written to {}", path.display());
     }

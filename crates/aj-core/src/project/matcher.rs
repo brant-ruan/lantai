@@ -2,7 +2,7 @@
 //!
 //! Pure logic, so it is easy to test in isolation and can later back a "which sessions would this rule match" preview in the UI.
 
-use aj_store::{RuleRow, SessionRow};
+use aj_store::{NewRule, RuleRow, SessionRow};
 use anyhow::{bail, Context, Result};
 use regex::RegexBuilder;
 
@@ -72,6 +72,59 @@ pub fn validate_rule(rule_type: &str, target_field: Option<&str>, pattern: &str)
         }
         other => bail!("unknown rule type: {other}"),
     }
+}
+
+/// Rule patterns as a person gives them, by kind, with the settings they share.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RuleInput<'a> {
+    pub paths: &'a [String],
+    pub remotes: &'a [String],
+    pub regexes: &'a [String],
+    /// What regex rules match against: one of [`REGEX_FIELDS`].
+    pub regex_field: &'a str,
+    pub auto_apply: bool,
+}
+
+/// A validated rule with its canonical pattern, ready to store.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidRule<'a> {
+    pub rule_type: &'static str,
+    pub target_field: Option<&'a str>,
+    pub pattern: String,
+    pub auto_apply: bool,
+}
+
+impl ValidRule<'_> {
+    pub fn as_new(&self) -> NewRule<'_> {
+        NewRule {
+            rule_type: self.rule_type,
+            target_field: self.target_field,
+            pattern: &self.pattern,
+            auto_apply: self.auto_apply,
+        }
+    }
+}
+
+/// Validate every rule of `input` (paths, then remotes, then regexes) before any is stored,
+/// so that one wrong pattern stores nothing.
+pub fn validate_rules<'a>(input: &RuleInput<'a>) -> Result<Vec<ValidRule<'a>>> {
+    let groups: [(&'static str, &[String], Option<&'a str>); 3] = [
+        (RULE_PATH_PREFIX, input.paths, None),
+        (RULE_GIT_REMOTE, input.remotes, None),
+        (RULE_REGEX, input.regexes, Some(input.regex_field)),
+    ];
+    let mut out = Vec::new();
+    for (rule_type, patterns, target_field) in groups {
+        for raw in patterns {
+            out.push(ValidRule {
+                rule_type,
+                target_field,
+                pattern: validate_rule(rule_type, target_field, raw)?,
+                auto_apply: input.auto_apply,
+            });
+        }
+    }
+    Ok(out)
 }
 
 /// Find the best matching rule.
@@ -148,6 +201,41 @@ pub fn uncovered_path(rules: &[RuleRow], session: &SessionRow) -> Option<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rule_sets_are_validated_whole_and_canonicalized() {
+        let paths = ["/work/app/".to_string()];
+        let regexes = ["^fix".to_string()];
+        let input = RuleInput {
+            paths: &paths,
+            regexes: &regexes,
+            regex_field: "title",
+            auto_apply: true,
+            ..Default::default()
+        };
+        let rules = validate_rules(&input).unwrap();
+        assert_eq!(
+            rules
+                .iter()
+                .map(|r| (r.rule_type, r.target_field, r.pattern.as_str()))
+                .collect::<Vec<_>>(),
+            [
+                (RULE_PATH_PREFIX, None, "/work/app"),
+                (RULE_REGEX, Some("title"), "^fix")
+            ]
+        );
+        assert!(rules.iter().all(|r| r.auto_apply));
+
+        let bad = ["relative/path".to_string()];
+        let err = validate_rules(&RuleInput {
+            paths: &bad,
+            regexes: &regexes,
+            regex_field: "any",
+            ..Default::default()
+        })
+        .unwrap_err();
+        assert!(err.to_string().contains("absolute path"));
+    }
 
     fn rule(
         id: i64,

@@ -12,12 +12,10 @@ pub use overview::{group_days, week_overviews, WeekOverview};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 use aj_store::{NewReportVersion, Store};
 use anyhow::{bail, Result};
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{NaiveDate, TimeZone};
 use sha2::{Digest as _, Sha256};
 
 use crate::anchors::{self, AnchorCheck};
@@ -33,26 +31,9 @@ use crate::prompt_library::{self, PromptVars, KIND_WEEKLY};
 use crate::report_io::{self, Base, ReportMode, Staleness};
 use crate::stage1::{self, is_cancelled, Stage1Options, Stage1Stats};
 use crate::structure::{self, ProjectSection};
-use crate::summarize::Budgets;
 
-#[derive(Debug, Clone)]
-pub struct WeeklyOptions {
-    pub week: Week,
-    /// Only include the project with this name.
-    pub project: Option<String>,
-    /// Name of the prompt to use; `None` uses the language's default weekly prompt.
-    pub prompt: Option<String>,
-    /// Language the report is written in.
-    pub language: &'static Language,
-    /// Concurrent model calls, both for digests and for project sections.
-    pub concurrency: usize,
-    /// Only assemble the material; call no model and save nothing.
-    pub dry_run: bool,
-    pub budgets: Budgets,
-    pub cancel: Option<Arc<AtomicBool>>,
-    pub mode: ReportMode,
-    pub now: DateTime<Utc>,
-}
+/// Options of a weekly report.
+pub type WeeklyOptions = report_io::ReportOptions<Week>;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WeeklyEstimate {
@@ -275,8 +256,8 @@ where
 {
     let mut result = WeeklyResult::default();
     let engine_name = engine.name();
-    let period = opts.week.key();
-    let title = opts.week.title();
+    let period = opts.period.key();
+    let title = opts.period.title();
     let lang = opts.language;
     let prompt_row = prompt_library::resolve(store, KIND_WEEKLY, lang, opts.prompt.as_deref())?;
     result.prompt_name = prompt_row.name.clone();
@@ -288,7 +269,7 @@ where
         now: opts.now,
         language: lang,
     };
-    let collected = collect_week(store, tz, opts.week, opts.project.as_deref(), &ctx)?;
+    let collected = collect_week(store, tz, opts.period, opts.project.as_deref(), &ctx)?;
     let materials = collected.materials;
     result.slices_ignored = collected.ignored;
     if materials.is_empty() {

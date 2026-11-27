@@ -1,8 +1,9 @@
 use super::*;
 use crate::engine::testing::MockEngine;
+use crate::summarize::Budgets;
 use aj_core::{slice::reslice_session, Config};
 use aj_ir::{AgentId, IrEvent};
-use chrono::FixedOffset;
+use chrono::{DateTime, FixedOffset, Utc};
 
 fn t(s: &str) -> DateTime<Utc> {
     s.parse().unwrap()
@@ -101,7 +102,7 @@ fn fixture() -> (Store, FixedOffset) {
 
 fn opts() -> MonthlyOptions {
     MonthlyOptions {
-        month: Month::parse("2026-11").unwrap(),
+        period: Month::parse("2026-11").unwrap(),
         project: None,
         prompt: None,
         concurrency: 2,
@@ -186,7 +187,7 @@ fn update_rewrites_only_projects_whose_weekly_section_changed() {
     let est = estimate_monthly(
         &store,
         &tz,
-        opts().month,
+        opts().period,
         None,
         &MaterialContext {
             engine_name: "mock",

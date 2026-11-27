@@ -14,6 +14,12 @@ stored data or exported IR is affected:
 
 ## [Unreleased]
 
+### Fixed
+
+- Creating a project with rules, or adding several rules at once (in the app or with `aj project
+  new` / `aj rule add`), no longer leaves a partial result when one rule is invalid or already
+  exists: nothing is created.
+
 ## [0.3.0] - 2026-11-27
 
 IR 0.3.0 · Schema 12.

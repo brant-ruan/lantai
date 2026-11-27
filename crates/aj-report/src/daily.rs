@@ -14,14 +14,13 @@ use std::sync::Arc;
 
 use aj_store::{NewReportVersion, Store};
 use anyhow::{bail, Result};
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::TimeZone;
 use sha2::{Digest as _, Sha256};
 
 use crate::anchors::{self, AnchorCheck};
 use crate::brief::{self, CachedBrief};
 use crate::digest::{self, StoredDigest};
 use crate::engine::Engine;
-use crate::lang::Language;
 use crate::manifest::project_key;
 use crate::material::{self, Material, MaterialContext, ProjectMaterial};
 use crate::progress::Progress;
@@ -29,30 +28,9 @@ use crate::prompt_library::{self, PromptVars, KIND_DAILY};
 use crate::report_io::{self, ReportMode, Staleness};
 use crate::stage1::{self, Stage1Options, Stage1Stats};
 use crate::structure::{self, ProjectSection};
-use crate::summarize::Budgets;
 
-#[derive(Debug, Clone)]
-pub struct DailyOptions {
-    /// Local date, `YYYY-MM-DD`.
-    pub date: String,
-    /// Only include the project with this name.
-    pub project: Option<String>,
-    /// Name of the prompt to use; `None` uses the language's default daily prompt.
-    pub prompt: Option<String>,
-    /// Language the report is written in.
-    pub language: &'static Language,
-    /// Number of slices digested concurrently in stage 1.
-    pub concurrency: usize,
-    /// Only assemble the material; call no model and save nothing.
-    pub dry_run: bool,
-    pub budgets: Budgets,
-    /// Optional cancellation flag, checked between model calls. A run cancelled while a
-    /// call is in flight finishes that call but saves no report version.
-    pub cancel: Option<Arc<AtomicBool>>,
-    pub mode: ReportMode,
-    /// Current time, which decides which slices are still live.
-    pub now: DateTime<Utc>,
-}
+/// Options of a daily report; the period is a local date, `YYYY-MM-DD`.
+pub type DailyOptions = report_io::ReportOptions<String>;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DailyEstimate {
@@ -166,13 +144,13 @@ where
         now: opts.now,
         language: lang,
     };
-    let collected = material::collect(store, tz, &opts.date, opts.project.as_deref(), &ctx)?;
+    let collected = material::collect(store, tz, &opts.period, opts.project.as_deref(), &ctx)?;
     let materials = collected.materials;
     result.slices_ignored = collected.ignored;
     if materials.is_empty() {
         bail!(
             "{} has no usable session slices ({} ignored)",
-            opts.date,
+            opts.period,
             result.slices_ignored
         );
     }
@@ -180,8 +158,8 @@ where
     let instructions = prompt_library::assemble(
         &prompt_row.body,
         &PromptVars {
-            date: Some(&opts.date),
-            period: Some(&opts.date),
+            date: Some(&opts.period),
+            period: Some(&opts.period),
             project: opts.project.as_deref(),
         },
         lang,
@@ -194,7 +172,7 @@ where
     // ---- Decide what to write ------------------------------------------------
     let base = match opts.mode {
         ReportMode::Update if !opts.dry_run => {
-            let base = report_io::load_base(store, KIND_DAILY, &opts.date, report_pid)?;
+            let base = report_io::load_base(store, KIND_DAILY, &opts.period, report_pid)?;
             if base.is_none() {
                 result
                     .warnings
@@ -207,7 +185,7 @@ where
     let Some((write_keys, removed_keys)) =
         report_io::plan_writes(base.as_ref(), &current, &prompt_hash, lang)
     else {
-        bail!("the report for {} is already up to date", opts.date);
+        bail!("the report for {} is already up to date", opts.period);
     };
     let mut targets: Vec<Material> = materials
         .into_iter()
@@ -273,7 +251,7 @@ where
         report_io::write_sections(
             engine,
             &prompt,
-            &lang.daily_title(&opts.date),
+            &lang.daily_title(&opts.period),
             &expected,
             opts.cancel.as_ref(),
             &mut result.warnings,
@@ -312,7 +290,7 @@ where
             structure::splice_sections(&b.sections, &written, &removed_names)
         }
     };
-    result.markdown = structure::compose_report(&lang.daily_title(&opts.date), &all_sections);
+    result.markdown = structure::compose_report(&lang.daily_title(&opts.period), &all_sections);
     result.projects_written = expected;
 
     let new_manifest = report_io::new_manifest(
@@ -331,7 +309,7 @@ where
     let stage2_hash = digest::hex(&Sha256::digest(prompt.as_bytes()));
     result.version_id = Some(store.save_report_version(&NewReportVersion {
         report_type: KIND_DAILY,
-        period_key: &opts.date,
+        period_key: &opts.period,
         project_id: report_pid,
         origin: "generated",
         markdown: &result.markdown,
@@ -345,7 +323,7 @@ where
     })?);
     // A finalized report that gained new material needs a fresh review.
     if base.as_ref().is_some_and(|b| b.is_final) {
-        store.set_report_status(KIND_DAILY, &opts.date, report_pid, "draft")?;
+        store.set_report_status(KIND_DAILY, &opts.period, report_pid, "draft")?;
     }
     Ok(result)
 }
@@ -364,7 +342,7 @@ fn condense(
     if total > opts.budgets.stage2_chars || sections.iter().any(brief::needs_clustering) {
         progress(&Progress::ClusteringProjects);
     }
-    let cached_briefs = CachedBrief::usable(store.project_briefs(&opts.date)?, opts.language);
+    let cached_briefs = CachedBrief::usable(store.project_briefs(&opts.period)?, opts.language);
     let condensed = brief::condense_if_needed(
         engine,
         engine_name,
@@ -374,7 +352,7 @@ fn condense(
         opts.budgets.stage2_chars,
     );
     for (_, b) in &condensed.to_save {
-        store.save_project_brief(&opts.date, &b.to_row(opts.language, engine_name))?;
+        store.save_project_brief(&opts.period, &b.to_row(opts.language, engine_name))?;
     }
     result.projects_condensed = condensed.projects;
     result.briefs_cached = condensed.cached;
@@ -393,6 +371,7 @@ mod tests {
     use crate::engine::testing::MockEngine;
     use crate::lang::{EN, ZH_HANS};
     use crate::manifest::Manifest;
+    use crate::summarize::Budgets;
     use aj_core::{slice::reslice_session, Config};
     use aj_ir::{AgentId, IrEvent};
     use chrono::{DateTime, FixedOffset, Utc};
@@ -464,7 +443,7 @@ mod tests {
 
     fn opts() -> DailyOptions {
         DailyOptions {
-            date: "2026-11-16".into(),
+            period: "2026-11-16".into(),
             project: None,
             prompt: None,
             concurrency: 2,

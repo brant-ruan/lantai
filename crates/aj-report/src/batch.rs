@@ -240,7 +240,7 @@ mod tests {
 
     fn daily_opts(date: &str) -> DailyOptions {
         DailyOptions {
-            date: date.into(),
+            period: date.into(),
             project: None,
             prompt: None,
             concurrency: 1,
@@ -435,7 +435,7 @@ mod tests {
 
         let engine = MockEngine::new(|_| Ok("## app\n- did work [#S2]".into()));
         let opts = WeeklyOptions {
-            week: Week::parse("2026-W47").unwrap(),
+            period: Week::parse("2026-W47").unwrap(),
             project: None,
             prompt: None,
             concurrency: 1,
@@ -512,7 +512,7 @@ mod tests {
 
         let engine = MockEngine::new(|_| Ok("## app\n- early work [#S1]".into()));
         let opts = MonthlyOptions {
-            month: Month::parse("2026-11").unwrap(),
+            period: Month::parse("2026-11").unwrap(),
             project: None,
             prompt: None,
             concurrency: 1,

@@ -6,8 +6,10 @@
 use std::collections::HashMap;
 
 use aj_adapter::SourceAdapter;
-use aj_core::project::matcher::{RULE_GIT_REMOTE, RULE_PATH_PREFIX, RULE_REGEX};
-use aj_core::project::{evaluate_all, uncovered_path, validate_rule};
+use aj_core::project::matcher::RULE_REGEX;
+use aj_core::project::{
+    evaluate_all, uncovered_path, validate_rule, validate_rules, RuleInput, ValidRule,
+};
 use aj_core::scan::normalized_cwd;
 use aj_store::NewRule;
 use serde::Serialize;
@@ -147,42 +149,32 @@ pub fn create_project(
     regex_field: Option<String>,
     auto_apply: Option<bool>,
 ) -> Result<i64, String> {
-    let store = state.open_store().map_err(cmd_err)?;
+    // The form sends a line per pattern; empty lines are not rules.
+    let given = |v: Option<Vec<String>>| -> Vec<String> {
+        v.unwrap_or_default()
+            .into_iter()
+            .filter(|p| !p.trim().is_empty())
+            .collect()
+    };
+    let (paths, remotes, regexes) = (given(paths), given(remotes), given(regexes));
+    let rules = validate_rules(&RuleInput {
+        paths: &paths,
+        remotes: &remotes,
+        regexes: &regexes,
+        regex_field: regex_field.as_deref().unwrap_or("any"),
+        auto_apply: auto_apply.unwrap_or(false),
+    })
+    .map_err(cmd_err)?;
+    let new: Vec<NewRule> = rules.iter().map(ValidRule::as_new).collect();
     let desc = description
         .as_deref()
         .map(str::trim)
         .filter(|d| !d.is_empty());
-    let id = store.create_project(&name, desc).map_err(cmd_err)?;
-    let auto = auto_apply.unwrap_or(false);
-    let field = regex_field.as_deref().unwrap_or("any");
-
-    let mut added = 0usize;
-    let groups: [(&str, Vec<String>, Option<&str>); 3] = [
-        (RULE_PATH_PREFIX, paths.unwrap_or_default(), None),
-        (RULE_GIT_REMOTE, remotes.unwrap_or_default(), None),
-        (RULE_REGEX, regexes.unwrap_or_default(), Some(field)),
-    ];
-    for (rule_type, patterns, target_field) in groups {
-        for raw in patterns {
-            if raw.trim().is_empty() {
-                continue;
-            }
-            let pattern = validate_rule(rule_type, target_field, &raw).map_err(cmd_err)?;
-            store
-                .add_rule(
-                    id,
-                    &NewRule {
-                        rule_type,
-                        target_field,
-                        pattern: &pattern,
-                        auto_apply: auto,
-                    },
-                )
-                .map_err(cmd_err)?;
-            added += 1;
-        }
-    }
-    if added > 0 {
+    let mut store = state.open_store().map_err(cmd_err)?;
+    let (id, rule_ids) = store
+        .create_project_with_rules(&name, desc, &new)
+        .map_err(cmd_err)?;
+    if !rule_ids.is_empty() {
         reevaluate(&state, &store)?;
     }
     Ok(id)

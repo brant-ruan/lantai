@@ -1,8 +1,8 @@
 //! Projects, rules and assignment: project, rule, assign, unassign, accept.
 
 use aj_adapter::SourceAdapter;
-use aj_core::project::matcher::{RULE_GIT_REMOTE, RULE_PATH_PREFIX, RULE_REGEX};
-use aj_core::project::{evaluate_all, uncovered_path, validate_rule};
+use aj_core::project::matcher::{RULE_GIT_REMOTE, RULE_PATH_PREFIX};
+use aj_core::project::{evaluate_all, uncovered_path, validate_rules, RuleInput, ValidRule};
 use aj_core::scan::normalized_cwd;
 use aj_store::{NewRule, SessionRow};
 use anyhow::{bail, Result};
@@ -77,6 +77,18 @@ pub(crate) struct RuleSpec {
     auto: bool,
 }
 
+impl RuleSpec {
+    fn input(&self) -> RuleInput<'_> {
+        RuleInput {
+            paths: &self.paths,
+            remotes: &self.remotes,
+            regexes: &self.regexes,
+            regex_field: &self.field,
+            auto_apply: self.auto,
+        }
+    }
+}
+
 #[derive(Args)]
 pub(crate) struct AssignArgs {
     /// Project name; `none` means explicitly no project
@@ -114,10 +126,14 @@ pub(crate) fn cmd_project(app: &mut App, cmd: ProjectCmd) -> Result<()> {
             Ok(())
         }
         ProjectCmd::New { name, desc, rule } => {
-            let id = app.store.create_project(&name, desc.as_deref())?;
+            let rules = validate_rules(&rule.input())?;
+            let new: Vec<NewRule> = rules.iter().map(ValidRule::as_new).collect();
+            let (_, ids) = app
+                .store
+                .create_project_with_rules(&name, desc.as_deref(), &new)?;
             println!("Created project \"{}\"", name.trim());
-            let added = add_rules(app, id, &rule)?;
-            if added > 0 {
+            print_added(&rules, &ids);
+            if !ids.is_empty() {
                 reevaluate(app)?;
             }
             Ok(())
@@ -216,9 +232,13 @@ pub(crate) fn cmd_rule(app: &mut App, cmd: RuleCmd) -> Result<()> {
         }
         RuleCmd::Add { project, rule } => {
             let p = app.store.require_project(&project)?;
-            if add_rules(app, p.id, &rule)? == 0 {
+            let rules = validate_rules(&rule.input())?;
+            if rules.is_empty() {
                 bail!("give the rule content with --path, --remote or --regex");
             }
+            let new: Vec<NewRule> = rules.iter().map(ValidRule::as_new).collect();
+            let ids = app.store.add_rules(p.id, &new)?;
+            print_added(&rules, &ids);
             reevaluate(app)
         }
         RuleCmd::Rm { id } => {
@@ -237,30 +257,10 @@ pub(crate) fn cmd_rule(app: &mut App, cmd: RuleCmd) -> Result<()> {
     }
 }
 
-fn add_rules(app: &App, project_id: i64, spec: &RuleSpec) -> Result<usize> {
-    let groups: [(&str, &[String], Option<&str>); 3] = [
-        (RULE_PATH_PREFIX, &spec.paths, None),
-        (RULE_GIT_REMOTE, &spec.remotes, None),
-        (RULE_REGEX, &spec.regexes, Some(spec.field.as_str())),
-    ];
-    let mut added = 0;
-    for (rule_type, patterns, field) in groups {
-        for pattern in patterns {
-            let pattern = validate_rule(rule_type, field, pattern)?;
-            let id = app.store.add_rule(
-                project_id,
-                &NewRule {
-                    rule_type,
-                    target_field: field,
-                    pattern: &pattern,
-                    auto_apply: spec.auto,
-                },
-            )?;
-            println!("Added rule #{id}: {pattern}");
-            added += 1;
-        }
+fn print_added(rules: &[ValidRule], ids: &[i64]) {
+    for (rule, id) in rules.iter().zip(ids) {
+        println!("Added rule #{id}: {}", rule.pattern);
     }
-    Ok(added)
 }
 
 /// After rules or projects change, re-evaluate every session that was not assigned manually.

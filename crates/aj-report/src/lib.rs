@@ -33,6 +33,7 @@ pub mod stage1;
 pub mod structure;
 pub mod summarize;
 mod textsim;
+pub mod versions;
 pub mod weekly;
 
 pub use config::{
@@ -42,5 +43,5 @@ pub use daily::{generate_daily, DailyOptions, DailyResult};
 pub use digest::{Digest, Point, StoredDigest};
 pub use engine::{Engine, ModelInfo};
 pub use keystore::KeyStore;
-pub use report_io::ReportMode;
+pub use report_io::{ReportMode, ReportOptions, DEFAULT_CONCURRENCY};
 pub use summarize::Budgets;

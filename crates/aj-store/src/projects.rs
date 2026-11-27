@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
-use rusqlite::{params, OptionalExtension, Row};
+use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::sessions::{session_from_row, SESSION_COLS};
 use crate::sql::{ts, SLICE_PROJECT, SLICE_UNASSIGNED};
@@ -96,19 +96,25 @@ impl Store {
     // ---- Projects ----------------------------------------------------------
 
     pub fn create_project(&self, name: &str, description: Option<&str>) -> Result<i64> {
-        let name = name.trim();
-        if name.is_empty() {
-            bail!("project name must not be empty");
-        }
-        if self.find_project(name)?.is_some() {
-            bail!("a project named \"{name}\" already exists");
-        }
-        self.conn.execute(
-            "INSERT INTO logical_projects (name, description, sort_order, created_at)
-             VALUES (?1, ?2, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM logical_projects), ?3)",
-            params![name, description, ts(Utc::now())],
-        )?;
-        Ok(self.conn.last_insert_rowid())
+        insert_project(&self.conn, name, description)
+    }
+
+    /// Create a project together with its rules, all or nothing. Returns the project's ID and
+    /// the rules' IDs in order.
+    pub fn create_project_with_rules(
+        &mut self,
+        name: &str,
+        description: Option<&str>,
+        rules: &[NewRule],
+    ) -> Result<(i64, Vec<i64>)> {
+        let tx = self.conn.transaction()?;
+        let id = insert_project(&tx, name, description)?;
+        let rule_ids = rules
+            .iter()
+            .map(|r| insert_rule(&tx, id, r))
+            .collect::<Result<_>>()?;
+        tx.commit()?;
+        Ok((id, rule_ids))
     }
 
     pub fn project(&self, id: i64) -> Result<Option<ProjectRow>> {
@@ -374,24 +380,18 @@ impl Store {
     // ---- Rules -------------------------------------------------------------
 
     pub fn add_rule(&self, project_id: i64, rule: &NewRule) -> Result<i64> {
-        let existing: Option<i64> = self
-            .conn
-            .query_row(
-                "SELECT project_id FROM project_match_rules WHERE rule_type = ?1 AND pattern = ?2",
-                params![rule.rule_type, rule.pattern],
-                |r| r.get(0),
-            )
-            .optional()?;
-        if let Some(owner) = existing {
-            let name = self.project(owner)?.map(|p| p.name).unwrap_or_default();
-            bail!("this rule already exists and belongs to project \"{name}\"");
-        }
-        self.conn.execute(
-            "INSERT INTO project_match_rules (project_id, rule_type, target_field, pattern, auto_apply)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![project_id, rule.rule_type, rule.target_field, rule.pattern, rule.auto_apply],
-        )?;
-        Ok(self.conn.last_insert_rowid())
+        insert_rule(&self.conn, project_id, rule)
+    }
+
+    /// Add rules to a project, all or nothing. Returns their IDs in order.
+    pub fn add_rules(&mut self, project_id: i64, rules: &[NewRule]) -> Result<Vec<i64>> {
+        let tx = self.conn.transaction()?;
+        let ids = rules
+            .iter()
+            .map(|r| insert_rule(&tx, project_id, r))
+            .collect::<Result<_>>()?;
+        tx.commit()?;
+        Ok(ids)
     }
 
     pub fn rules(&self) -> Result<Vec<RuleRow>> {
@@ -577,11 +577,90 @@ impl Store {
     }
 }
 
+/// Insert a project after checking its name; shared by single writes and transactions.
+fn insert_project(conn: &Connection, name: &str, description: Option<&str>) -> Result<i64> {
+    let name = name.trim();
+    if name.is_empty() {
+        bail!("project name must not be empty");
+    }
+    let taken: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM logical_projects WHERE name = ?1 COLLATE NOCASE)",
+        [name],
+        |r| r.get(0),
+    )?;
+    if taken {
+        bail!("a project named \"{name}\" already exists");
+    }
+    conn.execute(
+        "INSERT INTO logical_projects (name, description, sort_order, created_at)
+         VALUES (?1, ?2, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM logical_projects), ?3)",
+        params![name, description, ts(Utc::now())],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Insert a rule unless the same rule already exists; shared by single writes and transactions.
+fn insert_rule(conn: &Connection, project_id: i64, rule: &NewRule) -> Result<i64> {
+    let owner: Option<String> = conn
+        .query_row(
+            "SELECT p.name FROM project_match_rules r
+             JOIN logical_projects p ON p.id = r.project_id
+             WHERE r.rule_type = ?1 AND r.pattern = ?2",
+            params![rule.rule_type, rule.pattern],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if let Some(name) = owner {
+        bail!("this rule already exists and belongs to project \"{name}\"");
+    }
+    conn.execute(
+        "INSERT INTO project_match_rules (project_id, rule_type, target_field, pattern, auto_apply)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![
+            project_id,
+            rule.rule_type,
+            rule.target_field,
+            rule.pattern,
+            rule.auto_apply
+        ],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::NewSlice;
     use aj_ir::{AgentId, IrEvent};
+
+    #[test]
+    fn a_project_and_its_rules_are_created_all_or_nothing() {
+        let mut store = Store::open_in_memory().unwrap();
+        let rule = |pattern| NewRule {
+            rule_type: "path_prefix",
+            target_field: None,
+            pattern,
+            auto_apply: false,
+        };
+        let (app, ids) = store
+            .create_project_with_rules("App", None, &[rule("/work/app")])
+            .unwrap();
+        assert_eq!(ids.len(), 1);
+
+        // The second rule is App's already: neither the project nor its first rule stays.
+        let err = store
+            .create_project_with_rules("Web", None, &[rule("/work/web"), rule("/work/app")])
+            .unwrap_err();
+        assert!(err.to_string().contains("belongs to project \"App\""));
+        assert!(store.find_project("Web").unwrap().is_none());
+        assert_eq!(store.rules().unwrap().len(), 1);
+
+        let err = store
+            .add_rules(app, &[rule("/work/app/sub"), rule("/work/app")])
+            .unwrap_err();
+        assert!(err.to_string().contains("already exists"));
+        assert_eq!(store.rules().unwrap().len(), 1);
+    }
 
     fn store_with_session() -> (Store, i64) {
         let mut store = Store::open_in_memory().unwrap();

@@ -19,6 +19,7 @@ use crate::material::{Material, ProjectMaterial, UNASSIGNED};
 use crate::progress::Progress;
 use crate::stage1::is_cancelled;
 use crate::structure::{self, ProjectSection};
+use crate::summarize::Budgets;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ReportMode {
@@ -28,6 +29,45 @@ pub enum ReportMode {
     /// Write only the projects whose material changed since the current version. Falls
     /// back to a full regeneration when there is no version to update.
     Update,
+}
+
+impl ReportMode {
+    /// [`ReportMode::Update`] when `update` is set, else [`ReportMode::Regenerate`].
+    pub fn from_update(update: bool) -> Self {
+        if update {
+            ReportMode::Update
+        } else {
+            ReportMode::Regenerate
+        }
+    }
+}
+
+/// Concurrent model calls when the caller does not choose.
+pub const DEFAULT_CONCURRENCY: usize = 3;
+
+/// What generating a report takes, the same for every kind but the period it covers: a local
+/// date (`YYYY-MM-DD`) for [`crate::DailyOptions`], a [`crate::period::Week`] or a
+/// [`crate::period::Month`].
+#[derive(Debug, Clone)]
+pub struct ReportOptions<P> {
+    pub period: P,
+    /// Only include the project with this name.
+    pub project: Option<String>,
+    /// Name of the prompt to use; `None` uses the language's default prompt for the kind.
+    pub prompt: Option<String>,
+    /// Language the report is written in.
+    pub language: &'static Language,
+    /// Concurrent model calls, for slice digests and for project sections.
+    pub concurrency: usize,
+    /// Only assemble the material; call no model and save nothing.
+    pub dry_run: bool,
+    pub budgets: Budgets,
+    /// Optional cancellation flag, checked between model calls. A run cancelled while a
+    /// call is in flight finishes that call but saves no report version.
+    pub cancel: Option<Arc<AtomicBool>>,
+    pub mode: ReportMode,
+    /// Current time, which decides which slices are still live.
+    pub now: DateTime<Utc>,
 }
 
 /// How the current material differs from what the current report version was generated from.

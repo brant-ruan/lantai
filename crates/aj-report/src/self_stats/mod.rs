@@ -246,7 +246,7 @@ mod tests {
 
     fn generate(store: &mut Store, engine: &MockEngine, tz: &FixedOffset, date: &str) {
         let opts = DailyOptions {
-            date: date.into(),
+            period: date.into(),
             project: None,
             prompt: None,
             concurrency: 1,

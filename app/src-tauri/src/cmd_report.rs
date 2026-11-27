@@ -9,29 +9,28 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use aj_report::edits::{report_edits, ReportEdits};
+use aj_report::edits::ReportEdits;
 use aj_report::export::{
     default_daily_export_path, default_monthly_export_path, default_project_export_path,
     default_weekly_export_path, export_markdown, AnchorExportMode, ExportOutcome,
 };
-use aj_report::manifest::{section_writers, Manifest};
 use aj_report::material::MaterialContext;
 use aj_report::period::{Month, Week};
 use aj_report::progress::Progress;
 use aj_report::prompt_library::{KIND_DAILY, KIND_MONTHLY, KIND_WEEKLY};
-use aj_report::structure::{report_title, validate_user_edit};
 use aj_report::AppConfig;
 use aj_report::{
     daily::{estimate_daily, DailyEstimate},
     generate_daily,
-    monthly::{estimate_monthly, generate_monthly, MonthlyOptions},
-    report_io::{self, Staleness},
+    monthly::{estimate_monthly, generate_monthly},
+    report_io::Staleness,
     rollup::{project_rollup, Granularity},
     stage1::digest_single_slice,
-    weekly::{estimate_weekly, generate_weekly, WeeklyOptions},
-    DailyOptions, DailyResult, ReportMode, StoredDigest,
+    versions,
+    weekly::{estimate_weekly, generate_weekly},
+    DailyResult, Engine, ReportMode, ReportOptions, StoredDigest, DEFAULT_CONCURRENCY,
 };
-use aj_store::{NewReportVersion, Store};
+use aj_store::Store;
 use anyhow::Context;
 use chrono::{Local, Utc};
 use serde::Serialize;
@@ -288,61 +287,36 @@ fn build_report_state(
             status: m.status,
             current_version_id: m.current_version_id,
         });
-    // Period reports are shown with their canonical title and with project sections
-    // in the user's project order.
-    let period_report = matches!(report_type, KIND_DAILY | KIND_WEEKLY | KIND_MONTHLY);
-    let project_order: Vec<String> = if period_report {
-        report_io::project_order(store).map_err(cmd_err)?
-    } else {
-        Vec::new()
-    };
-    let rows = store
-        .report_versions(report_type, period_key, project_id)
-        .map_err(cmd_err)?;
-    // Newest first, for finding the generated text of each section.
-    let history: Vec<&str> = rows.iter().rev().map(|v| v.markdown.as_str()).collect();
-    let versions = rows
-        .iter()
-        .map(|v| {
-            let markdown = if period_report {
-                report_io::display_markdown(
-                    report_type,
-                    period_key,
-                    &v.markdown,
-                    &v.language,
-                    &project_order,
-                )
-            } else {
-                v.markdown.clone()
-            };
-            let edits = if period_report && v.is_current {
-                report_edits(&markdown, v.input_manifest.as_deref(), &history)
-                    .filter(|e| !e.is_empty())
-                    .map(edits_dto)
-            } else {
-                None
-            };
-            Ok(ReportVersionDto {
-                id: v.id,
-                number: v.number,
-                origin: v.origin.clone(),
-                markdown,
-                engine: v.engine.clone(),
-                writers: version_writers(
-                    store,
-                    cfg,
-                    v.input_manifest.as_deref(),
-                    v.engine.as_deref(),
-                )?,
-                prompt_name: v.prompt_name.clone(),
-                prompt_snapshot: v.prompt_snapshot.clone(),
-                language: v.language.clone(),
-                created_at: v.created_at.clone(),
-                is_current: v.is_current,
-                edits,
-            })
+    let versions = versions::shown_versions(store, report_type, period_key, project_id)
+        .map_err(cmd_err)?
+        .into_iter()
+        .map(|s| ReportVersionDto {
+            id: s.version.id,
+            number: s.version.number,
+            origin: s.version.origin,
+            markdown: s.markdown,
+            engine: s.version.engine,
+            writers: s
+                .writers
+                .into_iter()
+                .map(|w| SectionWriterDto {
+                    aliases: w
+                        .engine
+                        .as_deref()
+                        .map(|e| cfg.aliases_for_engine(e))
+                        .unwrap_or_default(),
+                    engine: w.engine,
+                    projects: w.projects,
+                })
+                .collect(),
+            prompt_name: s.version.prompt_name,
+            prompt_snapshot: s.version.prompt_snapshot,
+            language: s.version.language,
+            created_at: s.version.created_at,
+            is_current: s.version.is_current,
+            edits: s.edits.map(edits_dto),
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect();
 
     Ok(DailyReportStateDto {
         estimate,
@@ -350,40 +324,6 @@ fn build_report_state(
         versions,
         default_export_path: default_export_path.to_string_lossy().into_owned(),
     })
-}
-
-/// The models that wrote a version's sections, named as the settings name them now.
-fn version_writers(
-    store: &Store,
-    cfg: &AppConfig,
-    manifest_json: Option<&str>,
-    engine: Option<&str>,
-) -> Result<Vec<SectionWriterDto>, String> {
-    let manifest = manifest_json.and_then(Manifest::parse);
-    section_writers(manifest.as_ref(), engine)
-        .into_iter()
-        .map(|w| {
-            let projects = match &manifest {
-                Some(m) => w
-                    .keys
-                    .iter()
-                    .filter_map(|k| m.projects.get(k).map(|e| (k, e)))
-                    .map(|(k, e)| report_io::project_name(store, k, e))
-                    .collect::<anyhow::Result<Vec<_>>>()
-                    .map_err(cmd_err)?,
-                None => Vec::new(),
-            };
-            Ok(SectionWriterDto {
-                aliases: w
-                    .engine
-                    .as_deref()
-                    .map(|e| cfg.aliases_for_engine(e))
-                    .unwrap_or_default(),
-                engine: w.engine,
-                projects,
-            })
-        })
-        .collect()
 }
 
 /// Identifies one report generation job: the period (a date or a week key), plus the
@@ -736,13 +676,63 @@ where
     res
 }
 
-/// The language of a stored version; one this build does not know is shown as English.
-fn report_mode(update: Option<bool>) -> ReportMode {
-    if update.unwrap_or(false) {
-        ReportMode::Update
-    } else {
-        ReportMode::Regenerate
-    }
+/// What the front end asks for when generating a report of any kind.
+struct GenerateRequest<P> {
+    period: P,
+    project: Option<String>,
+    prompt: Option<String>,
+    engine: Option<String>,
+    update: Option<bool>,
+}
+
+/// The signature `generate_daily`, `generate_weekly` and `generate_monthly` share.
+type GenerateFn<P, R> = fn(
+    &mut Store,
+    &dyn Engine,
+    &Local,
+    &ReportOptions<P>,
+    &mut dyn FnMut(&Progress),
+) -> anyhow::Result<R>;
+
+/// Generates a report as job `key`: builds the engine and options from the request and the
+/// config, runs `generate` on the job's thread and converts its result with `to_dto`.
+async fn run_generation<P, R, T>(
+    window: tauri::Window,
+    state: &AppState,
+    key: String,
+    req: GenerateRequest<P>,
+    generate: GenerateFn<P, R>,
+    to_dto: fn(R) -> T,
+) -> Result<T, String>
+where
+    P: Send + 'static,
+    R: 'static,
+    T: Send + 'static,
+{
+    let cfg = state.load_config().map_err(cmd_err)?;
+    let language = state.report_language(&[]).map_err(cmd_err)?;
+    let data_dir = state.data_dir.clone();
+    run_report_job(window, state, key, move |cancel, progress| {
+        let engine = cfg
+            .build_engine(req.engine.as_deref(), &data_dir.join("runner"))
+            .map_err(cmd_err)?;
+        let mut store = Store::open(&data_dir.join(crate::state::DB_FILE)).map_err(cmd_err)?;
+        let opts = ReportOptions {
+            language,
+            period: req.period,
+            project: req.project,
+            prompt: req.prompt,
+            concurrency: DEFAULT_CONCURRENCY,
+            dry_run: false,
+            budgets: cfg.budgets(),
+            cancel: Some(cancel),
+            mode: ReportMode::from_update(req.update.unwrap_or(false)),
+            now: Utc::now(),
+        };
+        let r = generate(&mut store, engine.as_ref(), &Local, &opts, progress).map_err(cmd_err)?;
+        Ok(to_dto(r))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -756,31 +746,14 @@ pub async fn generate_daily_report(
     update: Option<bool>,
 ) -> Result<DailyResultDto, String> {
     let key = job_key(&date, project.as_deref());
-    let cfg = state.load_config().map_err(cmd_err)?;
-    let language = state.report_language(&[]).map_err(cmd_err)?;
-    let data_dir = state.data_dir.clone();
-    run_report_job(window, &state, key, move |cancel, progress| {
-        let built_engine = cfg
-            .build_engine(engine.as_deref(), &data_dir.join("runner"))
-            .map_err(cmd_err)?;
-        let mut store = Store::open(&data_dir.join(crate::state::DB_FILE)).map_err(cmd_err)?;
-        let opts = DailyOptions {
-            language,
-            date,
-            project,
-            prompt,
-            concurrency: 3,
-            dry_run: false,
-            budgets: cfg.budgets(),
-            cancel: Some(cancel),
-            mode: report_mode(update),
-            now: Utc::now(),
-        };
-        let r = generate_daily(&mut store, built_engine.as_ref(), &Local, &opts, progress)
-            .map_err(cmd_err)?;
-        Ok(to_result_dto(r))
-    })
-    .await
+    let req = GenerateRequest {
+        period: date,
+        project,
+        prompt,
+        engine,
+        update,
+    };
+    run_generation(window, &state, key, req, generate_daily, to_result_dto).await
 }
 
 /// Generates the weekly report of an ISO week (`2026-W47`); the job key is the week key.
@@ -794,29 +767,16 @@ pub async fn generate_weekly_report(
     update: Option<bool>,
 ) -> Result<WeeklyResultDto, String> {
     let week = Week::parse(&week).map_err(cmd_err)?;
-    let cfg = state.load_config().map_err(cmd_err)?;
-    let language = state.report_language(&[]).map_err(cmd_err)?;
-    let data_dir = state.data_dir.clone();
-    run_report_job(window, &state, week.key(), move |cancel, progress| {
-        let built_engine = cfg
-            .build_engine(engine.as_deref(), &data_dir.join("runner"))
-            .map_err(cmd_err)?;
-        let mut store = Store::open(&data_dir.join(crate::state::DB_FILE)).map_err(cmd_err)?;
-        let opts = WeeklyOptions {
-            language,
-            week,
-            project: None,
-            prompt,
-            concurrency: 3,
-            dry_run: false,
-            budgets: cfg.budgets(),
-            cancel: Some(cancel),
-            mode: report_mode(update),
-            now: Utc::now(),
-        };
-        let r = generate_weekly(&mut store, built_engine.as_ref(), &Local, &opts, progress)
-            .map_err(cmd_err)?;
-        Ok(WeeklyResultDto {
+    let key = week.key();
+    let req = GenerateRequest {
+        period: week,
+        project: None,
+        prompt,
+        engine,
+        update,
+    };
+    run_generation(window, &state, key, req, generate_weekly, |r| {
+        WeeklyResultDto {
             slices_used: r.slices_used,
             projects_written: r.projects_written,
             sections_kept: r.sections_kept,
@@ -827,7 +787,7 @@ pub async fn generate_weekly_report(
                 invalid: r.anchors.invalid,
             },
             version_id: r.version_id,
-        })
+        }
     })
     .await
 }
@@ -843,29 +803,16 @@ pub async fn generate_monthly_report(
     update: Option<bool>,
 ) -> Result<WeeklyResultDto, String> {
     let month = Month::parse(&month).map_err(cmd_err)?;
-    let cfg = state.load_config().map_err(cmd_err)?;
-    let language = state.report_language(&[]).map_err(cmd_err)?;
-    let data_dir = state.data_dir.clone();
-    run_report_job(window, &state, month.key(), move |cancel, progress| {
-        let built_engine = cfg
-            .build_engine(engine.as_deref(), &data_dir.join("runner"))
-            .map_err(cmd_err)?;
-        let mut store = Store::open(&data_dir.join(crate::state::DB_FILE)).map_err(cmd_err)?;
-        let opts = MonthlyOptions {
-            language,
-            month,
-            project: None,
-            prompt,
-            concurrency: 3,
-            dry_run: false,
-            budgets: cfg.budgets(),
-            cancel: Some(cancel),
-            mode: report_mode(update),
-            now: Utc::now(),
-        };
-        let r = generate_monthly(&mut store, built_engine.as_ref(), &Local, &opts, progress)
-            .map_err(cmd_err)?;
-        Ok(WeeklyResultDto {
+    let key = month.key();
+    let req = GenerateRequest {
+        period: month,
+        project: None,
+        prompt,
+        engine,
+        update,
+    };
+    run_generation(window, &state, key, req, generate_monthly, |r| {
+        WeeklyResultDto {
             slices_used: r.slices_used,
             projects_written: r.projects_written,
             sections_kept: r.sections_kept,
@@ -876,7 +823,7 @@ pub async fn generate_monthly_report(
                 invalid: r.anchors.invalid,
             },
             version_id: r.version_id,
-        })
+        }
     })
     .await
 }
@@ -919,49 +866,8 @@ pub fn save_report_edit(
     let mut store = state.open_store().map_err(cmd_err)?;
     let kind = report_type.as_deref().unwrap_or(KIND_DAILY);
     let pid = resolve_project_id(&store, project_id, project.as_deref())?;
-    // The edit is based on the current version: it keeps that version's language, prompt
-    // name and input manifest, so a later update still knows what the kept sections came from.
-    let current = store
-        .current_report_version(kind, &period_key, pid)
-        .map_err(cmd_err)?;
-    let language = match &current {
-        Some(v) => report_io::version_language(&v.language),
-        None => state.report_language(&[]).map_err(cmd_err)?,
-    };
-    let markdown_to_save = if matches!(kind, KIND_DAILY | KIND_WEEKLY | KIND_MONTHLY) {
-        let known_projects = report_io::project_order(&store).map_err(cmd_err)?;
-        validate_user_edit(
-            &markdown,
-            &report_title(kind, &period_key, language),
-            &known_projects,
-        )
-            .map_err(|errs| {
-                format!(
-                    "Report edit must keep valid project headings (## <Project>) and \"- \" bullet items: {}",
-                    errs.join("; ")
-                )
-            })?
-            .markdown
-    } else {
-        markdown
-    };
-    let current_prompt = current.as_ref().and_then(|v| v.prompt_name.clone());
-    let current_manifest = current.and_then(|v| v.input_manifest);
-    store
-        .save_report_version(&NewReportVersion {
-            report_type: kind,
-            period_key: &period_key,
-            project_id: pid,
-            origin: "user_edit",
-            markdown: &markdown_to_save,
-            engine: None,
-            input_hash: None,
-            prompt_id: None,
-            prompt_name: current_prompt.as_deref(),
-            prompt_snapshot: None,
-            input_manifest: current_manifest.as_deref(),
-            language: language.tag,
-        })
+    let language = state.report_language(&[]).map_err(cmd_err)?;
+    versions::save_user_edit(&mut store, kind, &period_key, pid, &markdown, language)
         .map_err(cmd_err)
 }
 

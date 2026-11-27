@@ -10,4 +10,7 @@ pub mod git;
 pub mod matcher;
 
 pub use assign::{evaluate_all, evaluate_session, ActiveRules, EvaluateStats};
-pub use matcher::{match_rules, uncovered_path, validate_rule, MatchContext, RuleMatch};
+pub use matcher::{
+    match_rules, uncovered_path, validate_rule, validate_rules, MatchContext, RuleInput, RuleMatch,
+    ValidRule,
+};

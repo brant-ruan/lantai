@@ -96,19 +96,9 @@ pub(crate) fn cmd_prompt(app: &mut App, cmd: PromptCmd) -> Result<()> {
             let prompts = if all {
                 app.store.list_prompts(kind.as_deref(), None)?
             } else {
-                let mut v = app.store.list_prompts(kind.as_deref(), Some(lang.tag))?;
-                if lang.builtin_prompt_language() != lang.tag {
-                    v.extend(
-                        app.store
-                            .list_prompts(kind.as_deref(), Some(lang.builtin_prompt_language()))?,
-                    );
-                }
-                v
+                prompt_library::offered(&app.store, kind.as_deref(), lang)?
             };
-            let mut defaults = Vec::new();
-            for k in KINDS {
-                defaults.push(prompt_library::default_prompt(&app.store, k, lang)?.id);
-            }
+            let defaults = prompt_library::default_ids(&app.store, lang)?;
             println!("Report language: {}", lang.tag);
             for p in prompts {
                 println!(

@@ -539,7 +539,7 @@ fn prompt_options(
     lang: &Language,
 ) -> Result<Vec<PromptOptionDto>, String> {
     let default = prompt_library::default_prompt(store, kind, lang).map_err(cmd_err)?;
-    let mut rows = crate::cmd_prompt::prompts_for(store, Some(kind), lang).map_err(cmd_err)?;
+    let mut rows = prompt_library::offered(store, Some(kind), lang).map_err(cmd_err)?;
     if !rows.iter().any(|p| p.id == default.id) {
         rows.insert(0, default.clone());
     }

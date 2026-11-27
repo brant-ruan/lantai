@@ -5,8 +5,7 @@
 //! report language.
 
 use aj_report::lang::Language;
-use aj_report::prompt_library::{self, PromptVars, KINDS};
-use aj_store::{PromptRow, Store};
+use aj_report::prompt_library::{self, PromptVars};
 use anyhow::Context;
 use serde::Serialize;
 
@@ -28,27 +27,6 @@ pub struct PromptDto {
     pub assembled_preview: String,
 }
 
-/// The prompts offered for `lang`: its own, plus the built-ins it borrows.
-pub fn prompts_for(
-    store: &Store,
-    kind: Option<&str>,
-    lang: &Language,
-) -> anyhow::Result<Vec<PromptRow>> {
-    let mut rows = store.list_prompts(kind, Some(lang.tag))?;
-    if lang.builtin_prompt_language() != lang.tag {
-        rows.extend(store.list_prompts(kind, Some(lang.builtin_prompt_language()))?);
-    }
-    Ok(rows)
-}
-
-/// IDs of the default prompt of every kind in `lang`.
-pub fn default_ids(store: &Store, lang: &Language) -> anyhow::Result<Vec<i64>> {
-    KINDS
-        .iter()
-        .map(|k| Ok(prompt_library::default_prompt(store, k, lang)?.id))
-        .collect()
-}
-
 /// What is sent for `body` when writing in `lang`.
 fn preview(body: &str, vars: &PromptVars, lang: &Language) -> String {
     prompt_library::with_language(&prompt_library::assemble(body, vars, lang), lang)
@@ -66,10 +44,10 @@ pub fn list_prompts(
     let rows = if all_languages.unwrap_or(false) {
         store.list_prompts(kind.as_deref(), None)
     } else {
-        prompts_for(&store, kind.as_deref(), lang)
+        prompt_library::offered(&store, kind.as_deref(), lang)
     }
     .map_err(cmd_err)?;
-    let defaults = default_ids(&store, lang).map_err(cmd_err)?;
+    let defaults = prompt_library::default_ids(&store, lang).map_err(cmd_err)?;
     Ok(rows
         .into_iter()
         .map(|p| PromptDto {

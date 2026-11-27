@@ -58,6 +58,24 @@ pub fn default_prompt(store: &Store, kind: &str, lang: &Language) -> Result<Prom
     }
 }
 
+/// IDs of the default prompt of every kind for `lang`.
+pub fn default_ids(store: &Store, lang: &Language) -> Result<Vec<i64>> {
+    KINDS
+        .iter()
+        .map(|k| Ok(default_prompt(store, k, lang)?.id))
+        .collect()
+}
+
+/// The prompts offered for `lang` (of one kind, or of every kind): its own, then those of the
+/// language it takes built-in prompts from, when that is another one.
+pub fn offered(store: &Store, kind: Option<&str>, lang: &Language) -> Result<Vec<PromptRow>> {
+    let mut rows = store.list_prompts(kind, Some(lang.tag))?;
+    if lang.builtin_prompt_language() != lang.tag {
+        rows.extend(store.list_prompts(kind, Some(lang.builtin_prompt_language()))?);
+    }
+    Ok(rows)
+}
+
 /// Pick the prompt for a generation: the named one (looked up among the prompts for
 /// `lang`, then among the built-ins it borrows, then the default), or the default.
 pub fn resolve(
@@ -81,11 +99,9 @@ pub fn resolve(
         return Ok(default);
     }
     let mut names: Vec<String> = Vec::new();
-    for language in languages {
-        for p in store.list_prompts(Some(kind), Some(language))? {
-            if !names.contains(&p.name) {
-                names.push(p.name);
-            }
+    for p in offered(store, Some(kind), lang)? {
+        if !names.contains(&p.name) {
+            names.push(p.name);
         }
     }
     bail!(

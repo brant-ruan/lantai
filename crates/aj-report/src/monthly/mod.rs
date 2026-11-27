@@ -12,18 +12,15 @@ pub use overview::{group_weeks, month_overviews, MonthOverview};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 use aj_store::{NewReportVersion, Store};
 use anyhow::{bail, Result};
-use chrono::{DateTime, Datelike, TimeZone, Utc};
+use chrono::{Datelike, TimeZone};
 use sha2::{Digest as _, Sha256};
 
 use crate::anchors::{self, AnchorCheck};
 use crate::digest;
 use crate::engine::Engine;
-use crate::lang::Language;
 use crate::manifest::{self, project_key, CurrentInputs, ProjectEntry};
 use crate::material::{self, Material, MaterialContext, ProjectMaterial, UNASSIGNED};
 use crate::period::{Month, Week};
@@ -32,26 +29,9 @@ use crate::prompt_library::{self, PromptVars, KIND_MONTHLY, KIND_WEEKLY};
 use crate::report_io::{self, Base, ReportMode, Staleness};
 use crate::stage1::is_cancelled;
 use crate::structure::{self, ProjectSection};
-use crate::summarize::Budgets;
 
-#[derive(Debug, Clone)]
-pub struct MonthlyOptions {
-    pub month: Month,
-    /// Only include the project with this name.
-    pub project: Option<String>,
-    /// Name of the prompt to use; `None` uses the language's default monthly prompt.
-    pub prompt: Option<String>,
-    /// Language the report is written in.
-    pub language: &'static Language,
-    /// Concurrent model calls for project sections.
-    pub concurrency: usize,
-    /// Only assemble the material; call no model and save nothing.
-    pub dry_run: bool,
-    pub budgets: Budgets,
-    pub cancel: Option<Arc<AtomicBool>>,
-    pub mode: ReportMode,
-    pub now: DateTime<Utc>,
-}
+/// Options of a monthly report.
+pub type MonthlyOptions = report_io::ReportOptions<Month>;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MonthlyEstimate {
@@ -363,8 +343,8 @@ where
 {
     let mut result = MonthlyResult::default();
     let engine_name = engine.name();
-    let period = opts.month.key();
-    let title = opts.month.title();
+    let period = opts.period.key();
+    let title = opts.period.title();
     let lang = opts.language;
     let prompt_row = prompt_library::resolve(store, KIND_MONTHLY, lang, opts.prompt.as_deref())?;
     result.prompt_name = prompt_row.name.clone();
@@ -376,7 +356,7 @@ where
         now: opts.now,
         language: lang,
     };
-    let collected = collect_month(store, tz, opts.month, opts.project.as_deref(), &ctx)?;
+    let collected = collect_month(store, tz, opts.period, opts.project.as_deref(), &ctx)?;
     result.slices_used = collected.materials.len();
     result.slices_ignored = collected.ignored;
     result.weeks_used = collected.weeks_used;
