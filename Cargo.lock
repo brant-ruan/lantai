@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "aj-adapter"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-ir",
  "anyhow",
@@ -28,7 +28,7 @@ dependencies = [
 
 [[package]]
 name = "aj-adapter-antigravity"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-ir",
@@ -40,7 +40,7 @@ dependencies = [
 
 [[package]]
 name = "aj-adapter-claude"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-ir",
@@ -53,7 +53,7 @@ dependencies = [
 
 [[package]]
 name = "aj-adapter-codex"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-ir",
@@ -66,7 +66,7 @@ dependencies = [
 
 [[package]]
 name = "aj-adapter-dsh"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-ir",
@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "aj-adapter-opencode"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-ir",
@@ -91,7 +91,7 @@ dependencies = [
 
 [[package]]
 name = "aj-adapter-workbuddy"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-ir",
@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "aj-app"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-backup",
@@ -128,7 +128,7 @@ dependencies = [
 
 [[package]]
 name = "aj-backup"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-store",
  "anyhow",
@@ -141,7 +141,7 @@ dependencies = [
 
 [[package]]
 name = "aj-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-backup",
@@ -160,7 +160,7 @@ dependencies = [
 
 [[package]]
 name = "aj-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-ir",
@@ -174,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "aj-ir"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "serde",
@@ -183,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "aj-report"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-core",
  "aj-ir",
@@ -200,7 +200,7 @@ dependencies = [
 
 [[package]]
 name = "aj-sources"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-adapter",
  "aj-adapter-antigravity",
@@ -216,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "aj-store"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aj-ir",
  "anyhow",
@@ -227,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "aj-update"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "semver",
