@@ -75,12 +75,15 @@ function listedEfforts(models: ModelInfo[] | null, id: string): string[] {
   return [...new Set(models.flatMap((m) => m.efforts))];
 }
 
+/** Highest temperature accepted (`aj_report::config::MAX_TEMPERATURE`). */
+const MAX_TEMPERATURE = 2;
+
 /** A temperature typed in the form: a number, null when blank, undefined when invalid. */
 function parseTemperature(text: string): number | null | undefined {
   const t = text.trim();
   if (!t) return null;
   const n = Number(t);
-  return Number.isFinite(n) ? n : undefined;
+  return Number.isFinite(n) && n >= 0 && n <= MAX_TEMPERATURE ? n : undefined;
 }
 
 function errText(err: unknown): string {
@@ -181,6 +184,9 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
   const [providerFetch, setProviderFetch] = useState<FetchState>(IDLE_FETCH);
   const [modelForm, setModelForm] = useState<ModelForm | null>(null);
   const [modelFetch, setModelFetch] = useState<FetchState>(IDLE_FETCH);
+  // Bumped by every model-form fetch and reset, so a slow list for a provider the form has
+  // since left (a CLI fetch starts by itself) cannot overwrite the current one.
+  const modelFetchSeq = useRef(0);
   const [modelFilter, setModelFilter] = useState("");
   const [browsing, setBrowsing] = useState<string | null>(null);
   const [browseFetch, setBrowseFetch] = useState<FetchState>(IDLE_FETCH);
@@ -291,15 +297,24 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
 
   // ---- model form ----
 
+  const resetModelFetch = () => {
+    modelFetchSeq.current += 1;
+    setModelFetch(IDLE_FETCH);
+  };
+
   const fetchForModelForm = async (providerName: string) => {
     const p = providerOf(providerName);
     if (!p) return;
+    const seq = ++modelFetchSeq.current;
+    const settle = (next: FetchState) => {
+      if (seq === modelFetchSeq.current) setModelFetch(next);
+    };
     setModelFetch(LOADING_FETCH);
     try {
       const models = await api.listProviderModels(p.name, providerToInput(p), null);
-      setModelFetch({ loading: false, models, error: null });
+      settle({ loading: false, models, error: null });
     } catch (e) {
-      setModelFetch({ loading: false, models: null, error: errText(e) });
+      settle({ loading: false, models: null, error: errText(e) });
     }
   };
 
@@ -308,7 +323,7 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
   const openModelForm = (
     init: Partial<ModelForm> & { provider: string },
   ) => {
-    setModelFetch(IDLE_FETCH);
+    resetModelFetch();
     setModelFilter("");
     setModelForm({
       originalAlias: null,
@@ -538,7 +553,7 @@ export function ModelsView({ onChanged }: ModelsViewProps) {
                   value={modelForm.provider}
                   onChange={(e) => {
                     const provider = e.target.value;
-                    setModelFetch(IDLE_FETCH);
+                    resetModelFetch();
                     setModelForm({ ...modelForm, provider });
                     if (isCliKind(providerOf(provider)?.kind)) void fetchForModelForm(provider);
                   }}
