@@ -57,18 +57,27 @@ All logic is in Rust libraries; the CLI and the desktop app are thin shells over
 
 ```text
 crates/
-  aj-ir/                  IR types and version (no IO)
-  aj-adapter/             SourceAdapter trait and shared helpers (line reading, zstd, text)
-  aj-adapter-<agent>/     one adapter per agent
-  aj-sources/             agent registry: session folders, detection, adapter construction
+  aj-ir/                  IR types and version, agent identifiers and their registry, the
+                          exchange format header (no IO)
+  aj-adapter/             SourceAdapter trait and shared helpers: line reading, zstd that
+                          tolerates an incomplete last frame, text (tag stripping, truncation),
+                          json (string fields, edit line counts), limits (truncation lengths)
+  aj-adapter-<agent>/     one adapter per agent: claude, codex, antigravity, dsh (DeepSeek
+                          Harness), workbuddy, opencode
+  aj-sources/             per agent: session folders, detection, adapter construction; the only
+                          map from agent to adapter
   aj-store/               SQLite persistence, migrations, queries, statistics queries
-  aj-core/                scanning, slicing, projects, dehydration, redaction, statistics
+  aj-core/                scanning, slicing, dehydration, redaction, statistics; projects split
+                          into rule matching (pure), Git detection (read only) and assignment
   aj-report/              digests, report generation, engines, anchors, export, human journal
-  aj-backup/              backup archives: export, validation, restore
-  aj-update/              update check against GitHub Releases
-  aj-cli/                 the `aj` command
+  aj-backup/              backup archives (export, validation, restore) and upgrading the
+                          database after one
+  aj-update/              update check against GitHub Releases: parsing and comparison (pure)
+                          plus one request
+  aj-cli/                 the `aj` command: main.rs defines and dispatches, cmd_* modules by area
 app/                      Tauri v2 + React desktop app (src/ front end, src-tauri/ shell)
 fixtures/                 redacted session samples and expected IR output
+website/                  the project site (static)
 ```
 
 Dependencies point one way: `aj-ir` ← adapters / `aj-store` ← `aj-core` ← `aj-report` ← `aj-cli`

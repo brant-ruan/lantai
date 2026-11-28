@@ -3,24 +3,26 @@
 What Lantai does today, what comes next, and what was set aside. The design of what exists is in
 [SPEC.md](SPEC.md); the formats of each agent are in [ADAPTERS.md](ADAPTERS.md).
 
-## Where it stands (0.1.0)
+## Where it stands (0.3.0)
 
 - **Sources:** Claude Code, Codex CLI, Antigravity, DeepSeek Harness, WorkBuddy and OpenCode 1.x,
   read into one versioned IR, with a compatibility check per source; agents are named by open
   identifiers, and `aj export` writes the IR exchange format.
-- **Models:** any OpenAI-compatible endpoint (with presets, local servers included) or the Claude
-  Code CLI, which is found on request; no model is built in. Common failures are explained.
+- **Models:** any OpenAI-compatible endpoint (with presets, local servers included), or the Claude
+  Code and Codex CLIs, found on request and run with the fewest tools each allows; no model is
+  built in. Reasoning effort and temperature per alias; digests and reports record which model
+  wrote them. Common failures are explained.
 - **Evening review:** a day's sessions laid out by project, assignment rules and suggestions,
   ignoring sessions, batch operations across days, a configurable day boundary.
 - **Reports:** daily, weekly and monthly reports as multi-level outlines with checked anchors;
-  cached digests, staleness detection and per-project updates; several prompts per report type;
-  Chinese and English reports.
+  cached digests, staleness detection and per-project updates; batch generation in every sidebar
+  list; several prompts per report type; Chinese and English reports.
 - **Human journal:** day notes, project notes, annotations on report points, project-page notes;
   marks where a person edited the model's text; source filter (both, agent only, human only);
   copy as Markdown.
 - **Around it:** project pages, a statistics dashboard (including token use), search over reports
-  and session text, backup and restore, a universal macOS app with the `aj` CLI inside, opt-in
-  update checks.
+  and session text, backup and restore, database upgrades that ask first and back up before
+  migrating, a universal macOS app with the `aj` CLI inside, opt-in update checks.
 
 ## Next
 

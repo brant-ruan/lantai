@@ -347,25 +347,7 @@ Everything lives in `~/Library/Application Support/lantai`: the database `journa
 
 ## Architecture
 
-Lantai is a Rust workspace with a thin Tauri + React shell. Each agent's format knowledge stays inside its adapter; everything above works on the versioned IR.
-
-```text
-crates/
-  aj-ir                 IR types and version, agent identifiers, exchange format (no I/O)
-  aj-adapter            SourceAdapter trait, streaming and zstd readers
-  aj-adapter-*          one adapter per agent: claude, codex, antigravity, dsh, workbuddy, opencode
-  aj-sources            registry: agent → session folders → adapter
-  aj-store              SQLite persistence and stats queries
-  aj-core               scanning, per-day slicing, redaction, project rules, stats
-  aj-report             digests, reports, engines, anchor validation, versions, export
-  aj-backup             backup archives
-  aj-update             update check against GitHub Releases
-  aj-cli                the `aj` command
-app/                    Tauri v2 desktop app (React + TypeScript)
-website/                lantai.wohin.me, plain static HTML
-```
-
-Dependencies point one way: `aj-ir` ← adapters / `aj-store` ← `aj-core` ← `aj-report` ← `aj-cli` / `app`.
+Lantai is a Rust workspace with a thin Tauri + React shell. Each agent's format knowledge stays inside its adapter; everything above works on the versioned IR. The crates, what each does and how they depend on each other are in [docs/SPEC.md](docs/SPEC.md), "Architecture".
 
 Documentation:
 

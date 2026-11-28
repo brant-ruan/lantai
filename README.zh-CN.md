@@ -347,25 +347,7 @@ stage2_chars = 60000               # 单次报告请求的素材上限
 
 ## 架构
 
-兰台是一个 Rust workspace，外加一层很薄的 Tauri + React 外壳。各家 Agent 的格式知识只留在各自的适配器里，之上的一切都基于有版本的 IR。
-
-```text
-crates/
-  aj-ir                 IR 类型与版本、Agent 标识、交换格式（无 IO）
-  aj-adapter            SourceAdapter 接口、流式与 zstd 读取
-  aj-adapter-*          每个 Agent 一个适配器：claude、codex、antigravity、dsh、workbuddy、opencode
-  aj-sources            注册表：Agent → 会话目录 → 适配器
-  aj-store              SQLite 持久化与统计查询
-  aj-core               扫描、按日切片、脱敏、项目规则、统计
-  aj-report             摘要、报告生成、生成引擎、锚点校验、版本、导出
-  aj-backup             备份归档
-  aj-update             检查 GitHub Releases 上的新版本
-  aj-cli                命令行 aj
-app/                    Tauri v2 桌面应用（React + TypeScript）
-website/                lantai.wohin.me，纯静态页面
-```
-
-依赖方向单向：`aj-ir` ← 适配器 / `aj-store` ← `aj-core` ← `aj-report` ← `aj-cli` / `app`。
+兰台是一个 Rust workspace，外加一层很薄的 Tauri + React 外壳。各家 Agent 的格式知识只留在各自的适配器里，之上的一切都基于有版本的 IR。各 crate 的职责与依赖关系见 [docs/SPEC.md](docs/SPEC.md) 的 "Architecture" 一节（英文）。
 
 文档（英文）：
 

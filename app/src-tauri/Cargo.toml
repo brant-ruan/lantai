@@ -8,21 +8,21 @@ license.workspace = true
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-aj-adapter = { path = "../../crates/aj-adapter" }
-aj-core = { path = "../../crates/aj-core" }
-aj-sources = { path = "../../crates/aj-sources" }
-aj-ir = { path = "../../crates/aj-ir" }
-aj-report = { path = "../../crates/aj-report" }
-aj-store = { path = "../../crates/aj-store" }
-aj-update = { path = "../../crates/aj-update" }
-anyhow = "1.0.104"
-chrono = "0.4.45"
-dirs = "7.0.0"
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
+aj-adapter.workspace = true
+aj-backup.workspace = true
+aj-core.workspace = true
+aj-sources.workspace = true
+aj-ir.workspace = true
+aj-report.workspace = true
+aj-store.workspace = true
+aj-update.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+dirs.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 tauri = { version = "2", features = [] }
 tauri-plugin-single-instance = "2"
-aj-backup = { path = "../../crates/aj-backup" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

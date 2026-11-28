@@ -5,14 +5,14 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-aj-core = { path = "../aj-core" }
-aj-ir = { path = "../aj-ir" }
-aj-store = { path = "../aj-store" }
-anyhow = "1.0.104"
-chrono = "0.4.45"
-regex = "1.13.1"
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
+aj-core.workspace = true
+aj-ir.workspace = true
+aj-store.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 sha2 = "0.11.1"
 toml = "1.2.1"
-ureq = { version = "3.5.2", features = ["json"] }
+ureq.workspace = true

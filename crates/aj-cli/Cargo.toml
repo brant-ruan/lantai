@@ -5,19 +5,19 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-aj-adapter = { path = "../aj-adapter" }
-aj-backup = { path = "../aj-backup" }
-aj-core = { path = "../aj-core" }
-aj-ir = { path = "../aj-ir" }
-aj-sources = { path = "../aj-sources" }
-aj-report = { path = "../aj-report" }
-aj-store = { path = "../aj-store" }
-anyhow = "1.0.104"
-chrono = "0.4.45"
+aj-adapter.workspace = true
+aj-backup.workspace = true
+aj-core.workspace = true
+aj-ir.workspace = true
+aj-sources.workspace = true
+aj-report.workspace = true
+aj-store.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
 clap = { version = "4.6.7", features = ["derive", "env"] }
-dirs = "7.0.0"
+dirs.workspace = true
 libc = "0.2.191"
-serde_json = "1.0.154"
+serde_json.workspace = true
 
 [[bin]]
 name = "aj"

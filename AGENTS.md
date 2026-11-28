@@ -96,24 +96,18 @@ decided by the owner.**
 
 ## Layout
 
-| Path | Responsibility |
-| :--- | :--- |
-| `crates/aj-ir` | IR types and version, agent identifiers and their registry, the exchange format header; no IO |
-| `crates/aj-adapter` | `SourceAdapter` and shared helpers (line reading, zstd that tolerates an incomplete last frame, `text` for tag stripping and truncation, `json` for string fields and edit line counts, `limits` for truncation lengths) |
-| `crates/aj-adapter-*` | one adapter per agent: `claude`, `codex`, `antigravity`, `dsh` (DeepSeek Harness), `workbuddy`, `opencode` |
-| `crates/aj-sources` | per agent: session folders, detection, adapter construction; the only map from agent to adapter |
-| `crates/aj-store` | SQLite persistence and statistics queries |
-| `crates/aj-core` | scanning, daily slices, dehydration and redaction, statistics; `project/` splits rule matching (pure), Git detection (read-only file system) and assignment |
-| `crates/aj-report` | digests, reports, engines, anchors, export, human journal |
-| `crates/aj-backup` | backup archives, and upgrading the database after one (file names passed in by callers) |
-| `crates/aj-update` | update check: parsing and comparison (pure) plus one request |
-| `crates/aj-cli` | `aj`: `main.rs` only defines and dispatches; commands live in `cmd_*` modules by area |
-| `app/` | Tauri v2 + React. `App.tsx` only composes views and cross-view actions; view state lives in `app/src/hooks/` (`useAppMetadata` for the lists every view shares, `usePeriodView` for day, week and month, `useProjectView`, `useStatsView`, …). `components/` keeps shared widgets at the top and groups the rest by area (`sidebar/`, `slices/`, `report/`, `project/`, `human/`, `stats/`, `settings/` with `settings/models/`). `storage.ts` wraps `localStorage`, `errors.ts` turns errors into text; styles are per area in `styles/`, imported in cascade order by `styles/index.css` |
-| `fixtures/` | redacted session samples and expected output |
-| `website/` | the project site (static); see [docs/WEBSITE.md](docs/WEBSITE.md) |
+The crates, what each does and the direction of dependencies (`aj-ir` ← adapters / `aj-store` ←
+`aj-core` ← `aj-report` ← `aj-cli` / `app`) are in [docs/SPEC.md](docs/SPEC.md), "Architecture";
+keep that tree current when adding or splitting a crate. Upper layers never read an agent's raw
+files.
 
-Dependencies: `aj-ir` ← adapters / `aj-store` ← `aj-core` ← `aj-report` ← `aj-cli` / `app`. Upper
-layers never read an agent's raw files.
+The desktop app (`app/`, Tauri v2 + React): `App.tsx` only composes views and cross-view actions;
+view state lives in `app/src/hooks/` (`useAppMetadata` for the lists every view shares,
+`usePeriodView` for day, week and month, `useProjectView`, `useStatsView`, …). `components/` keeps
+shared widgets at the top and groups the rest by area (`sidebar/`, `slices/`, `report/`, `project/`,
+`human/`, `stats/`, `settings/` with `settings/models/`). `storage.ts` wraps `localStorage`,
+`errors.ts` turns errors into text; styles are per area in `styles/`, imported in cascade order by
+`styles/index.css`. The website (`website/`) is described in [docs/WEBSITE.md](docs/WEBSITE.md).
 
 ## Non-obvious notes
 
@@ -137,44 +131,26 @@ What the code does not make obvious. The design behind each is in the spec.
   Never diff against "the latest generated version" as a whole: Update copies edited sections into
   generated versions. Line numbers refer to the displayed Markdown (rewritten title, sections
   reordered).
-- **Human journal, data:** nodes in `human_nodes`, read and written by `aj-store/src/human.rs`;
-  positions, moves and annotation attachment in `aj_report::human` (`attach.rs` is pure and
-  reattaches at read time by anchors and text, never writing back); sort keys from
-  `aj_core::order`. Human content is not sent to models, not counted in statistics, not exported
-  yet. App commands take a scope (a period, or a project page plus granularity, handled in
-  `aj_report::human::project`, which translates changes to the node's own period) and return all
-  nodes of the scope after each change; the front end's `useHumanJournal` queues changes so a
-  structural change never overtakes an unsaved edit. Project-page notes use `period_kind =
-  "project"` and the project ID as `period_key` (`aj_report::human::PROJECT_PAGE`).
-- **Human journal, positions:** a project note's `position` (`aj_store::HumanPosition`, top or
-  bottom) is part of its sibling group; children copy the root. Only a root's Alt+↑/↓ crosses
-  groups (`set_human_position` moves the subtree). Day notes, annotations and project-page notes
-  are always bottom.
-- **Human journal, dragging** (`hooks/useNoteDrag.ts`): groups declare themselves drop zones
-  through `HumanBlocks`' `zone` (empty groups show a placeholder while dragging); the drop is
-  computed from row positions and a 30 px indent step (matching `.human-children`) into
-  `aj_report::human::Drop`; the back end's `move_to` moves several blocks in one transaction and
-  checks same period, same project, and annotations only within one point. The drag handle's
-  mousedown must `stopPropagation`, or marquee selection takes it. During drags and marquee
-  selection `hooks/pointerDrag.ts` adds `is-pointer-dragging` to the body and report content takes
-  no pointer events (WebKit otherwise leaves hover styles on rows the pointer crossed), so hit tests
-  compare rectangles and cannot use `elementFromPoint`.
-- **Human journal, spacing:** note rows and report rows both use 2 px margin plus 4 px padding. On
-  the project page the report body is in a flex container where margins do not collapse, so
-  `styles/human.css` zeroes them under `.rollup-entry`; measure both places when changing spacing.
-- **Human journal, marquee and undo** (`hooks/useNoteMarquee.tsx`) is the one exception to
-  "shortcuts live only on the menu": it handles Backspace / Delete / Esc / Cmd+Z only when focus is
-  not in an input; undo inside an editor belongs to the editor. Delete commands return the deleted
-  rows for undo. It prevents default on mousedown in report whitespace (to avoid selecting text
-  while dragging), so focus never leaves the editor and it must blur the editor itself.
-- **Human journal, remounting:** when the block being edited unmounts (a report finishes and the
-  view remounts), `HumanBlocks.tsx`'s layout cleanup saves the draft and the caret; the same block
-  remounting in the same commit resumes editing in its layout effect. The new copy renders before
-  the old one's cleanup runs, so restoring cannot happen in a `useState` initializer.
-- **Human journal, hover buttons:** "Annotate" on report points and × on notes float absolutely
-  at the end of the line with an opaque background, taking no width and no height. Do not turn them
-  back into a column: line spacing and wrapping would then differ between source filters. "Expand
-  details" controls both the report outline and note folding (`hooks/useDetailsToggle.ts`).
+- **Human journal:** storage, sibling groups, positions, scopes, the project page, dragging and
+  undo are designed in `docs/SPEC.md`, "Human journal". Human content is not sent to models, not
+  counted in statistics and not exported yet. What the code adds:
+  - Dragging (`hooks/useNoteDrag.ts`) computes the drop from row positions and a 30 px indent
+    step, matching `.human-children`. The drag handle's mousedown must `stopPropagation`, or
+    marquee selection takes it. While a drag or a marquee lasts, `hooks/pointerDrag.ts` adds
+    `is-pointer-dragging` to the body, so `elementFromPoint` cannot be used.
+  - Note rows and report rows both use 2 px margin plus 4 px padding. On the project page margins
+    do not collapse in the flex container, so `styles/human.css` zeroes them under
+    `.rollup-entry`; measure both places when changing spacing.
+  - The marquee (`hooks/useNoteMarquee.tsx`) is the one exception to "shortcuts live only on the
+    menu": it handles Backspace / Delete / Esc / Cmd+Z only when focus is not in an input. It
+    prevents default on mousedown in report whitespace, so focus never leaves the editor and it
+    must blur the editor itself.
+  - Surviving a remount: `HumanBlocks.tsx` saves the draft and caret in a layout cleanup and
+    resumes in the layout effect. The new copy renders before the old one's cleanup runs, so
+    restoring cannot happen in a `useState` initializer.
+  - "Annotate" and × float over the line end; do not turn them back into a column, or spacing
+    and wrapping differ between source filters. "Expand details" controls both the report
+    outline and note folding (`hooks/useDetailsToggle.ts`).
 - **Copy:** the copy buttons build Markdown synchronously on click
   (`components/human/journalMarkdown.ts`; clipboard writes cannot follow an `await`). Where notes
   go is computed in `components/human/layout.ts`, shared by `HumanLayer.tsx`, `ProjectNotes.tsx`

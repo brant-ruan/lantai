@@ -5,12 +5,10 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-aj-adapter = { path = "../aj-adapter" }
-aj-ir = { path = "../aj-ir" }
-anyhow = "1.0.104"
-chrono = "0.4.45"
-rusqlite = { version = "0.43.0", features = ["bundled"] }
-serde_json = "1.0.154"
+aj-adapter.workspace = true
+aj-ir.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+rusqlite.workspace = true
+serde_json.workspace = true
 
-[dev-dependencies]
-serde_json = "1.0.154"
