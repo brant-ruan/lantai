@@ -3,7 +3,7 @@
 What Lantai does today, what comes next, and what was set aside. The design of what exists is in
 [SPEC.md](SPEC.md); the formats of each agent are in [ADAPTERS.md](ADAPTERS.md).
 
-## Where it stands (0.3.0)
+## Where it stands (0.4.0)
 
 - **Sources:** Claude Code, Codex CLI, Antigravity, DeepSeek Harness, WorkBuddy and OpenCode 1.x,
   read into one versioned IR, with a compatibility check per source; agents are named by open

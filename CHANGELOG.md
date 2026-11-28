@@ -14,6 +14,10 @@ stored data or exported IR is affected:
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-28
+
+IR 0.3.0 · Schema 12.
+
 ### Breaking
 
 - **`aj report show` prints a report as the app shows it:** the program's title and project
@@ -160,7 +164,8 @@ The first public release. IR 0.3.0 · Schema 11.
   off by default; when on, Lantai only reads GitHub's public release list and never downloads or
   installs anything.
 
-[Unreleased]: https://github.com/brant-ruan/lantai/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/brant-ruan/lantai/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/brant-ruan/lantai/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/brant-ruan/lantai/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/brant-ruan/lantai/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/brant-ruan/lantai/releases/tag/v0.1.0
