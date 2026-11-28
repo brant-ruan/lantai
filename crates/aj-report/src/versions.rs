@@ -86,6 +86,27 @@ pub fn shown_versions(
         .collect())
 }
 
+/// A report's text as it is shown (see [`display_markdown`]), for printing or writing a report
+/// outside the app. Reports other than period reports come back as they are.
+pub fn display_text(
+    store: &Store,
+    kind: &str,
+    period: &str,
+    markdown: &str,
+    language: &str,
+) -> Result<String> {
+    if !is_period_report(kind) {
+        return Ok(markdown.to_string());
+    }
+    Ok(display_markdown(
+        kind,
+        period,
+        markdown,
+        language,
+        &project_order(store)?,
+    ))
+}
+
 /// The models that wrote a version's sections, with the projects named as they are now.
 fn writers(store: &Store, version: &ReportVersionRow) -> Result<Vec<ShownWriter>> {
     let manifest = version.input_manifest.as_deref().and_then(Manifest::parse);
@@ -206,6 +227,23 @@ mod tests {
                 engine: Some("model-a".into()),
                 projects: vec![],
             }]
+        );
+    }
+
+    #[test]
+    fn display_text_matches_the_shown_version() {
+        let mut store = Store::open_in_memory().unwrap();
+        store.create_project("Beta", None).unwrap();
+        store.create_project("Alpha", None).unwrap();
+        let stored = "# Model title\n\n## Alpha\n\n- a point\n\n## Beta\n\n- b point\n";
+        generated(&mut store, stored);
+        let shown = shown_versions(&store, KIND_DAILY, "2026-11-16", None).unwrap();
+        let text = display_text(&store, KIND_DAILY, "2026-11-16", stored, "en").unwrap();
+        assert_eq!(text, shown[0].markdown);
+        // Reports without a display form come back unchanged.
+        assert_eq!(
+            display_text(&store, "other", "2026-11-16", stored, "en").unwrap(),
+            stored
         );
     }
 

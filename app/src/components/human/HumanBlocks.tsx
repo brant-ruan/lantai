@@ -16,12 +16,8 @@ import type { HumanNode } from "../../types";
 import { HumanMarkdown, insideCodeFence, type JournalLinkHandlers } from "./HumanMarkdown";
 import { NoteToggle } from "./NoteToggle";
 import { useNoteCollapse } from "../../hooks/useNoteCollapse";
-import {
-  startNoteDrag,
-  useNoteDragState,
-  zoneAccepts,
-  type DropZone,
-} from "../../hooks/useNoteDrag";
+import { startNoteDrag, useNoteDragState } from "../../hooks/useNoteDrag";
+import { zoneAccepts, type DropZone } from "./noteDrop";
 
 /** Whether `id` is `root` or lies below it. */
 function within(journal: HumanJournal, root: number, id: number): boolean {

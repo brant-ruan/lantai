@@ -18,7 +18,7 @@ import {
   OrphanedAnnotations,
 } from "./parts";
 import type { JournalLinkHandlers } from "./HumanMarkdown";
-import type { DropZone } from "../../hooks/useNoteDrag";
+import type { DropZone } from "./noteDrop";
 import { assignableProjects } from "../../projectOptions";
 import { periodLayout, pointText, type ProjectRef } from "./layout";
 

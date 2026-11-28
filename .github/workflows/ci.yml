@@ -32,10 +32,11 @@ jobs:
           cache-dependency-path: app/package-lock.json
 
       # The Tauri crate embeds app/dist at compile time, so the frontend is built first.
-      - name: Frontend type check and build
+      - name: Frontend type check, tests and build
         working-directory: app
         run: |
           npm ci
+          npm test
           npm run build
 
       - uses: dtolnay/rust-toolchain@stable

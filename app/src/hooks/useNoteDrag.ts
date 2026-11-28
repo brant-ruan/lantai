@@ -8,23 +8,20 @@
 // Groups declare themselves with a `zone` (see `HumanBlocks`): the notes at one end of a
 // project's section (or the day's notes, or a project page's own notes), or the annotations on
 // one point. Blocks only move within their period and project, and annotations only among the
-// annotations on their point.
+// annotations on their point. Which gap and move the pointer stands for is decided in
+// `components/human/noteDrop.ts`.
 import type React from "react";
 import { useSyncExternalStore } from "react";
 import type { HumanJournal } from "./useHumanJournal";
-import type { HumanDrop, HumanNode, HumanPosition } from "../types";
+import type { HumanDrop, HumanNode } from "../types";
 import { setPointerDrag } from "./pointerDrag";
-
-/** A group blocks can be dropped into. */
-export type DropZone =
-  | {
-      kind: "notes";
-      projectId: number | null;
-      position: HumanPosition;
-      /** The period the group belongs to, where a view shows several (a project page). */
-      period?: string;
-    }
-  | { kind: "annotations"; key: string; period?: string };
+import {
+  dropFor,
+  dropGap,
+  zoneAccepts,
+  type DropRow,
+  type DropZone,
+} from "../components/human/noteDrop";
 
 /** What is being dragged: the blocks moving (with everything under them) and their kind. */
 export interface NoteDragState {
@@ -63,16 +60,6 @@ export function useNoteDragState(): NoteDragState | null {
   return useSyncExternalStore(subscribe, () => state);
 }
 
-/** Whether blocks of `family` may be dropped in `zone`. */
-export function zoneAccepts(zone: DropZone, family: DropZone): boolean {
-  if (zone.period !== undefined && family.period !== undefined && zone.period !== family.period) {
-    return false;
-  }
-  if (zone.kind === "notes" && family.kind === "notes") return zone.projectId === family.projectId;
-  if (zone.kind === "annotations" && family.kind === "annotations") return zone.key === family.key;
-  return false;
-}
-
 /** The key of the group an annotation shows in. */
 export function annotationKey(journal: HumanJournal, id: number): string {
   const p = journal.placementOf.get(id);
@@ -89,12 +76,6 @@ function familyOf(journal: HumanJournal, node: HumanNode): DropZone {
 
 function sameFamily(a: DropZone, b: DropZone): boolean {
   return a.period === b.period && zoneAccepts(a, b);
-}
-
-interface Row {
-  id: number;
-  depth: number;
-  rect: DOMRect;
 }
 
 interface Target {
@@ -162,36 +143,18 @@ export function startNoteDrag(e: React.MouseEvent, nodeId: number, journal: Huma
     frame = requestAnimationFrame(tick);
   };
 
-  const rowsOf = (zone: HTMLElement): Row[] => {
+  const rowsOf = (zone: HTMLElement): DropRow[] => {
     const moving = state?.moving ?? new Set<number>();
-    const rows: Row[] = [];
+    const rows: DropRow[] = [];
     zone.querySelectorAll<HTMLElement>("[data-note-id]").forEach((el) => {
       const id = Number(el.dataset.noteId);
       if (moving.has(id)) return;
       let depth = 0;
       for (let p = parentOf(id); p !== null; p = parentOf(p)) depth += 1;
-      rows.push({ id, depth, rect: el.getBoundingClientRect() });
+      const rect = el.getBoundingClientRect();
+      rows.push({ id, depth, top: rect.top, bottom: rect.bottom });
     });
     return rows;
-  };
-
-  /** The drop for a gap after `prev` (none: the start of the group) at `depth`. */
-  const dropAt = (zone: DropZone, prev: Row | null, depth: number): HumanDrop => {
-    if (prev && depth === prev.depth + 1) return { type: "children", parent: prev.id, after: null };
-    // The ancestor of `prev` at `depth`: the block the dragged ones go right after.
-    let after: number | null = null;
-    if (prev) {
-      let id = prev.id;
-      for (let d = prev.depth; d > depth; d -= 1) id = parentOf(id) ?? id;
-      after = id;
-    }
-    if (depth > 0 && after !== null) {
-      return { type: "children", parent: parentOf(after)!, after };
-    }
-    if (zone.kind === "notes") {
-      return { type: "notes", projectId: zone.projectId, position: zone.position, after };
-    }
-    return { type: "annotations", with: ids[0], after };
   };
 
   const zoneData = (el: HTMLElement): DropZone => JSON.parse(el.dataset.dropZone ?? "{}");
@@ -227,24 +190,18 @@ export function startNoteDrag(e: React.MouseEvent, nodeId: number, journal: Huma
     const zone = zoneData(zoneEl);
     const box = zoneEl.getBoundingClientRect();
     const rows = rowsOf(zoneEl);
-    const next = rows.findIndex((r) => r.rect.top + r.rect.height / 2 > pointer.y);
-    const gap = next === -1 ? rows.length : next;
-    const prev = gap > 0 ? rows[gap - 1] : null;
-    const after = gap < rows.length ? rows[gap] : null;
-    const min = after ? after.depth : 0;
-    const max = prev ? prev.depth + 1 : 0;
     const wanted = Math.round((pointer.x - (box.left + BOX_PAD + 17)) / INDENT);
-    const depth = snapped ? min : Math.max(min, Math.min(max, wanted));
+    const { prev, after, depth } = dropGap(rows, pointer.y, wanted, snapped);
     const y = prev && after
-      ? (prev.rect.bottom + after.rect.top) / 2
+      ? (prev.bottom + after.top) / 2
       : prev
-        ? prev.rect.bottom + 1
+        ? prev.bottom + 1
         : after
-          ? after.rect.top - 1
+          ? after.top - 1
           : box.top + box.height / 2;
     const x = box.left + BOX_PAD + 3 + depth * INDENT;
     return {
-      drop: dropAt(zone, prev, depth),
+      drop: dropFor(zone, prev, depth, parentOf, ids[0]),
       zone: zoneEl,
       empty: rows.length === 0,
       x,

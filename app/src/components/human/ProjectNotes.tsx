@@ -9,7 +9,7 @@ import type { HumanNode, HumanPosition, RollupGranularity } from "../../types";
 import { entryLayout, pageNotesOf, PERIOD_KIND } from "./layout";
 import { HumanBlocks } from "./HumanBlocks";
 import type { JournalLinkHandlers } from "./HumanMarkdown";
-import type { DropZone } from "../../hooks/useNoteDrag";
+import type { DropZone } from "./noteDrop";
 import {
   AddNoteButton,
   AnnotateButton,

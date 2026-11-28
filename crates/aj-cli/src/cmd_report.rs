@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use aj_report::monthly::generate_monthly;
 use aj_report::period::{Month, Week};
 use aj_report::prompt_library::{KIND_DAILY, KIND_MONTHLY, KIND_WEEKLY};
+use aj_report::versions::{display_text, shown_versions};
 use aj_report::weekly::generate_weekly;
 use aj_report::{generate_daily, ReportMode, ReportOptions, DEFAULT_CONCURRENCY};
-use aj_store::ReportVersionRow;
 use anyhow::{bail, Context, Result};
 use chrono::Local;
 use clap::Subcommand;
@@ -145,8 +145,12 @@ pub(crate) enum ReportKind {
         #[arg(long)]
         version: Option<u64>,
         /// Print the prompt the version was generated with instead of the report
-        #[arg(long)]
+        #[arg(long, conflicts_with = "raw")]
         prompt: bool,
+        /// Print the text as stored instead of as the app shows it (the generated title,
+        /// project sections in the order they were written)
+        #[arg(long)]
+        raw: bool,
     },
 }
 
@@ -242,7 +246,8 @@ pub(crate) fn cmd_report(app: &mut App, kind: ReportKind) -> Result<()> {
             project,
         } => {
             let (kind, period) = resolve_period(app, date, week, month)?;
-            let versions = report_versions(app, kind, &period, project.as_deref())?;
+            let project_id = project_id(app, project.as_deref())?;
+            let versions = app.store.report_versions(kind, &period, project_id)?;
             if versions.is_empty() {
                 println!("No {kind} report for {period} yet.");
             }
@@ -268,12 +273,14 @@ pub(crate) fn cmd_report(app: &mut App, kind: ReportKind) -> Result<()> {
             project,
             version,
             prompt,
+            raw,
         } => {
             let (kind, period) = resolve_period(app, date, week, month)?;
-            let versions = report_versions(app, kind, &period, project.as_deref())?;
+            let project_id = project_id(app, project.as_deref())?;
+            let versions = shown_versions(&app.store, kind, &period, project_id)?;
             let chosen = match version {
-                Some(n) => versions.into_iter().find(|v| v.number == n),
-                None => versions.into_iter().find(|v| v.is_current),
+                Some(n) => versions.into_iter().find(|v| v.version.number == n),
+                None => versions.into_iter().find(|v| v.version.is_current),
             };
             let Some(v) = chosen else {
                 bail!("no such report version for {period}; see `aj report history`");
@@ -281,10 +288,13 @@ pub(crate) fn cmd_report(app: &mut App, kind: ReportKind) -> Result<()> {
             if prompt {
                 println!(
                     "{}",
-                    v.prompt_snapshot
+                    v.version
+                        .prompt_snapshot
                         .as_deref()
                         .unwrap_or("(no prompt recorded)")
                 );
+            } else if raw {
+                println!("{}", v.version.markdown);
             } else {
                 println!("{}", v.markdown);
             }
@@ -293,17 +303,12 @@ pub(crate) fn cmd_report(app: &mut App, kind: ReportKind) -> Result<()> {
     }
 }
 
-fn report_versions(
-    app: &App,
-    kind: &str,
-    period: &str,
-    project: Option<&str>,
-) -> Result<Vec<ReportVersionRow>> {
-    let project_id = project
+/// The ID of the project named by `--project`, if one was given.
+fn project_id(app: &App, project: Option<&str>) -> Result<Option<i64>> {
+    Ok(project
         .map(|p| app.store.require_project(p))
         .transpose()?
-        .map(|p| p.id);
-    app.store.report_versions(kind, period, project_id)
+        .map(|p| p.id))
 }
 
 /// The week given, or the week of the date given (today by default).
@@ -360,14 +365,22 @@ fn cmd_report_monthly(
     let r = generate_monthly(&mut app.store, engine.as_ref(), &Local, &opts, &mut |msg| {
         eprintln!("{msg}")
     })?;
-    println!("{}", r.markdown);
     if opts.dry_run {
+        println!("{}", r.markdown);
         eprintln!(
             "\n[preview] {} weekly report(s) ({} slices, {} ignored); {} chars of requests. No model was called.",
             r.weeks_used, r.slices_used, r.slices_ignored, r.stage2_prompt_chars
         );
         return Ok(());
     }
+    let shown = display_text(
+        &app.store,
+        KIND_MONTHLY,
+        &opts.period.key(),
+        &r.markdown,
+        opts.language.tag,
+    )?;
+    println!("{shown}");
     eprintln!(
         "\n{} weekly report(s) ({} slices, {} ignored); {} chars of requests; {} anchors, {} invalid ones removed; {:.0}s",
         r.weeks_used,
@@ -390,7 +403,7 @@ fn cmd_report_monthly(
     for w in &r.warnings {
         eprintln!("  warning: {w}");
     }
-    write_out(out, &r.markdown)
+    write_out(out, &shown)
 }
 
 fn cmd_report_weekly(
@@ -404,14 +417,22 @@ fn cmd_report_weekly(
     let r = generate_weekly(&mut app.store, engine.as_ref(), &Local, &opts, &mut |msg| {
         eprintln!("{msg}")
     })?;
-    println!("{}", r.markdown);
     if opts.dry_run {
+        println!("{}", r.markdown);
         eprintln!(
             "\n[preview] {} slices ({} ignored), {} with a cached digest; {} chars of requests. No model was called.",
             r.slices_used, r.slices_ignored, r.stage1.digests_cached, r.stage2_prompt_chars
         );
         return Ok(());
     }
+    let shown = display_text(
+        &app.store,
+        KIND_WEEKLY,
+        &opts.period.key(),
+        &r.markdown,
+        opts.language.tag,
+    )?;
+    println!("{shown}");
     eprintln!(
         "\n{} slices ({} ignored): {} digests generated, {} cached; {} project-day(s) clustered ({} cached); {} chars of requests; {} anchors, {} invalid ones removed; {:.0}s",
         r.slices_used,
@@ -437,7 +458,7 @@ fn cmd_report_weekly(
     for w in &r.warnings {
         eprintln!("  warning: {w}");
     }
-    write_out(out, &r.markdown)
+    write_out(out, &shown)
 }
 
 fn cmd_report_daily(
@@ -451,14 +472,22 @@ fn cmd_report_daily(
         eprintln!("{msg}")
     })?;
 
-    println!("{}", r.markdown);
     if opts.dry_run {
+        println!("{}", r.markdown);
         eprintln!(
             "\n[preview] {} slices ({} ignored), {} with a cached digest; {} chars of material. No model was called.",
             r.slices_used, r.slices_ignored, r.stage1.digests_cached, r.stage2_prompt_chars
         );
         return Ok(());
     }
+    let shown = display_text(
+        &app.store,
+        KIND_DAILY,
+        &opts.period,
+        &r.markdown,
+        opts.language.tag,
+    )?;
+    println!("{shown}");
     eprintln!(
         "\n{} slices ({} ignored): {} digests generated, {} updated incrementally, {} cached, {} short slices passed through; {} anchors, {} invalid ones removed",
         r.slices_used,
@@ -500,7 +529,7 @@ fn cmd_report_daily(
     for w in &r.warnings {
         eprintln!("  warning: {w}");
     }
-    write_out(out, &r.markdown)
+    write_out(out, &shown)
 }
 
 /// What the user asked for on the command line; budgets and the engine come from the config file.

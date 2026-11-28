@@ -441,6 +441,13 @@ aj migrate [--backup-dir D]           back up and upgrade a database from an old
 aj doctor                             parse health and source status
 ```
 
+The command line shows what the app shows. `aj days` lists days as the date list does: days whose
+slices are all ignored are left out, each day's count and active time cover only the slices that
+take part in reports (active time counting overlapping sessions once), and the ignored slices are
+counted separately. A report printed by `aj report show`, or by a generation and written with
+`--out`, is in its display form (the program's title, project sections in sidebar order; see
+[Reading reports](#reading-reports)); `aj report show --raw` prints the stored text instead.
+
 ## Search
 
 **Two layers, one box.** Searching reports answers "when and in which project did I do X";

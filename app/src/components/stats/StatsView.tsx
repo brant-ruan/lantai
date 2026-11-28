@@ -62,7 +62,8 @@ export function StatsView({
     : stats
       ? s.upTo(stats.untilDate)
       : "";
-  // Changing the range or the filter starts the charts afresh (no stale hover, list collapsed).
+  // Changing the range or the filter starts the charts afresh (no stale hover, list collapsed);
+  // each keyed sibling needs its own key.
   const resetKey = `${range}|${includeIgnored}`;
 
   return (
@@ -121,7 +122,7 @@ export function StatsView({
           <div className="stats-container">
             <StatsKpis stats={stats} />
             <TrendChart
-              key={resetKey}
+              key={`trend|${resetKey}`}
               stats={stats}
               series={series}
               hoveredSeriesKey={hoveredSeriesKey}
@@ -130,7 +131,7 @@ export function StatsView({
               onJumpToWeek={onJumpToWeek}
             />
             <StatsDistribution
-              key={resetKey}
+              key={`projects|${resetKey}`}
               stats={stats}
               series={series}
               hoveredSeriesKey={hoveredSeriesKey}

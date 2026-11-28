@@ -73,11 +73,16 @@ pub(crate) fn cmd_reslice(app: &mut App) -> Result<()> {
     Ok(())
 }
 
+/// Recent days as the app's date list shows them: days with only ignored slices are left out,
+/// and active time counts overlapping sessions once.
 pub(crate) fn cmd_days(app: &App, limit: u32) -> Result<()> {
-    for (date, slices, minutes) in app.store.dates_with_activity(limit)? {
+    for day in aj_core::overview::day_overviews(&app.store, false)?
+        .into_iter()
+        .take(limit as usize)
+    {
         println!(
-            "{date}  {slices:>3} slices  {:>4} active min (summed over sessions)",
-            minutes
+            "{}  {:>3} slices  {:>3} ignored  {:>4} active min",
+            day.local_date, day.slices, day.ignored_slices, day.active_minutes
         );
     }
     Ok(())

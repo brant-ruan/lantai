@@ -116,7 +116,8 @@ What the code does not make obvious. The design behind each is in the spec.
 - **Report pipeline:** versions, input manifests, staleness and Update for daily, weekly and monthly
   reports are shared in `aj-report/src/report_io.rs`, as are their run options (`ReportOptions<P>`,
   where only the period type differs); `daily/`, `weekly/` and `monthly/` only orchestrate. Showing
-  versions and saving a user's edit are `aj_report::versions`. Stage 1's worker pool is `stage1.rs`;
+  versions and saving a user's edit are `aj_report::versions`; `aj` prints reports in the same
+  display form (`versions::display_text`). Stage 1's worker pool is `stage1.rs`;
   only the main thread touches the database. Titles come from `structure::report_title` (rewritten
   on validation and on read; the model's title is dropped); weekly and monthly stats lines (`> `)
   come from `report_io::stats_line`. Daily generation checks each new section's anchors against that
@@ -134,8 +135,8 @@ What the code does not make obvious. The design behind each is in the spec.
 - **Human journal:** storage, sibling groups, positions, scopes, the project page, dragging and
   undo are designed in `docs/SPEC.md`, "Human journal". Human content is not sent to models, not
   counted in statistics and not exported yet. What the code adds:
-  - Dragging (`hooks/useNoteDrag.ts`) computes the drop from row positions and a 30 px indent
-    step, matching `.human-children`. The drag handle's mousedown must `stopPropagation`, or
+  - Dragging (`hooks/useNoteDrag.ts`) measures row positions and a 30 px indent step, matching
+    `.human-children`; `components/human/noteDrop.ts` turns them into the drop. The drag handle's mousedown must `stopPropagation`, or
     marquee selection takes it. While a drag or a marquee lasts, `hooks/pointerDrag.ts` adds
     `is-pointer-dragging` to the body, so `elementFromPoint` cannot be used.
   - Note rows and report rows both use 2 px margin plus 4 px padding. On the project page margins
@@ -245,8 +246,8 @@ What the code does not make obvious. The design behind each is in the spec.
   has a fixed width (584 px); measure in WebKit after changing the text.
 - **Active time** summed across sessions always takes the union of intervals
   (`aj_core::slice::union_minutes`), never the sum of slices' `active_minutes`, or parallel
-  sessions count twice. The sidebar's date list uses `aj_core::overview::day_overviews`; the
-  store's `day_counts` has no active time for that reason.
+  sessions count twice. The sidebar's date list and `aj days` use
+  `aj_core::overview::day_overviews`; the store's `day_counts` has no active time for that reason.
 - **Slice conditions in SQL** (included in reports, effective project, unassigned) are written
   once in `aj-store/src/sql.rs` and mirror `SliceRow::is_ignored` and `effective_project`;
   change both together. `Store::project_summaries` counts over every slice; use
@@ -293,7 +294,14 @@ What the code does not make obvious. The design behind each is in the spec.
   `CHANGELOG.md`; bumping `IR_VERSION` or `SCHEMA_VERSION` updates that section's "IR x · Schema
   y" line and adds what users must do under Breaking.
 - **Before committing:** `cargo fmt --all`, `cargo clippy --workspace --all-targets` (no
-  warnings), `cargo test --workspace`; for front-end changes also `npx tsc --noEmit` in `app/`.
+  warnings), `cargo test --workspace`; for front-end changes also `npx tsc --noEmit` and
+  `npm test` in `app/`.
+- **Front-end tests** (vitest, `*.test.ts` next to the code) cover pure logic only, no
+  components and no end-to-end runs: note placement and copying (`components/human/layout.ts`,
+  `journalMarkdown.ts`, shared data in `fixture.ts` and `testing.ts`), where dragged notes land
+  (`components/human/noteDrop.ts`, kept apart from the DOM work in `hooks/useNoteDrag.ts` for
+  this), and assignment menus (`projectOptions.ts`). Logic worth a test moves into a pure
+  module first.
 - **Tauri commands** that touch the database or call a model are `#[tauri::command(async)]` or
   `async fn`: synchronous commands run on the main thread in Tauri v2, and a query or a wait on the
   write lock (`busy_timeout` of 15 seconds) would freeze the UI. Only commands that need the main

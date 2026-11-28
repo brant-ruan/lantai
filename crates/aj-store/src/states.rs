@@ -51,8 +51,9 @@ macro_rules! stored_enum {
         }
 
         impl std::fmt::Display for $name {
+            /// The stored text, honouring width and alignment (`{:<10}`) as a `&str` would.
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str(self.as_str())
+                f.pad(self.as_str())
             }
         }
 
@@ -175,6 +176,13 @@ mod tests {
             err,
             "invalid slice ignore state \"x\"; expected one of inherit, ignored, included"
         );
+    }
+
+    #[test]
+    fn display_pads_like_the_stored_text() {
+        // CLI tables align columns with `{:<n}`; a value must take the width its text would.
+        assert_eq!(format!("{:<10}|", ReportOrigin::Generated), "generated |");
+        assert_eq!(format!("{:>6}|", ReportStatus::Final), " final|");
     }
 
     #[test]

@@ -326,19 +326,6 @@ impl Store {
         Ok(())
     }
 
-    pub fn dates_with_activity(&self, limit: u32) -> Result<Vec<(String, u64, i64)>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT local_date, COUNT(*), SUM(active_minutes) FROM session_daily_slices
-             GROUP BY local_date ORDER BY local_date DESC LIMIT ?1",
-        )?;
-        let rows = stmt
-            .query_map([limit], |r| {
-                Ok((r.get(0)?, r.get::<_, i64>(1)? as u64, r.get(2)?))
-            })?
-            .collect::<rusqlite::Result<_>>()?;
-        Ok(rows)
-    }
-
     /// Every day with slices, newest first. Without `include_ignored`, days whose slices are
     /// all ignored are left out.
     pub fn day_counts(&self, include_ignored: bool) -> Result<Vec<DayCounts>> {

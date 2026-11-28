@@ -14,8 +14,20 @@ stored data or exported IR is affected:
 
 ## [Unreleased]
 
+### Breaking
+
+- **`aj report show` prints a report as the app shows it:** the program's title and project
+  sections in your sidebar order. A report generated with `aj report daily` / `weekly` /
+  `monthly` is printed and written with `--out` in the same form; `--dry-run` output is
+  unchanged. If a script of yours needs the text as stored (what `aj report show` printed
+  before), add `--raw`.
+
 ### Fixed
 
+- `aj days` matches the app's date list: days whose sessions are all ignored are left out,
+  slice counts and active time leave ignored slices out, and active time counts overlapping
+  sessions once instead of adding them up (so it can be lower than before). A new column counts
+  the day's ignored slices.
 - Creating a project with rules, or adding several rules at once (in the app or with `aj project
   new` / `aj rule add`), no longer leaves a partial result when one rule is invalid or already
   exists: nothing is created.
